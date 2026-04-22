@@ -19,3 +19,38 @@ tests/uvm/vc_hdrs.h
 __pycache__
 # downloaded bitstreams
 fpga/bitstreams
+
+# Synopsys DC generated files
+dc/v1-dc/outputs/
+dc/v1-dc/reports/
+dc/v1-dc/run/work/
+dc/v1-dc/run/alib-52/
+dc/v1-dc/run/dc.*
+dc/v1-dc/run/*.log
+dc/v1-dc/run/*.out
+dc/v1-dc/run/*.svf
+dc/v1-dc/run/*.svf.*
+dc/v1-dc/run/command.log
+dc/v1-dc/run/elaborate.log
+dc/v1-dc/run/filenames.log
+
+# VCS / Verdi generated files
+vcs/simv
+vcs/simv.daidir/
+vcs/csrc/
+vcs/*.fsdb
+vcs/*.vcd
+vcs/*.vpd
+vcs/*.log
+vcs/ucli.key
+vcs/verdiLog/
+vcs/*.key
+vcs/*.daidir/
+
+# cycle_counter
+tests/cocotb/cycle_counter/rvv/cov.vdb
+tests/cocotb/cycle_counter/scalar/cov.vdb
+tests/cocotb/cycle_counter/rvv/simv.daidir
+tests/cocotb/cycle_counter/scalar/simv.daidir
+tests/cocotb/cycle_counter/rvv/simv.vdb
+tests/cocotb/cycle_counter/scalar/simv.vdb

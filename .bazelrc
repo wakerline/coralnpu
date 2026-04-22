@@ -75,6 +75,10 @@ run --action_env=XILINXD_LICENSE_FILE
 run --host_action_env=XILINXD_LICENSE_FILE
 
 
+build:vcs --action_env=CCACHE_DISABLE=1
+test:vcs --action_env=CCACHE_DISABLE=1
+run:vcs --action_env=CCACHE_DISABLE=1
+
 # Add config to enable VCS targets.
 build:vcs --build_tag_filters="vcs"
 test:vcs --build_tag_filters="vcs"
@@ -121,6 +125,26 @@ build --features=-supports_start_end_lib
 # Only show warnings/errors from our own code
 build --output_filter="^//(?!(third_party)(/|:|$))"
 
-
 # Import user config, if it exists (gitignored).
 try-import %workspace%/.bazelrc.user
+
+# cpu usage
+build --jobs=16
+run --jobs=16
+
+# gcc and g++ env
+build --action_env=CC=/home/wangyy/002_research/tools/noccache-bin/gcc
+build --action_env=CXX=/home/wangyy/002_research/tools/noccache-bin/g++
+build --repo_env=CC=/home/wangyy/002_research/tools/noccache-bin/gcc
+build --repo_env=CXX=/home/wangyy/002_research/tools/noccache-bin/g++
+
+test --action_env=CC=/home/wangyy/002_research/tools/noccache-bin/gcc
+test --action_env=CXX=/home/wangyy/002_research/tools/noccache-bin/g++
+test --repo_env=CC=/home/wangyy/002_research/tools/noccache-bin/gcc
+test --repo_env=CXX=/home/wangyy/002_research/tools/noccache-bin/g++
+
+run --action_env=CC=/home/wangyy/002_research/tools/noccache-bin/gcc
+run --action_env=CXX=/home/wangyy/002_research/tools/noccache-bin/g++
+run --repo_env=CC=/home/wangyy/002_research/tools/noccache-bin/gcc
+run --repo_env=CXX=/home/wangyy/002_research/tools/noccache-bin/g++
+

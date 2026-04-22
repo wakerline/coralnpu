@@ -106,7 +106,7 @@ cocotb_test_suite(
             "//coralnpu_test_utils:sim_test_fixture",
             "@rules_python//python/runfiles",
         ],
-        "data": ["run_mobilenet_v1_025_partial_binary.elf"],
+        "data": [":run_mobilenet_v1_025_partial_binary"],
     },
     vcs_build_args = VCS_BUILD_ARGS,
     vcs_data = ["run_mobilenet_v1_025_partial_binary.elf"] + VCS_COMMON_DATA,
@@ -348,4 +348,3 @@ cocotb_test_suite(
     },
     verilator_model = "//tests/cocotb:rvv_core_mini_highmem_axi_model",
 )
-

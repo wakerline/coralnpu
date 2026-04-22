@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,19 +14,26 @@
 
 #include <stdint.h>
 
-// TODO: Add two inputs buffers of 8 uint32_t's (input1_buffer, input2_buffer)
-// TODO: Add one output buffer of 8 uint32_t's (output_buffer)
+volatile int32_t input_data[4] __attribute__((section(".data"))) = {0, 0, 0, 0};
+volatile int32_t output_data[4] __attribute__((section(".data"))) = {0, 0, 0, 0};
+volatile int32_t done __attribute__((section(".data"))) = 0;
+volatile int32_t halt __attribute__((section(".data"))) = 0;
+volatile int32_t status __attribute__((section(".data"))) = -1;
 
-uint32_t input1_buffer[8] __attribute__((section(".data")));
-uint32_t input2_buffer[8] __attribute__((section(".data")));
-uint32_t output_buffer[8] __attribute__((section(".data")));
+static void RunAlgorithm() {
+  for (int i = 0; i < 4; ++i) {
+    output_data[i] = (input_data[i] * 3) - 2;
+  }
+}
 
 int main(int argc, char** argv) {
-  // TODO: Add code to element wise add/subtract from input1_buffer and
-  // input2_buffer and store the result to output_buffer.
+  (void)argc;
+  (void)argv;
 
-  for (int i=0 ;i < 8; i++){
-    output_buffer[i] = input1_buffer[i] + input2_buffer[i];
+  RunAlgorithm();
+  status = 0;
+  done = 1;
+  while (!halt) {
   }
-  return 0;
+  return status;
 }

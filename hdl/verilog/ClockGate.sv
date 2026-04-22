@@ -27,7 +27,14 @@ module ClockGate(
 ///////////////////////////
 /// ClockGate Selection ///
 ///////////////////////////
-`ifdef USE_TSMC12FFC
+`ifdef USE_TSMC28
+  CKLNQD12BWP40P140LVT u_cg(
+    .TE(te),
+    .E(enable),
+    .CP(clk_i),
+    .Q(clk_o)
+  );
+`elsif USE_TSMC12FFC
   // TSMC12FFC Specific ClockGate
   CKLNQD10BWP6T20P96CPDLVT u_cg(
     .TE(te),
