@@ -316,8 +316,8 @@ module rvv_backend_div_unit
   assign res_info.vs2_eew     = vs2_eew;
 
   edff #(
-    .T      (DIV_RES_t),
-    .INIT   ('0)
+    .T      (DIV_RES_t)
+  //  .INIT   ('0)  //by wangyy
   ) res_information
   (
     .clk    (clk),

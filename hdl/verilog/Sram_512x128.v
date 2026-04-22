@@ -25,7 +25,36 @@ module Sram_512x128(
 ///////////////////////////
 ///// SRAM Selection //////
 ///////////////////////////
-`ifdef USE_TSMC12FFC
+`ifdef USE_TSMC28
+///////////////////////////
+/////// SPSRAM SRAM ///////
+///////////////////////////
+    wire [127:0] nwmask;
+    genvar i;
+    generate
+      for (i = 0; i < 16; i++) begin : gen_wmask
+        assign nwmask[8*i +: 8] = {8{~wmask[i]}};
+      end
+    endgenerate
+    TS1N28HPCPLVTB512X128M4SWBSO u_tsmc28_sram
+    (
+      .SLP(1'b0),
+      .SD(1'b0),
+      .CLK(clock),
+      .CEB(~enable),
+      .WEB(~write),
+      .CEBM(1'b0),
+      .WEBM(1'b0),
+      .A(addr),
+      .D(wdata),
+      .BWEB(nwmask),
+      .AM(9'b0),
+      .DM(128'b0),
+      .BWEBM({128{1'b1}}),
+      .BIST(1'b0),
+      .Q(rdata)
+    );
+`elsif USE_TSMC12FFC
 ///////////////////////////
 ///// TSMC12FFC SRAM //////
 ///////////////////////////

@@ -1,0 +1,1760 @@
+ 
+****************************************
+Report : hierarchy
+        -noleaf
+Design : RvvCoreMiniHighmemAxi
+Version: T-2022.03-SP2
+Date   : Sat Apr 18 10:50:53 2026
+****************************************
+
+Attributes:
+    r - licensed design
+
+RvvCoreMiniHighmemAxi
+    AxiSlave                                                                                                            r
+        CoralNPURRArbiter_1_0
+        Queue1_RWAxiAddress
+        Queue2_AxiAddress_0
+            ram_2x67_0
+        Queue2_AxiAddress_1
+            ram_2x67_1
+        Queue2_AxiWriteResponse
+            ram_2x8
+        Queue3_AxiReadData                                                                                              r
+            ram_3x137
+        Queue3_AxiWriteData                                                                                             r
+            ram_3x145
+    ClockGate_1
+    CoralNPURRArbiter
+    CoralNPURRArbiter_1_1
+    CoreCSR
+        Queue1_DebugModuleRspIO_1
+    DBus2AxiV2
+        Queue2_AxiWriteData
+            ram_2x145
+    DebugModule                                                                                                         r
+        Queue1_DebugModuleReqIO
+        Queue1_DebugModuleRspIO_0
+    FabricArbiter_0
+    FabricArbiter_1
+    FabricMux                                                                                                           r
+    IBus2Axi                                                                                                            r
+    Queue1_UInt1
+    RstSync
+        ClockGate_0
+    RvvCoreMiniHighmem
+        RvvCoreShim
+            RvvCoreWrapper
+                RvvCore_N4                                                                                              r
+                    RvvFrontEnd_N4                                                                                      r
+                        Aligner_N4_837242                                                                               r
+                    rvv_backend                                                                                         r
+                        cdffr_36
+                        multi_fifo_1_1_2_1_125242_0                                                                     r
+                            cdffr_310242_0
+                            cdffr_310242_1
+                            cdffr_385242_6
+                        multi_fifo_1_1_2_1_125242_1                                                                     r
+                            cdffr_310242_2
+                            cdffr_310242_3
+                            cdffr_385242_7
+                        multi_fifo_1_1_2_1_125242_2                                                                     r
+                            cdffr_310242_4
+                            cdffr_310242_5
+                            cdffr_385242_8
+                        multi_fifo_1_1_2_1_125242_3                                                                     r
+                            cdffr_310242_6
+                            cdffr_310242_7
+                            cdffr_385242_9
+                        multi_fifo_1_1_2_1_125242_4                                                                     r
+                            cdffr_310242_8
+                            cdffr_310242_9
+                            cdffr_385242_10
+                        multi_fifo_1_1_2_1_125242_5                                                                     r
+                            cdffr_310242_10
+                            cdffr_310242_11
+                            cdffr_385242_11
+                        multi_fifo_1_1_2_1_125242_6                                                                     r
+                            cdffr_310242_12
+                            cdffr_310242_13
+                            cdffr_385242_12
+                        multi_fifo_1_1_2_1_125242_7                                                                     r
+                            cdffr_310242_14
+                            cdffr_310242_15
+                            cdffr_385242_13
+                        multi_fifo_2_2_4_1_1_845242                                                                     r
+                            cdffr_385242_14
+                            cdffr_385242_15
+                            cdffr_844242_4
+                        multi_fifo_2_2_8_1_1_314242                                                                     r
+                            cdffr_587242_49
+                            cdffr_844242_15
+                            cdffr_844242_16
+                        multi_fifo_3_1_4_1_1_066242                                                                     r
+                            cdffr_385242_20
+                            cdffr_385242_21
+                            cdffr_844242_9
+                        multi_fifo_3_1_4_1_1_633242                                                                     r
+                            cdffr_385242_22
+                            cdffr_385242_23
+                            cdffr_844242_12
+                        multi_fifo_3_2_4_1_1_307242                                                                     r
+                            cdffr_385242_16
+                            cdffr_385242_17
+                            cdffr_844242_5
+                        multi_fifo_3_2_4_1_1_691242                                                                     r
+                            cdffr_385242_18
+                            cdffr_385242_19
+                            cdffr_844242_6
+                        multi_fifo_3_2_8_1_1_112242                                                                     r
+                            cdffr_587242_45
+                            cdffr_844242_10
+                            cdffr_844242_11
+                        multi_fifo_3_2_8_1_1_551242                                                                     r
+                            cdffr_587242_44
+                            cdffr_844242_7
+                            cdffr_844242_8
+                        multi_fifo_3_2_8_1_1_897242                                                                     r
+                            cdffr_587242_46
+                            cdffr_844242_13
+                            cdffr_844242_14
+                        multi_fifo_4_2_8_1_080242                                                                       r
+                            cdffr_587242_50
+                            cdffr_844242_17
+                            cdffr_844242_18
+                        multi_fifo_6_3_16_1_039242                                                                      r
+                            cdffr_587242_47
+                            cdffr_587242_48
+                            cdffr_963242_1
+                        rvv_backend_alu
+                            rvv_backend_alu_unit
+                                cdffr_34
+                                edff_682242_0
+                                rvv_backend_alu_unit_addsub_0                                                           r
+                                rvv_backend_alu_unit_execution_p1_0                                                     r
+                                rvv_backend_alu_unit_mask_0                                                             r
+                                    barrel_shifter_DATA_WIDTH128_1
+                                rvv_backend_alu_unit_other_0
+                                rvv_backend_alu_unit_shift_0                                                            r
+                                    barrel_shifter_DATA_WIDTH16_0
+                                    barrel_shifter_DATA_WIDTH16_1
+                                    barrel_shifter_DATA_WIDTH16_2
+                                    barrel_shifter_DATA_WIDTH16_3
+                                    barrel_shifter_DATA_WIDTH16_4
+                                    barrel_shifter_DATA_WIDTH16_5
+                                    barrel_shifter_DATA_WIDTH16_6
+                                    barrel_shifter_DATA_WIDTH16_7
+                                    barrel_shifter_DATA_WIDTH32_0
+                                    barrel_shifter_DATA_WIDTH32_1
+                                    barrel_shifter_DATA_WIDTH32_2
+                                    barrel_shifter_DATA_WIDTH32_3
+                                    barrel_shifter_DATA_WIDTH64_0
+                                    barrel_shifter_DATA_WIDTH64_1
+                                    barrel_shifter_DATA_WIDTH64_2
+                                    barrel_shifter_DATA_WIDTH64_3
+                            rvv_backend_alu_unit_1
+                                cdffr_35
+                                edff_682242_2
+                                rvv_backend_alu_unit_addsub_1                                                           r
+                                rvv_backend_alu_unit_execution_p1_1                                                     r
+                                    barrel_shifter_DATA_WIDTH128_2
+                                    barrel_shifter_DATA_WIDTH128_3
+                                    cdffr_587242_0
+                                    cdffr_587242_1
+                                    cdffr_587242_2
+                                    cdffr_587242_3
+                                    cdffr_587242_4
+                                    cdffr_587242_5
+                                    cdffr_587242_6
+                                    cdffr_587242_7
+                                    cdffr_587242_8
+                                    cdffr_587242_9
+                                    cdffr_587242_10
+                                    cdffr_587242_11
+                                    cdffr_587242_12
+                                    cdffr_587242_13
+                                    cdffr_587242_14
+                                    cdffr_587242_15
+                                    cdffr_587242_16
+                                    cdffr_587242_17
+                                    cdffr_587242_18
+                                    cdffr_587242_19
+                                    cdffr_587242_20
+                                    cdffr_587242_21
+                                    cdffr_587242_22
+                                    cdffr_587242_23
+                                    cdffr_587242_24
+                                    cdffr_587242_25
+                                    cdffr_587242_26
+                                    cdffr_587242_27
+                                rvv_backend_alu_unit_mask_1                                                             r
+                                    barrel_shifter_DATA_WIDTH128_4
+                                rvv_backend_alu_unit_other_1
+                                rvv_backend_alu_unit_shift_1                                                            r
+                                    barrel_shifter_DATA_WIDTH16_8
+                                    barrel_shifter_DATA_WIDTH16_9
+                                    barrel_shifter_DATA_WIDTH16_10
+                                    barrel_shifter_DATA_WIDTH16_11
+                                    barrel_shifter_DATA_WIDTH16_12
+                                    barrel_shifter_DATA_WIDTH16_13
+                                    barrel_shifter_DATA_WIDTH16_14
+                                    barrel_shifter_DATA_WIDTH16_15
+                                    barrel_shifter_DATA_WIDTH32_4
+                                    barrel_shifter_DATA_WIDTH32_5
+                                    barrel_shifter_DATA_WIDTH32_6
+                                    barrel_shifter_DATA_WIDTH32_7
+                                    barrel_shifter_DATA_WIDTH64_4
+                                    barrel_shifter_DATA_WIDTH64_5
+                                    barrel_shifter_DATA_WIDTH64_6
+                                    barrel_shifter_DATA_WIDTH64_7
+                        rvv_backend_arb
+                            arb_round_robin_REQ_NUM2_0                                                                  r
+                                edff_1_092242_0
+                            arb_round_robin_REQ_NUM2_1                                                                  r
+                                edff_1_092242_1
+                            arb_round_robin_REQ_NUM2_2                                                                  r
+                                edff_1_092242_2
+                        rvv_backend_decode
+                            rvv_backend_decode_unit_0
+                                rvv_backend_decode_unit_ari_0                                                           r
+                                rvv_backend_decode_unit_lsu_0                                                           r
+                            rvv_backend_decode_unit_1
+                                rvv_backend_decode_unit_ari_1                                                           r
+                                rvv_backend_decode_unit_lsu_1                                                           r
+                        rvv_backend_decode_de2
+                            rvv_backend_decode_ctrl                                                                     r
+                                cdffr_963242_0
+                            rvv_backend_decode_unit_de2_0
+                                rvv_backend_decode_unit_ari_de2_0                                                       r
+                                rvv_backend_decode_unit_lsu_de2_0                                                       r
+                            rvv_backend_decode_unit_de2_1
+                                rvv_backend_decode_unit_ari_de2_1                                                       r
+                                rvv_backend_decode_unit_lsu_de2_1                                                       r
+                        rvv_backend_dispatch                                                                            r
+                            rvv_backend_dispatch_bypass_0
+                            rvv_backend_dispatch_bypass_1
+                            rvv_backend_dispatch_bypass_2
+                            rvv_backend_dispatch_ctrl
+                            rvv_backend_dispatch_operand
+                            rvv_backend_dispatch_opr_byte_type_0                                                        r
+                            rvv_backend_dispatch_opr_byte_type_1                                                        r
+                            rvv_backend_dispatch_opr_byte_type_2                                                        r
+                            rvv_backend_dispatch_raw_uop_rob_0                                                          r
+                            rvv_backend_dispatch_raw_uop_rob_1                                                          r
+                            rvv_backend_dispatch_raw_uop_rob_2                                                          r
+                            rvv_backend_dispatch_raw_uop_uop_PREUOP_NUM1                                                r
+                            rvv_backend_dispatch_raw_uop_uop_PREUOP_NUM2                                                r
+                            rvv_backend_dispatch_structure_hazard
+                        rvv_backend_div
+                            arb_round_robin_REQ_NUM2_3                                                                  r
+                                edff_1_092242_3
+                            rvv_backend_div_unit
+                                cdffr_33
+                                edff_035242
+                                rvv_backend_div_unit_divider_08_0                                                       r
+                                    cdffr_16
+                                    cdffr_17
+                                    cdffr_502242_0
+                                    cdffr_502242_1
+                                    cdffr_502242_2
+                                    cdffr_502242_3
+                                    edff_0_303242_0
+                                    edff_587242_0
+                                rvv_backend_div_unit_divider_08_1                                                       r
+                                    cdffr_18
+                                    cdffr_19
+                                    cdffr_502242_4
+                                    cdffr_502242_5
+                                    cdffr_502242_6
+                                    cdffr_502242_7
+                                    edff_0_303242_1
+                                    edff_587242_1
+                                rvv_backend_div_unit_divider_08_2                                                       r
+                                    cdffr_20
+                                    cdffr_21
+                                    cdffr_502242_8
+                                    cdffr_502242_9
+                                    cdffr_502242_10
+                                    cdffr_502242_11
+                                    edff_0_303242_2
+                                    edff_587242_2
+                                rvv_backend_div_unit_divider_08_3                                                       r
+                                    cdffr_22
+                                    cdffr_23
+                                    cdffr_502242_12
+                                    cdffr_502242_13
+                                    cdffr_502242_14
+                                    cdffr_502242_15
+                                    edff_0_303242_3
+                                    edff_587242_3
+                                rvv_backend_div_unit_divider_08_4                                                       r
+                                    cdffr_24
+                                    cdffr_25
+                                    cdffr_502242_16
+                                    cdffr_502242_17
+                                    cdffr_502242_18
+                                    cdffr_502242_19
+                                    edff_0_303242_4
+                                    edff_587242_4
+                                rvv_backend_div_unit_divider_08_5                                                       r
+                                    cdffr_26
+                                    cdffr_27
+                                    cdffr_502242_20
+                                    cdffr_502242_21
+                                    cdffr_502242_22
+                                    cdffr_502242_23
+                                    edff_0_303242_5
+                                    edff_587242_5
+                                rvv_backend_div_unit_divider_08_6                                                       r
+                                    cdffr_28
+                                    cdffr_29
+                                    cdffr_502242_24
+                                    cdffr_502242_25
+                                    cdffr_502242_26
+                                    cdffr_502242_27
+                                    edff_0_303242_6
+                                    edff_587242_6
+                                rvv_backend_div_unit_divider_08_7                                                       r
+                                    cdffr_30
+                                    cdffr_31
+                                    cdffr_502242_28
+                                    cdffr_502242_29
+                                    cdffr_502242_30
+                                    cdffr_502242_31
+                                    edff_0_303242_7
+                                    edff_587242_7
+                                rvv_backend_div_unit_divider_10_0                                                       r
+                                    cdffr_8
+                                    cdffr_9
+                                    cdffr_424242_0
+                                    cdffr_424242_1
+                                    cdffr_424242_2
+                                    cdffr_424242_3
+                                    edff_0_232242_0
+                                    edff_963242_0
+                                rvv_backend_div_unit_divider_10_1                                                       r
+                                    cdffr_10
+                                    cdffr_11
+                                    cdffr_424242_4
+                                    cdffr_424242_5
+                                    cdffr_424242_6
+                                    cdffr_424242_7
+                                    edff_0_232242_1
+                                    edff_963242_1
+                                rvv_backend_div_unit_divider_10_2                                                       r
+                                    cdffr_12
+                                    cdffr_13
+                                    cdffr_424242_8
+                                    cdffr_424242_9
+                                    cdffr_424242_10
+                                    cdffr_424242_11
+                                    edff_0_232242_2
+                                    edff_963242_2
+                                rvv_backend_div_unit_divider_10_3                                                       r
+                                    cdffr_14
+                                    cdffr_15
+                                    cdffr_424242_12
+                                    cdffr_424242_13
+                                    cdffr_424242_14
+                                    cdffr_424242_15
+                                    edff_0_232242_3
+                                    edff_963242_3
+                                rvv_backend_div_unit_divider_20_0                                                       r
+                                    cdffr_0
+                                    cdffr_1
+                                    cdffr_999242_0
+                                    cdffr_999242_1
+                                    cdffr_999242_2
+                                    cdffr_999242_3
+                                    edff_0_397242_0
+                                    edff_822242_0
+                                rvv_backend_div_unit_divider_20_1                                                       r
+                                    cdffr_2
+                                    cdffr_3
+                                    cdffr_999242_4
+                                    cdffr_999242_5
+                                    cdffr_999242_6
+                                    cdffr_999242_7
+                                    edff_0_397242_1
+                                    edff_822242_1
+                                rvv_backend_div_unit_divider_20_2                                                       r
+                                    cdffr_4
+                                    cdffr_5
+                                    cdffr_999242_8
+                                    cdffr_999242_9
+                                    cdffr_999242_10
+                                    cdffr_999242_11
+                                    edff_0_397242_2
+                                    edff_822242_2
+                                rvv_backend_div_unit_divider_20_3                                                       r
+                                    cdffr_6
+                                    cdffr_7
+                                    cdffr_999242_12
+                                    cdffr_999242_13
+                                    cdffr_999242_14
+                                    cdffr_999242_15
+                                    edff_0_397242_3
+                                    edff_822242_3
+                            rvv_backend_fdiv_wrapper
+                                cdffr_32
+                                edff_100242
+                                fpnew_divsqrt_th_64_multi_10_1_0_0
+                                    ct_vfdsu_top_0
+                                        ct_vfdsu_ctrl_0                                                                 r
+                                            gated_clk_cell_23
+                                            gated_clk_cell_24
+                                            gated_clk_cell_25
+                                            gated_clk_cell_26
+                                            gated_clk_cell_27
+                                        ct_vfdsu_double_0
+                                            ct_vfdsu_pack_0                                                             r
+                                            ct_vfdsu_prepare_0
+                                                ct_vfdsu_ff1_0
+                                                ct_vfdsu_ff1_1
+                                                gated_clk_cell_10
+                                            ct_vfdsu_round_0                                                            r
+                                                gated_clk_cell_8
+                                            ct_vfdsu_srt_0                                                              r
+                                                ct_vfdsu_srt_radix16_with_sqrt_0                                        r
+                                                    ct_vfdsu_srt_radix16_bound_table_0
+                                                    gated_clk_cell_0
+                                                    gated_clk_cell_1
+                                                gated_clk_cell_9
+                                        ct_vfdsu_scalar_dp_0
+                                            gated_clk_cell_20
+                                fpnew_divsqrt_th_64_multi_10_1_0_1
+                                    ct_vfdsu_top_1
+                                        ct_vfdsu_ctrl_1                                                                 r
+                                            gated_clk_cell_31
+                                            gated_clk_cell_32
+                                            gated_clk_cell_33
+                                            gated_clk_cell_34
+                                            gated_clk_cell_35
+                                        ct_vfdsu_double_1
+                                            ct_vfdsu_pack_1                                                             r
+                                            ct_vfdsu_prepare_1
+                                                ct_vfdsu_ff1_2
+                                                ct_vfdsu_ff1_3
+                                                gated_clk_cell_13
+                                            ct_vfdsu_round_1                                                            r
+                                                gated_clk_cell_11
+                                            ct_vfdsu_srt_1                                                              r
+                                                ct_vfdsu_srt_radix16_with_sqrt_1                                        r
+                                                    ct_vfdsu_srt_radix16_bound_table_1
+                                                    gated_clk_cell_2
+                                                    gated_clk_cell_3
+                                                gated_clk_cell_12
+                                        ct_vfdsu_scalar_dp_1
+                                            gated_clk_cell_28
+                                fpnew_divsqrt_th_64_multi_10_1_0_2
+                                    ct_vfdsu_top_2
+                                        ct_vfdsu_ctrl_2                                                                 r
+                                            gated_clk_cell_39
+                                            gated_clk_cell_40
+                                            gated_clk_cell_41
+                                            gated_clk_cell_42
+                                            gated_clk_cell_43
+                                        ct_vfdsu_double_2
+                                            ct_vfdsu_pack_2                                                             r
+                                            ct_vfdsu_prepare_2
+                                                ct_vfdsu_ff1_4
+                                                ct_vfdsu_ff1_5
+                                                gated_clk_cell_16
+                                            ct_vfdsu_round_2                                                            r
+                                                gated_clk_cell_14
+                                            ct_vfdsu_srt_2                                                              r
+                                                ct_vfdsu_srt_radix16_with_sqrt_2                                        r
+                                                    ct_vfdsu_srt_radix16_bound_table_2
+                                                    gated_clk_cell_4
+                                                    gated_clk_cell_5
+                                                gated_clk_cell_15
+                                        ct_vfdsu_scalar_dp_2
+                                            gated_clk_cell_36
+                                fpnew_divsqrt_th_64_multi_10_1_0_3
+                                    ct_vfdsu_top_3
+                                        ct_vfdsu_ctrl_3                                                                 r
+                                            gated_clk_cell_47
+                                            gated_clk_cell_48
+                                            gated_clk_cell_49
+                                            gated_clk_cell_50
+                                            gated_clk_cell_51
+                                        ct_vfdsu_double_3
+                                            ct_vfdsu_pack_3                                                             r
+                                            ct_vfdsu_prepare_3
+                                                ct_vfdsu_ff1_6
+                                                ct_vfdsu_ff1_7
+                                                gated_clk_cell_19
+                                            ct_vfdsu_round_3                                                            r
+                                                gated_clk_cell_17
+                                            ct_vfdsu_srt_3                                                              r
+                                                ct_vfdsu_srt_radix16_with_sqrt_3                                        r
+                                                    ct_vfdsu_srt_radix16_bound_table_3
+                                                    gated_clk_cell_6
+                                                    gated_clk_cell_7
+                                                gated_clk_cell_18
+                                        ct_vfdsu_scalar_dp_3
+                                            gated_clk_cell_44
+                        rvv_backend_fma
+                            rvv_backend_fma_wrapper_0
+                                arb_round_robin_REQ_NUM4_0                                                              r
+                                    edff_1_862242_0
+                                barrel_shifter_DATA_WIDTH128_5
+                                barrel_shifter_DATA_WIDTH128_6
+                                cdffr_385242_0
+                                cdffr_385242_1
+                                cdffr_385242_2
+                                cdffr_587242_30
+                                cdffr_587242_31
+                                cdffr_587242_32
+                                cdffr_587242_33
+                                cdffr_587242_34
+                                cdffr_587242_35
+                                cdffr_587242_36
+                                edff_623242_0
+                                edff_623242_1
+                                edff_623242_2
+                                fpnew_cast_multi_10_e_3_3_672242_0                                                      r
+                                    fpnew_classifier_0_1_0
+                                    fpnew_rounding_00000020_0                                                           r
+                                    lzc_00000020_1_0
+                                fpnew_cast_multi_10_e_3_3_672242_1                                                      r
+                                    fpnew_classifier_0_1_1
+                                    fpnew_rounding_00000020_1                                                           r
+                                    lzc_00000020_1_1
+                                fpnew_cast_multi_10_e_3_3_672242_2                                                      r
+                                    fpnew_classifier_0_1_2
+                                    fpnew_rounding_00000020_2                                                           r
+                                    lzc_00000020_1_2
+                                fpnew_cast_multi_10_e_3_3_672242_3                                                      r
+                                    fpnew_classifier_0_1_3
+                                    fpnew_rounding_00000020_3                                                           r
+                                    lzc_00000020_1_3
+                                fpnew_fma_multi_10_3_3_0                                                                r
+                                    fpnew_classifier_0_3_1
+                                    fpnew_rounding_0000001f_1                                                           r
+                                    lzc_00000017_1_1
+                                    lzc_00000033_1_1
+                                fpnew_fma_multi_10_3_3_1                                                                r
+                                    fpnew_classifier_0_3_2
+                                    fpnew_rounding_0000001f_2                                                           r
+                                    lzc_00000017_1_2
+                                    lzc_00000033_1_2
+                                fpnew_fma_multi_10_3_3_2                                                                r
+                                    fpnew_classifier_0_3_3
+                                    fpnew_rounding_0000001f_3                                                           r
+                                    lzc_00000017_1_3
+                                    lzc_00000033_1_3
+                                fpnew_fma_multi_10_3_3_772242_0                                                         r
+                                    fpnew_classifier_0_3_4
+                                    fpnew_rounding_0000001f_4                                                           r
+                                    lzc_00000017_1_4
+                                    lzc_00000033_1_4
+                                fpnew_noncomp_0_3_3_0                                                                   r
+                                    fpnew_classifier_0_2_1
+                                fpnew_noncomp_0_3_3_1                                                                   r
+                                    fpnew_classifier_0_2_2
+                                fpnew_noncomp_0_3_3_2                                                                   r
+                                    fpnew_classifier_0_2_3
+                                fpnew_noncomp_0_3_3_339242_0                                                            r
+                                    fpnew_classifier_0_2_4
+                                rvv_backend_sqrt7_rec7_0                                                                r
+                                rvv_backend_sqrt7_rec7_1                                                                r
+                                rvv_backend_sqrt7_rec7_2                                                                r
+                                rvv_backend_sqrt7_rec7_663242_0                                                         r
+                            rvv_backend_fma_wrapper_1
+                                arb_round_robin_REQ_NUM4_1                                                              r
+                                    edff_1_862242_1
+                                barrel_shifter_DATA_WIDTH128_7
+                                barrel_shifter_DATA_WIDTH128_8
+                                cdffr_385242_3
+                                cdffr_385242_4
+                                cdffr_385242_5
+                                cdffr_587242_37
+                                cdffr_587242_38
+                                cdffr_587242_39
+                                cdffr_587242_40
+                                cdffr_587242_41
+                                cdffr_587242_42
+                                cdffr_587242_43
+                                edff_623242_3
+                                edff_623242_4
+                                edff_623242_5
+                                fpnew_cast_multi_10_e_3_3_672242_4                                                      r
+                                    fpnew_classifier_0_1_4
+                                    fpnew_rounding_00000020_4                                                           r
+                                    lzc_00000020_1_4
+                                fpnew_cast_multi_10_e_3_3_672242_5                                                      r
+                                    fpnew_classifier_0_1_5
+                                    fpnew_rounding_00000020_5                                                           r
+                                    lzc_00000020_1_5
+                                fpnew_cast_multi_10_e_3_3_672242_6                                                      r
+                                    fpnew_classifier_0_1_6
+                                    fpnew_rounding_00000020_6                                                           r
+                                    lzc_00000020_1_6
+                                fpnew_cast_multi_10_e_3_3_672242_7                                                      r
+                                    fpnew_classifier_0_1_7
+                                    fpnew_rounding_00000020_7                                                           r
+                                    lzc_00000020_1_7
+                                fpnew_fma_multi_10_3_3_3                                                                r
+                                    fpnew_classifier_0_3_5
+                                    fpnew_rounding_0000001f_5                                                           r
+                                    lzc_00000017_1_5
+                                    lzc_00000033_1_5
+                                fpnew_fma_multi_10_3_3_4                                                                r
+                                    fpnew_classifier_0_3_6
+                                    fpnew_rounding_0000001f_6                                                           r
+                                    lzc_00000017_1_6
+                                    lzc_00000033_1_6
+                                fpnew_fma_multi_10_3_3_5                                                                r
+                                    fpnew_classifier_0_3_7
+                                    fpnew_rounding_0000001f_7                                                           r
+                                    lzc_00000017_1_7
+                                    lzc_00000033_1_7
+                                fpnew_fma_multi_10_3_3_772242_1                                                         r
+                                    fpnew_classifier_0_3_8
+                                    fpnew_rounding_0000001f_8                                                           r
+                                    lzc_00000017_1_8
+                                    lzc_00000033_1_8
+                                fpnew_noncomp_0_3_3_3                                                                   r
+                                    fpnew_classifier_0_2_5
+                                fpnew_noncomp_0_3_3_4                                                                   r
+                                    fpnew_classifier_0_2_6
+                                fpnew_noncomp_0_3_3_5                                                                   r
+                                    fpnew_classifier_0_2_7
+                                fpnew_noncomp_0_3_3_339242_1                                                            r
+                                    fpnew_classifier_0_2_8
+                                rvv_backend_sqrt7_rec7_3                                                                r
+                                rvv_backend_sqrt7_rec7_4                                                                r
+                                rvv_backend_sqrt7_rec7_5                                                                r
+                                rvv_backend_sqrt7_rec7_663242_1                                                         r
+                        rvv_backend_lsu_remap                                                                           r
+                        rvv_backend_mulmac
+                            rvv_backend_mac_unit_0                                                                      r
+                                cdffr_T_logic_Z_1yB__35
+                                edff_424242_2
+                                edff_424242_3
+                                edff_424242_4
+                                edff_424242_5
+                                edff_424242_6
+                                edff_424242_7
+                                edff_424242_8
+                                edff_424242_9
+                                edff_424242_10
+                                edff_424242_11
+                                edff_424242_12
+                                edff_424242_13
+                                edff_424242_14
+                                edff_424242_15
+                                edff_424242_16
+                                edff_424242_17
+                                edff_424242_18
+                                edff_424242_19
+                                edff_424242_20
+                                edff_424242_21
+                                edff_424242_22
+                                edff_424242_23
+                                edff_424242_24
+                                edff_424242_25
+                                edff_424242_26
+                                edff_424242_27
+                                edff_424242_28
+                                edff_424242_29
+                                edff_424242_30
+                                edff_424242_31
+                                edff_424242_32
+                                edff_424242_33
+                                edff_424242_34
+                                edff_424242_35
+                                edff_424242_36
+                                edff_424242_37
+                                edff_424242_38
+                                edff_424242_39
+                                edff_424242_40
+                                edff_424242_41
+                                edff_424242_42
+                                edff_424242_43
+                                edff_424242_44
+                                edff_424242_45
+                                edff_424242_46
+                                edff_424242_47
+                                edff_424242_48
+                                edff_424242_49
+                                edff_424242_50
+                                edff_424242_51
+                                edff_424242_52
+                                edff_424242_53
+                                edff_424242_54
+                                edff_424242_55
+                                edff_424242_56
+                                edff_424242_57
+                                edff_424242_58
+                                edff_424242_59
+                                edff_424242_60
+                                edff_424242_61
+                                edff_424242_62
+                                edff_424242_63
+                                edff_424242_64
+                                edff_424242_65
+                                edff_682242_1_2
+                                edff_715242_0
+                                edff_839242_0
+                                edff_844242_0
+                                edff_T_logic_Z_1yB__16
+                                edff_T_logic_Z_1yB__17
+                                edff_T_logic_Z_1yB__18
+                                edff_T_logic_Z_1yB__19
+                                edff_T_logic_Z_1yB__20
+                                edff_T_logic_Z_1yB__21
+                                edff_T_logic_Z_1yB__22
+                                rvv_backend_mul_unit_mul8_0                                                             r
+                                rvv_backend_mul_unit_mul8_1                                                             r
+                                rvv_backend_mul_unit_mul8_2                                                             r
+                                rvv_backend_mul_unit_mul8_3                                                             r
+                                rvv_backend_mul_unit_mul8_4                                                             r
+                                rvv_backend_mul_unit_mul8_5                                                             r
+                                rvv_backend_mul_unit_mul8_6                                                             r
+                                rvv_backend_mul_unit_mul8_7                                                             r
+                                rvv_backend_mul_unit_mul8_8                                                             r
+                                rvv_backend_mul_unit_mul8_9                                                             r
+                                rvv_backend_mul_unit_mul8_10                                                            r
+                                rvv_backend_mul_unit_mul8_11                                                            r
+                                rvv_backend_mul_unit_mul8_12                                                            r
+                                rvv_backend_mul_unit_mul8_13                                                            r
+                                rvv_backend_mul_unit_mul8_14                                                            r
+                                rvv_backend_mul_unit_mul8_15                                                            r
+                                rvv_backend_mul_unit_mul8_16                                                            r
+                                rvv_backend_mul_unit_mul8_17                                                            r
+                                rvv_backend_mul_unit_mul8_18                                                            r
+                                rvv_backend_mul_unit_mul8_19                                                            r
+                                rvv_backend_mul_unit_mul8_20                                                            r
+                                rvv_backend_mul_unit_mul8_21                                                            r
+                                rvv_backend_mul_unit_mul8_22                                                            r
+                                rvv_backend_mul_unit_mul8_23                                                            r
+                                rvv_backend_mul_unit_mul8_24                                                            r
+                                rvv_backend_mul_unit_mul8_25                                                            r
+                                rvv_backend_mul_unit_mul8_26                                                            r
+                                rvv_backend_mul_unit_mul8_27                                                            r
+                                rvv_backend_mul_unit_mul8_28                                                            r
+                                rvv_backend_mul_unit_mul8_29                                                            r
+                                rvv_backend_mul_unit_mul8_30                                                            r
+                                rvv_backend_mul_unit_mul8_31                                                            r
+                                rvv_backend_mul_unit_mul8_32                                                            r
+                                rvv_backend_mul_unit_mul8_33                                                            r
+                                rvv_backend_mul_unit_mul8_34                                                            r
+                                rvv_backend_mul_unit_mul8_35                                                            r
+                                rvv_backend_mul_unit_mul8_36                                                            r
+                                rvv_backend_mul_unit_mul8_37                                                            r
+                                rvv_backend_mul_unit_mul8_38                                                            r
+                                rvv_backend_mul_unit_mul8_39                                                            r
+                                rvv_backend_mul_unit_mul8_40                                                            r
+                                rvv_backend_mul_unit_mul8_41                                                            r
+                                rvv_backend_mul_unit_mul8_42                                                            r
+                                rvv_backend_mul_unit_mul8_43                                                            r
+                                rvv_backend_mul_unit_mul8_44                                                            r
+                                rvv_backend_mul_unit_mul8_45                                                            r
+                                rvv_backend_mul_unit_mul8_46                                                            r
+                                rvv_backend_mul_unit_mul8_47                                                            r
+                                rvv_backend_mul_unit_mul8_48                                                            r
+                                rvv_backend_mul_unit_mul8_49                                                            r
+                                rvv_backend_mul_unit_mul8_50                                                            r
+                                rvv_backend_mul_unit_mul8_51                                                            r
+                                rvv_backend_mul_unit_mul8_52                                                            r
+                                rvv_backend_mul_unit_mul8_53                                                            r
+                                rvv_backend_mul_unit_mul8_54                                                            r
+                                rvv_backend_mul_unit_mul8_55                                                            r
+                                rvv_backend_mul_unit_mul8_56                                                            r
+                                rvv_backend_mul_unit_mul8_57                                                            r
+                                rvv_backend_mul_unit_mul8_58                                                            r
+                                rvv_backend_mul_unit_mul8_59                                                            r
+                                rvv_backend_mul_unit_mul8_60                                                            r
+                                rvv_backend_mul_unit_mul8_61                                                            r
+                                rvv_backend_mul_unit_mul8_62                                                            r
+                                rvv_backend_mul_unit_mul8_63                                                            r
+                            rvv_backend_mac_unit_1                                                                      r
+                                cdffr_T_logic_Z_1yB__36
+                                edff_424242_66
+                                edff_424242_67
+                                edff_424242_68
+                                edff_424242_69
+                                edff_424242_70
+                                edff_424242_71
+                                edff_424242_72
+                                edff_424242_73
+                                edff_424242_74
+                                edff_424242_75
+                                edff_424242_76
+                                edff_424242_77
+                                edff_424242_78
+                                edff_424242_79
+                                edff_424242_80
+                                edff_424242_81
+                                edff_424242_82
+                                edff_424242_83
+                                edff_424242_84
+                                edff_424242_85
+                                edff_424242_86
+                                edff_424242_87
+                                edff_424242_88
+                                edff_424242_89
+                                edff_424242_90
+                                edff_424242_91
+                                edff_424242_92
+                                edff_424242_93
+                                edff_424242_94
+                                edff_424242_95
+                                edff_424242_96
+                                edff_424242_97
+                                edff_424242_98
+                                edff_424242_99
+                                edff_424242_100
+                                edff_424242_101
+                                edff_424242_102
+                                edff_424242_103
+                                edff_424242_104
+                                edff_424242_105
+                                edff_424242_106
+                                edff_424242_107
+                                edff_424242_108
+                                edff_424242_109
+                                edff_424242_110
+                                edff_424242_111
+                                edff_424242_112
+                                edff_424242_113
+                                edff_424242_114
+                                edff_424242_115
+                                edff_424242_116
+                                edff_424242_117
+                                edff_424242_118
+                                edff_424242_119
+                                edff_424242_120
+                                edff_424242_121
+                                edff_424242_122
+                                edff_424242_123
+                                edff_424242_124
+                                edff_424242_125
+                                edff_424242_126
+                                edff_424242_127
+                                edff_424242_128
+                                edff_424242_129
+                                edff_682242_1_3
+                                edff_715242_1
+                                edff_839242_1
+                                edff_844242_1
+                                edff_T_logic_Z_1yB__23
+                                edff_T_logic_Z_1yB__24
+                                edff_T_logic_Z_1yB__25
+                                edff_T_logic_Z_1yB__26
+                                edff_T_logic_Z_1yB__27
+                                edff_T_logic_Z_1yB__28
+                                edff_T_logic_Z_1yB__29
+                                rvv_backend_mul_unit_mul8_64                                                            r
+                                rvv_backend_mul_unit_mul8_65                                                            r
+                                rvv_backend_mul_unit_mul8_66                                                            r
+                                rvv_backend_mul_unit_mul8_67                                                            r
+                                rvv_backend_mul_unit_mul8_68                                                            r
+                                rvv_backend_mul_unit_mul8_69                                                            r
+                                rvv_backend_mul_unit_mul8_70                                                            r
+                                rvv_backend_mul_unit_mul8_71                                                            r
+                                rvv_backend_mul_unit_mul8_72                                                            r
+                                rvv_backend_mul_unit_mul8_73                                                            r
+                                rvv_backend_mul_unit_mul8_74                                                            r
+                                rvv_backend_mul_unit_mul8_75                                                            r
+                                rvv_backend_mul_unit_mul8_76                                                            r
+                                rvv_backend_mul_unit_mul8_77                                                            r
+                                rvv_backend_mul_unit_mul8_78                                                            r
+                                rvv_backend_mul_unit_mul8_79                                                            r
+                                rvv_backend_mul_unit_mul8_80                                                            r
+                                rvv_backend_mul_unit_mul8_81                                                            r
+                                rvv_backend_mul_unit_mul8_82                                                            r
+                                rvv_backend_mul_unit_mul8_83                                                            r
+                                rvv_backend_mul_unit_mul8_84                                                            r
+                                rvv_backend_mul_unit_mul8_85                                                            r
+                                rvv_backend_mul_unit_mul8_86                                                            r
+                                rvv_backend_mul_unit_mul8_87                                                            r
+                                rvv_backend_mul_unit_mul8_88                                                            r
+                                rvv_backend_mul_unit_mul8_89                                                            r
+                                rvv_backend_mul_unit_mul8_90                                                            r
+                                rvv_backend_mul_unit_mul8_91                                                            r
+                                rvv_backend_mul_unit_mul8_92                                                            r
+                                rvv_backend_mul_unit_mul8_93                                                            r
+                                rvv_backend_mul_unit_mul8_94                                                            r
+                                rvv_backend_mul_unit_mul8_95                                                            r
+                                rvv_backend_mul_unit_mul8_96                                                            r
+                                rvv_backend_mul_unit_mul8_97                                                            r
+                                rvv_backend_mul_unit_mul8_98                                                            r
+                                rvv_backend_mul_unit_mul8_99                                                            r
+                                rvv_backend_mul_unit_mul8_100                                                           r
+                                rvv_backend_mul_unit_mul8_101                                                           r
+                                rvv_backend_mul_unit_mul8_102                                                           r
+                                rvv_backend_mul_unit_mul8_103                                                           r
+                                rvv_backend_mul_unit_mul8_104                                                           r
+                                rvv_backend_mul_unit_mul8_105                                                           r
+                                rvv_backend_mul_unit_mul8_106                                                           r
+                                rvv_backend_mul_unit_mul8_107                                                           r
+                                rvv_backend_mul_unit_mul8_108                                                           r
+                                rvv_backend_mul_unit_mul8_109                                                           r
+                                rvv_backend_mul_unit_mul8_110                                                           r
+                                rvv_backend_mul_unit_mul8_111                                                           r
+                                rvv_backend_mul_unit_mul8_112                                                           r
+                                rvv_backend_mul_unit_mul8_113                                                           r
+                                rvv_backend_mul_unit_mul8_114                                                           r
+                                rvv_backend_mul_unit_mul8_115                                                           r
+                                rvv_backend_mul_unit_mul8_116                                                           r
+                                rvv_backend_mul_unit_mul8_117                                                           r
+                                rvv_backend_mul_unit_mul8_118                                                           r
+                                rvv_backend_mul_unit_mul8_119                                                           r
+                                rvv_backend_mul_unit_mul8_120                                                           r
+                                rvv_backend_mul_unit_mul8_121                                                           r
+                                rvv_backend_mul_unit_mul8_122                                                           r
+                                rvv_backend_mul_unit_mul8_123                                                           r
+                                rvv_backend_mul_unit_mul8_124                                                           r
+                                rvv_backend_mul_unit_mul8_125                                                           r
+                                rvv_backend_mul_unit_mul8_126                                                           r
+                                rvv_backend_mul_unit_mul8_127                                                           r
+                        rvv_backend_pmtrdt
+                            rvv_backend_pmtrdt_unit_1_1_1
+                                arb_round_robin_REQ_NUM3                                                                r
+                                    edff_1_465242
+                                rvv_backend_freduction                                                                  r
+                                    fpnew_fma_multi_10_3_3_518242                                                       r
+                                        fpnew_classifier_0_3_0
+                                        fpnew_rounding_0000001f_0                                                       r
+                                        lzc_00000017_1_0
+                                        lzc_00000033_1_0
+                                    fpnew_noncomp_0_3_3_518242                                                          r
+                                        fpnew_classifier_0_2_0
+                                rvv_backend_pmtrdt_unit_permutation                                                     r
+                                    edff_288242_0
+                                    edff_288242_1
+                                    edff_587242_8
+                                    edff_682242_1_0
+                                    edff_T_logic_Z_1yB__0
+                                    edff_T_logic_Z_1yB__1
+                                    edff_T_logic_Z_1yB__2
+                                    edff_T_logic_Z_1yB__3
+                                    edff_T_logic_Z_1yB__4
+                                    edff_T_logic_Z_1yB__5
+                                    edff_T_logic_Z_1yB__6
+                                    edff_T_logic_Z_1yB__7
+                                    edff_T_logic_Z_1yB__8
+                                    edff_T_logic_Z_1yB__9
+                                    edff_T_logic_Z_1yB__10
+                                    edff_T_logic_Z_1yB__11
+                                    edff_T_logic_Z_1yB__12
+                                    edff_T_logic_Z_1yB__13
+                                    edff_T_logic_Z_1yB__14
+                                    edff_T_logic_Z_1yB__15
+                                    handshake_ff_502242_0
+                                        cdffr_T_logic_Z_1yB__0
+                                        edff_502242_0
+                                    handshake_ff_502242_1
+                                        cdffr_T_logic_Z_1yB__1
+                                        edff_502242_1
+                                    handshake_ff_502242_2
+                                        cdffr_T_logic_Z_1yB__2
+                                        edff_502242_2
+                                    handshake_ff_502242_3
+                                        cdffr_T_logic_Z_1yB__3
+                                        edff_502242_3
+                                    handshake_ff_502242_4
+                                        cdffr_T_logic_Z_1yB__4
+                                        edff_502242_4
+                                    handshake_ff_502242_5
+                                        cdffr_T_logic_Z_1yB__5
+                                        edff_502242_5
+                                    handshake_ff_502242_6
+                                        cdffr_T_logic_Z_1yB__6
+                                        edff_502242_6
+                                    handshake_ff_502242_7
+                                        cdffr_T_logic_Z_1yB__7
+                                        edff_502242_7
+                                    handshake_ff_502242_8
+                                        cdffr_T_logic_Z_1yB__8
+                                        edff_502242_8
+                                    handshake_ff_502242_9
+                                        cdffr_T_logic_Z_1yB__9
+                                        edff_502242_9
+                                    handshake_ff_502242_10
+                                        cdffr_T_logic_Z_1yB__10
+                                        edff_502242_10
+                                    handshake_ff_502242_11
+                                        cdffr_T_logic_Z_1yB__11
+                                        edff_502242_11
+                                    handshake_ff_502242_12
+                                        cdffr_T_logic_Z_1yB__12
+                                        edff_502242_12
+                                    handshake_ff_502242_13
+                                        cdffr_T_logic_Z_1yB__13
+                                        edff_502242_13
+                                    handshake_ff_502242_14
+                                        cdffr_T_logic_Z_1yB__14
+                                        edff_502242_14
+                                    handshake_ff_502242_15
+                                        cdffr_T_logic_Z_1yB__15
+                                        edff_502242_15
+                                    handshake_ff_793242_0
+                                        cdffr_T_logic_Z_1yB__16
+                                        edff_793242_0
+                                    handshake_ff_793242_1
+                                        cdffr_T_logic_Z_1yB__17
+                                        edff_793242_1
+                                    handshake_ff_793242_2
+                                        cdffr_T_logic_Z_1yB__18
+                                        edff_793242_2
+                                    handshake_ff_793242_3
+                                        cdffr_T_logic_Z_1yB__19
+                                        edff_793242_3
+                                    handshake_ff_793242_4
+                                        cdffr_T_logic_Z_1yB__20
+                                        edff_793242_4
+                                    handshake_ff_793242_5
+                                        cdffr_T_logic_Z_1yB__21
+                                        edff_793242_5
+                                    handshake_ff_793242_6
+                                        cdffr_T_logic_Z_1yB__22
+                                        edff_793242_6
+                                    handshake_ff_793242_7
+                                        cdffr_T_logic_Z_1yB__23
+                                        edff_793242_7
+                                    handshake_ff_793242_8
+                                        cdffr_T_logic_Z_1yB__24
+                                        edff_793242_8
+                                    handshake_ff_793242_9
+                                        cdffr_T_logic_Z_1yB__25
+                                        edff_793242_9
+                                    handshake_ff_793242_10
+                                        cdffr_T_logic_Z_1yB__26
+                                        edff_793242_10
+                                    handshake_ff_793242_11
+                                        cdffr_T_logic_Z_1yB__27
+                                        edff_793242_11
+                                    handshake_ff_793242_12
+                                        cdffr_T_logic_Z_1yB__28
+                                        edff_793242_12
+                                    handshake_ff_793242_13
+                                        cdffr_T_logic_Z_1yB__29
+                                        edff_793242_13
+                                    handshake_ff_793242_14
+                                        cdffr_T_logic_Z_1yB__30
+                                        edff_793242_14
+                                    handshake_ff_793242_15
+                                        cdffr_T_logic_Z_1yB__31
+                                        edff_793242_15
+                                rvv_backend_pmtrdt_unit_reduction                                                       r
+                                    adder_ADD_NUM4_ADD_WIDTH8_0                                                         r
+                                    adder_ADD_NUM4_ADD_WIDTH8_1                                                         r
+                                    adder_ADD_NUM4_ADD_WIDTH8_2                                                         r
+                                    adder_ADD_NUM4_ADD_WIDTH8_3                                                         r
+                                    barrel_shifter_DATA_WIDTH128_0
+                                    cdffr_0_587242
+                                    cdffr_476242
+                                    cdffr_502242_32
+                                    cdffr_T_logic_Z_1yB__34
+                                    edff_240242_1
+                                    edff_348242
+                                    edff_424242_1
+                                    edff_468242
+                                    edff_682242_1_1
+                                    edff_999242_1
+                                    edff_999242_2
+                                    edff_999242_3
+                                    edff_999242_4
+                                    handshake_ff_378242_0
+                                        cdffr_T_logic_Z_1yB__32
+                                        edff_378242_0
+                                    handshake_ff_378242_1
+                                        cdffr_T_logic_Z_1yB__33
+                                        edff_378242_1
+                                    rvv_backend_pmtrdt_unit_reduction_alu_ALU_WIDTH8_0                                  r
+                                    rvv_backend_pmtrdt_unit_reduction_alu_ALU_WIDTH8_1                                  r
+                                    rvv_backend_pmtrdt_unit_reduction_alu_ALU_WIDTH8_2                                  r
+                                    rvv_backend_pmtrdt_unit_reduction_alu_ALU_WIDTH8_3                                  r
+                                    rvv_backend_pmtrdt_unit_reduction_alu_ALU_WIDTH16_0                                 r
+                                    rvv_backend_pmtrdt_unit_reduction_alu_ALU_WIDTH16_1                                 r
+                                    rvv_backend_pmtrdt_unit_reduction_alu_ALU_WIDTH32_0                                 r
+                                    rvv_backend_pmtrdt_unit_reduction_alu_ALU_WIDTH32_1                                 r
+                                    rvv_backend_pmtrdt_unit_reduction_alu_ALU_WIDTH32_2                                 r
+                                    rvv_backend_pmtrdt_unit_reduction_alu_ALU_WIDTH32_3                                 r
+                        rvv_backend_retire
+                            rvv_backend_retire_waw_UOP_NUM2                                                             r
+                            rvv_backend_retire_waw_UOP_NUM3                                                             r
+                            rvv_backend_retire_waw_UOP_NUM4                                                             r
+                        rvv_backend_rob                                                                                 r
+                            edff
+                            multi_fifo_3_4_8_1_1_1_355242                                                               r
+                                cdffr_587242_29
+                                cdffr_844242_2
+                                cdffr_844242_3
+                            multi_fifo__logic_Z_1yB__3_4_8_1_1_1_1                                                      r
+                                cdffr_844242_0
+                                cdffr_844242_1
+                        rvv_backend_vrf
+                            rvv_backend_vrf_reg
+                                edff_502242_16
+                                edff_502242_17
+                                edff_502242_18
+                                edff_502242_19
+                                edff_502242_20
+                                edff_502242_21
+                                edff_502242_22
+                                edff_502242_23
+                                edff_502242_24
+                                edff_502242_25
+                                edff_502242_26
+                                edff_502242_27
+                                edff_502242_28
+                                edff_502242_29
+                                edff_502242_30
+                                edff_502242_31
+                                edff_502242_32
+                                edff_502242_33
+                                edff_502242_34
+                                edff_502242_35
+                                edff_502242_36
+                                edff_502242_37
+                                edff_502242_38
+                                edff_502242_39
+                                edff_502242_40
+                                edff_502242_41
+                                edff_502242_42
+                                edff_502242_43
+                                edff_502242_44
+                                edff_502242_45
+                                edff_502242_46
+                                edff_502242_47
+                                edff_502242_48
+                                edff_502242_49
+                                edff_502242_50
+                                edff_502242_51
+                                edff_502242_52
+                                edff_502242_53
+                                edff_502242_54
+                                edff_502242_55
+                                edff_502242_56
+                                edff_502242_57
+                                edff_502242_58
+                                edff_502242_59
+                                edff_502242_60
+                                edff_502242_61
+                                edff_502242_62
+                                edff_502242_63
+                                edff_502242_64
+                                edff_502242_65
+                                edff_502242_66
+                                edff_502242_67
+                                edff_502242_68
+                                edff_502242_69
+                                edff_502242_70
+                                edff_502242_71
+                                edff_502242_72
+                                edff_502242_73
+                                edff_502242_74
+                                edff_502242_75
+                                edff_502242_76
+                                edff_502242_77
+                                edff_502242_78
+                                edff_502242_79
+                                edff_502242_80
+                                edff_502242_81
+                                edff_502242_82
+                                edff_502242_83
+                                edff_502242_84
+                                edff_502242_85
+                                edff_502242_86
+                                edff_502242_87
+                                edff_502242_88
+                                edff_502242_89
+                                edff_502242_90
+                                edff_502242_91
+                                edff_502242_92
+                                edff_502242_93
+                                edff_502242_94
+                                edff_502242_95
+                                edff_502242_96
+                                edff_502242_97
+                                edff_502242_98
+                                edff_502242_99
+                                edff_502242_100
+                                edff_502242_101
+                                edff_502242_102
+                                edff_502242_103
+                                edff_502242_104
+                                edff_502242_105
+                                edff_502242_106
+                                edff_502242_107
+                                edff_502242_108
+                                edff_502242_109
+                                edff_502242_110
+                                edff_502242_111
+                                edff_502242_112
+                                edff_502242_113
+                                edff_502242_114
+                                edff_502242_115
+                                edff_502242_116
+                                edff_502242_117
+                                edff_502242_118
+                                edff_502242_119
+                                edff_502242_120
+                                edff_502242_121
+                                edff_502242_122
+                                edff_502242_123
+                                edff_502242_124
+                                edff_502242_125
+                                edff_502242_126
+                                edff_502242_127
+                                edff_502242_128
+                                edff_502242_129
+                                edff_502242_130
+                                edff_502242_131
+                                edff_502242_132
+                                edff_502242_133
+                                edff_502242_134
+                                edff_502242_135
+                                edff_502242_136
+                                edff_502242_137
+                                edff_502242_138
+                                edff_502242_139
+                                edff_502242_140
+                                edff_502242_141
+                                edff_502242_142
+                                edff_502242_143
+                                edff_502242_144
+                                edff_502242_145
+                                edff_502242_146
+                                edff_502242_147
+                                edff_502242_148
+                                edff_502242_149
+                                edff_502242_150
+                                edff_502242_151
+                                edff_502242_152
+                                edff_502242_153
+                                edff_502242_154
+                                edff_502242_155
+                                edff_502242_156
+                                edff_502242_157
+                                edff_502242_158
+                                edff_502242_159
+                                edff_502242_160
+                                edff_502242_161
+                                edff_502242_162
+                                edff_502242_163
+                                edff_502242_164
+                                edff_502242_165
+                                edff_502242_166
+                                edff_502242_167
+                                edff_502242_168
+                                edff_502242_169
+                                edff_502242_170
+                                edff_502242_171
+                                edff_502242_172
+                                edff_502242_173
+                                edff_502242_174
+                                edff_502242_175
+                                edff_502242_176
+                                edff_502242_177
+                                edff_502242_178
+                                edff_502242_179
+                                edff_502242_180
+                                edff_502242_181
+                                edff_502242_182
+                                edff_502242_183
+                                edff_502242_184
+                                edff_502242_185
+                                edff_502242_186
+                                edff_502242_187
+                                edff_502242_188
+                                edff_502242_189
+                                edff_502242_190
+                                edff_502242_191
+                                edff_502242_192
+                                edff_502242_193
+                                edff_502242_194
+                                edff_502242_195
+                                edff_502242_196
+                                edff_502242_197
+                                edff_502242_198
+                                edff_502242_199
+                                edff_502242_200
+                                edff_502242_201
+                                edff_502242_202
+                                edff_502242_203
+                                edff_502242_204
+                                edff_502242_205
+                                edff_502242_206
+                                edff_502242_207
+                                edff_502242_208
+                                edff_502242_209
+                                edff_502242_210
+                                edff_502242_211
+                                edff_502242_212
+                                edff_502242_213
+                                edff_502242_214
+                                edff_502242_215
+                                edff_502242_216
+                                edff_502242_217
+                                edff_502242_218
+                                edff_502242_219
+                                edff_502242_220
+                                edff_502242_221
+                                edff_502242_222
+                                edff_502242_223
+                                edff_502242_224
+                                edff_502242_225
+                                edff_502242_226
+                                edff_502242_227
+                                edff_502242_228
+                                edff_502242_229
+                                edff_502242_230
+                                edff_502242_231
+                                edff_502242_232
+                                edff_502242_233
+                                edff_502242_234
+                                edff_502242_235
+                                edff_502242_236
+                                edff_502242_237
+                                edff_502242_238
+                                edff_502242_239
+                                edff_502242_240
+                                edff_502242_241
+                                edff_502242_242
+                                edff_502242_243
+                                edff_502242_244
+                                edff_502242_245
+                                edff_502242_246
+                                edff_502242_247
+                                edff_502242_248
+                                edff_502242_249
+                                edff_502242_250
+                                edff_502242_251
+                                edff_502242_252
+                                edff_502242_253
+                                edff_502242_254
+                                edff_502242_255
+                                edff_502242_256
+                                edff_502242_257
+                                edff_502242_258
+                                edff_502242_259
+                                edff_502242_260
+                                edff_502242_261
+                                edff_502242_262
+                                edff_502242_263
+                                edff_502242_264
+                                edff_502242_265
+                                edff_502242_266
+                                edff_502242_267
+                                edff_502242_268
+                                edff_502242_269
+                                edff_502242_270
+                                edff_502242_271
+                                edff_502242_272
+                                edff_502242_273
+                                edff_502242_274
+                                edff_502242_275
+                                edff_502242_276
+                                edff_502242_277
+                                edff_502242_278
+                                edff_502242_279
+                                edff_502242_280
+                                edff_502242_281
+                                edff_502242_282
+                                edff_502242_283
+                                edff_502242_284
+                                edff_502242_285
+                                edff_502242_286
+                                edff_502242_287
+                                edff_502242_288
+                                edff_502242_289
+                                edff_502242_290
+                                edff_502242_291
+                                edff_502242_292
+                                edff_502242_293
+                                edff_502242_294
+                                edff_502242_295
+                                edff_502242_296
+                                edff_502242_297
+                                edff_502242_298
+                                edff_502242_299
+                                edff_502242_300
+                                edff_502242_301
+                                edff_502242_302
+                                edff_502242_303
+                                edff_502242_304
+                                edff_502242_305
+                                edff_502242_306
+                                edff_502242_307
+                                edff_502242_308
+                                edff_502242_309
+                                edff_502242_310
+                                edff_502242_311
+                                edff_502242_312
+                                edff_502242_313
+                                edff_502242_314
+                                edff_502242_315
+                                edff_502242_316
+                                edff_502242_317
+                                edff_502242_318
+                                edff_502242_319
+                                edff_502242_320
+                                edff_502242_321
+                                edff_502242_322
+                                edff_502242_323
+                                edff_502242_324
+                                edff_502242_325
+                                edff_502242_326
+                                edff_502242_327
+                                edff_502242_328
+                                edff_502242_329
+                                edff_502242_330
+                                edff_502242_331
+                                edff_502242_332
+                                edff_502242_333
+                                edff_502242_334
+                                edff_502242_335
+                                edff_502242_336
+                                edff_502242_337
+                                edff_502242_338
+                                edff_502242_339
+                                edff_502242_340
+                                edff_502242_341
+                                edff_502242_342
+                                edff_502242_343
+                                edff_502242_344
+                                edff_502242_345
+                                edff_502242_346
+                                edff_502242_347
+                                edff_502242_348
+                                edff_502242_349
+                                edff_502242_350
+                                edff_502242_351
+                                edff_502242_352
+                                edff_502242_353
+                                edff_502242_354
+                                edff_502242_355
+                                edff_502242_356
+                                edff_502242_357
+                                edff_502242_358
+                                edff_502242_359
+                                edff_502242_360
+                                edff_502242_361
+                                edff_502242_362
+                                edff_502242_363
+                                edff_502242_364
+                                edff_502242_365
+                                edff_502242_366
+                                edff_502242_367
+                                edff_502242_368
+                                edff_502242_369
+                                edff_502242_370
+                                edff_502242_371
+                                edff_502242_372
+                                edff_502242_373
+                                edff_502242_374
+                                edff_502242_375
+                                edff_502242_376
+                                edff_502242_377
+                                edff_502242_378
+                                edff_502242_379
+                                edff_502242_380
+                                edff_502242_381
+                                edff_502242_382
+                                edff_502242_383
+                                edff_502242_384
+                                edff_502242_385
+                                edff_502242_386
+                                edff_502242_387
+                                edff_502242_388
+                                edff_502242_389
+                                edff_502242_390
+                                edff_502242_391
+                                edff_502242_392
+                                edff_502242_393
+                                edff_502242_394
+                                edff_502242_395
+                                edff_502242_396
+                                edff_502242_397
+                                edff_502242_398
+                                edff_502242_399
+                                edff_502242_400
+                                edff_502242_401
+                                edff_502242_402
+                                edff_502242_403
+                                edff_502242_404
+                                edff_502242_405
+                                edff_502242_406
+                                edff_502242_407
+                                edff_502242_408
+                                edff_502242_409
+                                edff_502242_410
+                                edff_502242_411
+                                edff_502242_412
+                                edff_502242_413
+                                edff_502242_414
+                                edff_502242_415
+                                edff_502242_416
+                                edff_502242_417
+                                edff_502242_418
+                                edff_502242_419
+                                edff_502242_420
+                                edff_502242_421
+                                edff_502242_422
+                                edff_502242_423
+                                edff_502242_424
+                                edff_502242_425
+                                edff_502242_426
+                                edff_502242_427
+                                edff_502242_428
+                                edff_502242_429
+                                edff_502242_430
+                                edff_502242_431
+                                edff_502242_432
+                                edff_502242_433
+                                edff_502242_434
+                                edff_502242_435
+                                edff_502242_436
+                                edff_502242_437
+                                edff_502242_438
+                                edff_502242_439
+                                edff_502242_440
+                                edff_502242_441
+                                edff_502242_442
+                                edff_502242_443
+                                edff_502242_444
+                                edff_502242_445
+                                edff_502242_446
+                                edff_502242_447
+                                edff_502242_448
+                                edff_502242_449
+                                edff_502242_450
+                                edff_502242_451
+                                edff_502242_452
+                                edff_502242_453
+                                edff_502242_454
+                                edff_502242_455
+                                edff_502242_456
+                                edff_502242_457
+                                edff_502242_458
+                                edff_502242_459
+                                edff_502242_460
+                                edff_502242_461
+                                edff_502242_462
+                                edff_502242_463
+                                edff_502242_464
+                                edff_502242_465
+                                edff_502242_466
+                                edff_502242_467
+                                edff_502242_468
+                                edff_502242_469
+                                edff_502242_470
+                                edff_502242_471
+                                edff_502242_472
+                                edff_502242_473
+                                edff_502242_474
+                                edff_502242_475
+                                edff_502242_476
+                                edff_502242_477
+                                edff_502242_478
+                                edff_502242_479
+                                edff_502242_480
+                                edff_502242_481
+                                edff_502242_482
+                                edff_502242_483
+                                edff_502242_484
+                                edff_502242_485
+                                edff_502242_486
+                                edff_502242_487
+                                edff_502242_488
+                                edff_502242_489
+                                edff_502242_490
+                                edff_502242_491
+                                edff_502242_492
+                                edff_502242_493
+                                edff_502242_494
+                                edff_502242_495
+                                edff_502242_496
+                                edff_502242_497
+                                edff_502242_498
+                                edff_502242_499
+                                edff_502242_500
+                                edff_502242_501
+                                edff_502242_502
+                                edff_502242_503
+                                edff_502242_504
+                                edff_502242_505
+                                edff_502242_506
+                                edff_502242_507
+                                edff_502242_508
+                                edff_502242_509
+                                edff_502242_510
+                                edff_502242_511
+                                edff_502242_512
+                                edff_502242_513
+                                edff_502242_514
+                                edff_502242_515
+                                edff_502242_516
+                                edff_502242_517
+                                edff_502242_518
+                                edff_502242_519
+                                edff_502242_520
+                                edff_502242_521
+                                edff_502242_522
+                                edff_502242_523
+                                edff_502242_524
+                                edff_502242_525
+                                edff_502242_526
+                                edff_502242_527
+        SCore                                                                                                           r
+            Alu_0                                                                                                       r
+            Alu_1                                                                                                       r
+            Alu_2                                                                                                       r
+            Alu_3                                                                                                       r
+            Arbiter2_CsrCmd
+            Arbiter5_RegfileWriteDataIO
+            Bru                                                                                                         r
+            Bru_1_0                                                                                                     r
+            Bru_1_1                                                                                                     r
+            Bru_1_2                                                                                                     r
+            Csr                                                                                                         r
+            DispatchV2                                                                                                  r
+            Dvu                                                                                                         r
+            FRegfile                                                                                                    r
+            FaultManager                                                                                                r
+            FloatCore
+                FloatCoreWrapper
+                    fpnew_top_00000010302_1_012242
+                        fpnew_opgroup_block_0_00000020_0_1_10_2_155_3__logic_Z_1yB__00000000_622949
+                            fpnew_opgroup_fmt_slice_0_0_00000020_0_00000003_3__logic_Z_1yB__00000000
+                                fpnew_fma_0_00000003_3__logic_Z_1yB___logic_Z_1yB_                                      r
+                                    fpnew_classifier_0_3_9
+                                    fpnew_rounding_0000001f_9                                                           r
+                                    lzc_00000033_1_9
+                            rr_arb_tree_00000005_1_630242
+                        fpnew_opgroup_block_1_00000020_0_1_10_2_2aa_3__logic_Z_1yB__00000000_622949
+                            fpnew_opgroup_multifmt_slice_1_00000020_10_2_0_1_00000003_3__logic_Z_1yB_
+                                fpnew_divsqrt_th_32_00000003_3__logic_Z_1yB__790242
+                                    pa_fdsu_top
+                                        pa_fdsu_ctrl                                                                    r
+                                            gated_clk_cell_52
+                                            gated_clk_cell_53
+                                            gated_clk_cell_54
+                                            gated_clk_cell_55
+                                        pa_fdsu_pack_single                                                             r
+                                        pa_fdsu_prepare
+                                            pa_fdsu_ff1
+                                        pa_fdsu_round_single                                                            r
+                                            gated_clk_cell_56
+                                        pa_fdsu_special
+                                        pa_fdsu_srt_single                                                              r
+                                            gated_clk_cell_57
+                                            gated_clk_cell_58
+                                            gated_clk_cell_59
+                                    pa_fpu_dp
+                                        gated_clk_cell_60
+                                        pa_fpu_src_type_1
+                                        pa_fpu_src_type_2
+                                    pa_fpu_frbus
+                            rr_arb_tree_00000005_1_184242
+                        fpnew_opgroup_block_2_00000020_0_1_10_2_155_3__logic_Z_1yB__00000000_622949
+                            fpnew_opgroup_fmt_slice_2_0_00000020_0_00000003_3__logic_Z_1yB__00000000
+                                fpnew_noncomp_0_00000003_3__logic_Z_1yB___logic_Z_1yB_                                  r
+                                    fpnew_classifier_0_2_9
+                            rr_arb_tree_00000005_1_387242
+                        fpnew_opgroup_block_3_00000020_0_1_10_2_2aa_3__logic_Z_1yB__00000000_622949
+                            fpnew_opgroup_multifmt_slice_3_00000020_10_2_0_1_00000003_3__logic_Z_1yB_
+                                fpnew_cast_multi_10_2_00000003_3__logic_Z_1yB__790242                                   r
+                                    fpnew_classifier_0_1_8
+                                    fpnew_rounding_00000020_8                                                           r
+                                    lzc_00000020_1_8
+                            rr_arb_tree_00000005_1_481242
+                        rr_arb_tree_00000004_1_150242                                                                   r
+                            lzc_00000004_0_0
+                            lzc_00000004_0_1
+                Queue1_FloatInstruction
+                Queue2_RegfileWriteDataIO
+                    ram_2x37
+            LsuV2                                                                                                       r
+                Aligner_119_4
+                    Aligner_N4_809242                                                                                   r
+                CircularBufferMulti_1                                                                                   r
+            Mlu                                                                                                         r
+                Arbiter4_MluCmd
+                Queue1_MluStage1
+                Queue1_MluStage2
+            Regfile                                                                                                     r
+            RetirementBuffer                                                                                            r
+                CircularBufferMulti_2                                                                                   r
+            UncachedFetch
+                FetchControl                                                                                            r
+                Fetcher
+                InstructionBuffer                                                                                       r
+                    CircularBufferMulti                                                                                 r
+    SRAM_0
+    SRAM_1
+    TCM128_0
+        SRAM_65536x128_0
+            Sram_2048x128_0
+            Sram_2048x128_1
+            Sram_2048x128_2
+            Sram_2048x128_3
+            Sram_2048x128_4
+            Sram_2048x128_5
+            Sram_2048x128_6
+            Sram_2048x128_7
+            Sram_2048x128_8
+            Sram_2048x128_9
+            Sram_2048x128_10
+            Sram_2048x128_11
+            Sram_2048x128_12
+            Sram_2048x128_13
+            Sram_2048x128_14
+            Sram_2048x128_15
+            Sram_2048x128_16
+            Sram_2048x128_17
+            Sram_2048x128_18
+            Sram_2048x128_19
+            Sram_2048x128_20
+            Sram_2048x128_21
+            Sram_2048x128_22
+            Sram_2048x128_23
+            Sram_2048x128_24
+            Sram_2048x128_25
+            Sram_2048x128_26
+            Sram_2048x128_27
+            Sram_2048x128_28
+            Sram_2048x128_29
+            Sram_2048x128_30
+            Sram_2048x128_31
+    TCM128_1
+        SRAM_65536x128_1
+            Sram_2048x128_32
+            Sram_2048x128_33
+            Sram_2048x128_34
+            Sram_2048x128_35
+            Sram_2048x128_36
+            Sram_2048x128_37
+            Sram_2048x128_38
+            Sram_2048x128_39
+            Sram_2048x128_40
+            Sram_2048x128_41
+            Sram_2048x128_42
+            Sram_2048x128_43
+            Sram_2048x128_44
+            Sram_2048x128_45
+            Sram_2048x128_46
+            Sram_2048x128_47
+            Sram_2048x128_48
+            Sram_2048x128_49
+            Sram_2048x128_50
+            Sram_2048x128_51
+            Sram_2048x128_52
+            Sram_2048x128_53
+            Sram_2048x128_54
+            Sram_2048x128_55
+            Sram_2048x128_56
+            Sram_2048x128_57
+            Sram_2048x128_58
+            Sram_2048x128_59
+            Sram_2048x128_60
+            Sram_2048x128_61
+            Sram_2048x128_62
+            Sram_2048x128_63
+1

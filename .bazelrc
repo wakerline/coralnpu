@@ -47,6 +47,10 @@ run --action_env=VERDI_HOME
 run --action_env=LM_LICENSE_FILE
 run --action_env=XILINXD_LICENSE_FILE
 
+build:vcs --action_env=CCACHE_DISABLE=1
+test:vcs --action_env=CCACHE_DISABLE=1
+run:vcs --action_env=CCACHE_DISABLE=1
+
 # Add config to enable VCS targets.
 build:vcs --build_tag_filters="vcs"
 test:vcs --build_tag_filters="vcs"
@@ -82,3 +86,23 @@ build --linkopt=-fuse-ld=bfd
 # Disable LLD-specific "start-lib" optimization (incompatible with BFD)
 build --host_features=-supports_start_end_lib
 build --features=-supports_start_end_lib
+
+# cpu usage
+build --jobs=16
+run --jobs=16
+
+# gcc and g++ env
+build --action_env=CC=/home/wangyy/002_research/tools/noccache-bin/gcc
+build --action_env=CXX=/home/wangyy/002_research/tools/noccache-bin/g++
+build --repo_env=CC=/home/wangyy/002_research/tools/noccache-bin/gcc
+build --repo_env=CXX=/home/wangyy/002_research/tools/noccache-bin/g++
+
+test --action_env=CC=/home/wangyy/002_research/tools/noccache-bin/gcc
+test --action_env=CXX=/home/wangyy/002_research/tools/noccache-bin/g++
+test --repo_env=CC=/home/wangyy/002_research/tools/noccache-bin/gcc
+test --repo_env=CXX=/home/wangyy/002_research/tools/noccache-bin/g++
+
+run --action_env=CC=/home/wangyy/002_research/tools/noccache-bin/gcc
+run --action_env=CXX=/home/wangyy/002_research/tools/noccache-bin/g++
+run --repo_env=CC=/home/wangyy/002_research/tools/noccache-bin/gcc
+run --repo_env=CXX=/home/wangyy/002_research/tools/noccache-bin/g++

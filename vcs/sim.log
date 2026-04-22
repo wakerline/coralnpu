@@ -1,0 +1,111 @@
+Command: /home/wangyy/003_research/ara_clean/hardware/vcs/./simv -sv_lib /home/wangyy/003_research/ara_clean/hardware/build/work-dpi/ara_dpi +lint=TFIPC-L +vcs+loopreport +PRELOAD=/home/wangyy/003_research/ara_clean/apps/bin/rv64uv-ara-vadd -l sim.log
+Chronologic VCS simulator copyright 1991-2023
+Contains Synopsys proprietary information.
+Compiler version V-2023.12-SP1_Full64; Runtime version V-2023.12-SP1_Full64;  Apr 11 20:34 2026
+UVM_INFO /home/wangwy/software/synopsys/install/vcs/V-2023.12-SP1/etc/uvm-1.2/base/uvm_root.svh(402) @ 0: reporter [UVM/RELNOTES] 
+----------------------------------------------------------------
+UVM-1.2.Synopsys
+(C) 2007-2014 Mentor Graphics Corporation
+(C) 2007-2014 Cadence Design Systems, Inc.
+(C) 2006-2014 Synopsys, Inc.
+(C) 2011-2013 Cypress Semiconductor Corp.
+(C) 2013-2014 NVIDIA Corporation
+----------------------------------------------------------------
+
+  ***********       IMPORTANT RELEASE NOTES         ************
+
+  You are using a version of the UVM library that has been compiled
+  with `UVM_NO_DEPRECATED undefined.
+  See http://www.eda.org/svdb/view.php?id=3313 for more details.
+
+  You are using a version of the UVM library that has been compiled
+  with `UVM_OBJECT_DO_NOT_NEED_CONSTRUCTOR undefined.
+  See http://www.eda.org/svdb/view.php?id=3770 for more details.
+
+      (Specify +UVM_NO_RELNOTES to turn off this notice)
+
+[VCS - FSDB] Dumping to ara_tb.fsdb
+*Verdi* WARNING: 'Enable FSDB dumping with option -debug/-debug_pp/-debug_all and option -P along with novas.tab file' will be deprecated in VERDI2024.09.
+*Verdi* WARNING: Please use '-debug_access' along with a proper setting on VERDI_HOME environment variable in vcs compilation. For details, please refer to VCS manual for -debug_access usage.
+*Verdi* Loading libsscore_vcs202312.so
+FSDB Dumper for VCS, Release Verdi_V-2023.12-SP1, Linux x86_64/64bit, 03/03/2024
+(C) 1996 - 2024 by Synopsys, Inc.
+*Verdi* : Create FSDB file 'ara_tb.fsdb'
+*Verdi* : Begin traversing the scope (ara_tb), layer (0).
+*Verdi* : End of traversing.
+Dump results on ../gold_results.txt
+
+Warning-[RT-NCMUCS] No condition matches in statement
+/home/wangyy/003_research/ara_clean/hardware/src/axi_inval_filter.sv, 85
+  No condition matches in 'unique case' statement. 'default' specification is 
+  missing, inside ara_tb.dut.i_ara_soc.i_system.i_axi_inval_filter.inval_fsm, 
+  at time 0ps.
+
+Loading ELF file /home/wangyy/003_research/ara_clean/apps/bin/rv64uv-ara-vadd
+Loading section 0000000080000000 of length 0000000000004142
+Loading section 0000000080004150 of length 0000000000000690
+Loading section 00000000800047e0 of length 0000000000003ca8
+[TRACER] Output filename is: trace_hart_0.log
+Checking the results of the test case 1:
+PASSED.
+Checking the results of the test case 2:
+PASSED.
+Checking the results of the test case 3:
+PASSED.
+Checking the results of the test case 4:
+PASSED.
+Checking the results of the test case 5:
+PASSED.
+Checking the results of the test case 6:
+PASSED.
+Checking the results of the test case 7:
+PASSED.
+Checking the results of the test case 8:
+PASSED.
+Checking the results of the test case 9:
+PASSED.
+Checking the results of the test case 10:
+PASSED.
+Checking the results of the test case 11:
+PASSED.
+Checking the results of the test case 12:
+PASSED.
+Checking the results of the test case 13:
+PASSED.
+Checking the results of the test case 14:
+PASSED.
+Checking the results of the test case 15:
+PASSED.
+Checking the results of the test case 16:
+PASSED.
+Checking the results of the test case 17:
+PASSED.
+Checking the results of the test case 18:
+PASSED.
+Checking the results of the test case 19:
+PASSED.
+Checking the results of the test case 20:
+PASSED.
+Checking the results of the test case 21:
+PASSED.
+Checking the results of the test case 22:
+PASSED.
+Checking the results of the test case 23:
+PASSED.
+Checking the results of the test case 24:
+PASSED.
+Checking the results of the test case 25:
+PASSED.
+PASSED: /home/wangyy/003_research/ara_clean/apps/riscv-tests/isa/rv64uv/vadd.c!
+[hw-cycles]:           0
+[cva6-d$-stalls]:           0
+[cva6-i$-stalls]:           0
+[cva6-sb-full]:           0
+Info: "/home/wangyy/003_research/ara_clean/hardware/tb/ara_tb.sv", 213: ara_tb: at time 60507500 ps
+Core Test *** SUCCESS *** (tohost = 0)
+$finish called from file "/home/wangyy/003_research/ara_clean/hardware/tb/ara_tb.sv", line 219.
+$finish at simulation time             60507500
+           V C S   S i m u l a t i o n   R e p o r t 
+Time: 60507500 ps
+CPU Time:     35.970 seconds;       Data structure size:  39.4Mb
+Sat Apr 11 20:34:55 2026

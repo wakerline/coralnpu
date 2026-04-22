@@ -24,11 +24,13 @@ def _collect_verilog_files(dep):
     return all_files
 
 def _vcs_testbench_test_impl(ctx):
-    all_files = _collect_verilog_files(ctx.attr.deps)
+    all_files = _collect_verilog_files(ctx.attr.deps) + ctx.files.srcs
 
     vcs_binary_output = ctx.actions.declare_file(ctx.attr.module)
     vcs_daidir_output = ctx.actions.declare_directory(
         ctx.attr.module + ".daidir")
+    vcs_vdb_output = ctx.actions.declare_directory(
+        ctx.attr.module + ".vdb")
 
     verilog_files = []
     for file in all_files:
@@ -40,6 +42,12 @@ def _vcs_testbench_test_impl(ctx):
         "vcs",
         "-full64",
         "-sverilog",
+        "-kdb",
+        "+vcs+fsdbon",
+        "-debug_access+all",
+        "-timescale=1ns/1ps",
+        "-cm",
+        "line+tgl+fsm+cond+branch+assert",
     ]
     verilog_dirs = dict()
     for file in verilog_files:
@@ -50,13 +58,13 @@ def _vcs_testbench_test_impl(ctx):
     command.append(vcs_binary_output.path)
 
     ctx.actions.run_shell(
-        outputs=[vcs_binary_output, vcs_daidir_output],
+        outputs=[vcs_binary_output, vcs_daidir_output, vcs_vdb_output],
         inputs=verilog_files,
         command = " ".join(command),
         use_default_shell_env = True,
     )
 
-    return [DefaultInfo(runfiles=ctx.runfiles(files=[vcs_daidir_output]),
+    return [DefaultInfo(runfiles=ctx.runfiles(files=[vcs_daidir_output, vcs_vdb_output]),
                         executable=vcs_binary_output)]
 
 _vcs_testbench_test = rule(

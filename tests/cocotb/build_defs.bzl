@@ -36,6 +36,8 @@ VERILATOR_BUILD_ARGS = [
 
 VCS_BUILD_ARGS = [
     "-timescale=1ns/1ps",
+    "-Mcc=/home/wangyy/002_research/tools/noccache-bin/gcc",
+    "-Mcplusplus=/home/wangyy/002_research/tools/noccache-bin/g++",
     "-kdb",
     "+vcs+fsdbon",
     "-debug_access+all",
@@ -51,8 +53,11 @@ VCS_TEST_ARGS = [
     "+vcs+fsdbon",
     "+fsdb+mda",
     "+fsdb+struct",
+    "+fsdbfile+$TEST_UNDECLARED_OUTPUTS_DIR/waves.fsdb",
     "-cm",
     "line+cond+tgl+branch+assert",
+    "-cm_dir",
+    "$TEST_UNDECLARED_OUTPUTS_DIR/cov",
 ]
 
 VCS_DEFINES = {

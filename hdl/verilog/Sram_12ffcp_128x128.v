@@ -22,7 +22,34 @@ module Sram_12ffcp_128x128(
   output [127:0] rdata
 );
 
-`ifdef USE_TSMC12FFC
+`ifdef USE_TSMC28
+    wire [127:0] nwmask;
+    genvar i;
+    generate
+      for (i = 0; i < 16; i++) begin
+        assign nwmask[8*i +: 8] = {8{~wmask[i]}};
+      end
+    endgenerate
+    TS1N28HPCPLVTB128X128M4SWBSO u_tsmc28_sram
+    (
+      .SLP(1'b0),
+      .SD(1'b0),
+      .CLK(clock),
+      .CEB(~enable),
+      .WEB(~write),
+      .CEBM(1'b0),
+      .WEBM(1'b0),
+      .A(addr),
+      .D(wdata),
+      .BWEB(nwmask),
+      .AM(7'b0),
+      .DM(128'b0),
+      .BWEBM({128{1'b1}}),
+      .BIST(1'b0),
+      .Q(rdata)
+     );
+
+`elsif USE_TSMC12FFC
     wire [127:0] nwmask;
     genvar i;
     generate
@@ -93,7 +120,7 @@ module Sram_12ffcp_128x128(
     end
   end
 `else
-  $error("No SRAM implementation selected. Please define USE_TSMC12FFC or USE_GENERIC for build (thrown in Sram_12ffcp_128x128.v).");
+  $error("No SRAM implementation selected. Please define USE_TSMC28, USE_TSMC12FFC or USE_GENERIC for build (thrown in Sram_12ffcp_128x128.v).");
 `endif // FFCP12_SRAM
 
 endmodule

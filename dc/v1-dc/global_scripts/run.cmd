@@ -1,0 +1,1 @@
+dc_shell -64bit -f ../global_scripts/dc.tcl | tee dc.log

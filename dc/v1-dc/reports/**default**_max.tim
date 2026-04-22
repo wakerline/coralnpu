@@ -1,0 +1,24 @@
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -input_pins
+        -nets
+        -group **default**
+        -max_paths 100
+        -transition_time
+        -capacitance
+        -sort_by slack
+Design : RvvCoreMiniHighmemAxi
+Version: T-2022.03-SP2
+Date   : Sat Apr 18 10:47:01 2026
+****************************************
+
+ # A fanout number of 1000 was used for high fanout net computations.
+
+Operating Conditions: ssg0p72v125c   Library: tcbn28hpcplusbwp40p140lvtssg0p72v125c_ccs
+Wire Load Model Mode: segmented
+No paths.
+
+1

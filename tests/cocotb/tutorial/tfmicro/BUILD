@@ -101,10 +101,10 @@ cocotb_test_suite(
             "//coralnpu_test_utils:sim_test_fixture",
             "@rules_python//python/runfiles",
         ],
-        "data": ["run_mobilenet_v1_025_partial_binary.elf"],
+        "data": [":run_mobilenet_v1_025_partial_binary"],
     },
     vcs_build_args = VCS_BUILD_ARGS,
-    vcs_data = glob(["**/*.elf"]) + [
+    vcs_data = [":run_mobilenet_v1_025_partial_binary.elf"] + [
         "//tests/cocotb:coverage_exclude.cfg",
     ],
     vcs_defines = VCS_DEFINES,
@@ -351,4 +351,3 @@ cocotb_test_suite(
     },
     verilator_model = "//tests/cocotb:rvv_core_mini_highmem_axi_model",
 )
-

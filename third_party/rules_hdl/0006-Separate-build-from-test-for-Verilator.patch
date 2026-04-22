@@ -24,12 +24,18 @@ diff --git a/cocotb/cocotb.bzl b/cocotb/cocotb.bzl
 index 2b0a3c2..90c70bc 100644
 --- a/cocotb/cocotb.bzl
 +++ b/cocotb/cocotb.bzl
-@@ -161,6 +161,7 @@ def _get_test_command(ctx, verilog_files, vhdl_files):
+@@ -161,6 +161,13 @@ def _get_test_command(ctx, verilog_files, vhdl_files):
          waves_args +
          seed_args +
          test_module_args +
+-        ("&& cp -fr `pwd`/sim_build/simv.vdb $TEST_UNDECLARED_OUTPUTS_DIR" if ctx.attr.sim_name == "vcs" else "")
 +        (" --model {}".format(ctx.executable.model.short_path) if ctx.attr.sim_name == "verilator" else "" ) +
-         ("&& cp -fr `pwd`/sim_build/simv.vdb $TEST_UNDECLARED_OUTPUTS_DIR" if ctx.attr.sim_name == "vcs" else "")
++        (
++            "&& if [ -d `pwd`/sim_build/simv.vdb ]; then cp -fr `pwd`/sim_build/simv.vdb $TEST_UNDECLARED_OUTPUTS_DIR; fi " +
++            "&& if [ -d `pwd`/sim_build/simv.daidir ]; then cp -fr `pwd`/sim_build/simv.daidir $TEST_UNDECLARED_OUTPUTS_DIR; fi"
++            if ctx.attr.sim_name == "vcs" else
++            ""
++        )
      )
  
 @@ -185,7 +186,8 @@ def _cocotb_test_impl(ctx):
@@ -91,4 +97,3 @@ index ce392a9..1703e4f 100644
      sys.exit(num_failed)
 -- 
 2.50.0.727.gbf7dc18ff4-goog
-

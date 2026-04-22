@@ -1,0 +1,1 @@
+dc_shell -64bit -f ../local_scripts/soc_scan.tcl | tee dft.log

@@ -1,0 +1,10 @@
+
+-- Mapping default work directory
+WORK > DEFAULT
+DEFAULT : ./work
+
+-- Library Mapping
+IEEE : $VCS_HOME/linux64/packages/IEEE/lib
+
+SYNOPSYS : $VCS_HOME/linux64/packages/synopsys/lib
+
