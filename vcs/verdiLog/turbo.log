@@ -1,3 +1,0 @@
-Command Line: /home/wangwy/software/synopsys/install/verdi/V-2023.12-SP1/platform/LINUXAMD64/bin/Novas -dbdir ./simv.daidir -ssf ara_tb.fsdb
-uname(Linux t7920 5.14.0-503.22.1.el9_5.x86_64 #1 SMP PREEMPT_DYNAMIC Wed Jan 22 13:59:07 UTC 2025 x86_64)
-au time 460.606344 10.984523 1.896563 delta 317575168 317575168 total 912416768 912416768
