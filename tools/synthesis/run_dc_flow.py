@@ -185,10 +185,10 @@ def resolve_from_test_label(label: str) -> tuple[str, str]:
 
 def render_gui_setup(gui_path: Path, design_name: str, vcs_option: str, backup: bool) -> None:
     original = gui_path.read_text(encoding="utf-8")
-    if backup:
-        backup_path = gui_path.with_suffix(gui_path.suffix + ".orig")
-        if not backup_path.exists():
-            shutil.copyfile(gui_path, backup_path)
+    # if backup:
+    #     backup_path = gui_path.with_suffix(gui_path.suffix + ".orig")
+    #     if not backup_path.exists():
+    #         shutil.copyfile(gui_path, backup_path)
 
     rendered = replace_tcl_var(original, "GUI_DESIGN_NAME", design_name)
     rendered = replace_tcl_var(rendered, "GUI_VCS_OPTION", vcs_option)

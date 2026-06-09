@@ -61,6 +61,7 @@ cocotb_test_suite(
     vcs_build_args = VCS_BUILD_ARGS,
     vcs_data = [
         ":scalar_cycle_counter.elf",
+        "//hdl/verilog:dpi_files",
         "//tests/cocotb/cycle_counter:pipeline_trace.py",
     ] + [
         "//tests/cocotb:coverage_exclude.cfg",
