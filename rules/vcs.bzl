@@ -18,7 +18,7 @@ load("@rules_hdl//verilog:providers.bzl", "VerilogInfo")
 load("@coralnpu_hw//rules:verilog.bzl", "collect_verilog_files")
 
 def _vcs_testbench_test_impl(ctx):
-    all_files = _collect_verilog_files(ctx.attr.deps) + ctx.files.srcs
+    all_files = collect_verilog_files(ctx.attr.deps).to_list() + ctx.files.srcs
 
     vcs_binary_output = ctx.actions.declare_file(ctx.attr.module)
     vcs_daidir_output = ctx.actions.declare_directory(
@@ -259,4 +259,3 @@ _vcs_binary = rule(
 
 def vcs_binary(name, tags=[], **kwargs):
     _vcs_binary(name = name, tags = ["vcs"] + tags, **kwargs)
-
