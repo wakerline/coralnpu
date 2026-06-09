@@ -52,6 +52,11 @@ fi
 export LD_LIBRARY_PATH=$EXECROOT/%{VCS_LIB_DIR}%${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 mkdir -p %{OUTDIR_NAME}%_tmp
 cd %{OUTDIR_NAME}%_tmp
+mkdir -p vcs_tmp csrc
+export TMPDIR="$PWD/vcs_tmp"
+export TEMP_DIRECTORY="$PWD/vcs_tmp"
+export CCACHE_DISABLE=1
+export CCACHE_TEMPDIR="$PWD/vcs_tmp"
 vcs %{VCS_OPTS}% %{LOAD_ARG}% %{BUILD_ARGS}% %{INCLUDES}% %{DEFINES}% %{PARAMETERS}% -top %{HDL_TOPLEVEL}% %{SOURCES}% -o simv
 cp simv $EXECROOT/%{OUTPUT_SIMV}%
 mkdir -p $EXECROOT/%{OUTPUT_DAIDIR}%

@@ -30,7 +30,83 @@ module Sram #(
   ///// SRAM Selection //////
   ///////////////////////////
 
-`ifdef USE_TSMC12FFC
+`ifdef USE_TSMC28
+  ///////////////////////////
+  ////// TSMC28 SRAM ////////
+  ///////////////////////////
+  wire [127:0] nwmask;
+  genvar i_wmask;
+  generate
+    for (i_wmask = 0; i_wmask < 16; i_wmask = i_wmask + 1) begin : gen_wmask
+      assign nwmask[8*i_wmask+:8] = {8{~wmask[i_wmask]}};
+    end
+  endgenerate
+
+  if (NUM_ENTRIES == 2048) begin
+    TS1N28HPCPLVTB2048X128M4SWBSO u_sram (
+        .SLP(1'b0),
+        .SD(1'b0),
+        .CLK(clock),
+        .CEB(~enable),
+        .WEB(~write),
+        .CEBM(1'b0),
+        .WEBM(1'b0),
+        .A(addr),
+        .D(wdata),
+        .BWEB(nwmask),
+        .AM(11'b0),
+        .DM(128'b0),
+        .BWEBM({128{1'b1}}),
+        .BIST(1'b0),
+        .Q(rdata)
+    );
+  end else if (NUM_ENTRIES == 512) begin
+    TS1N28HPCPLVTB512X128M4SWBSO u_sram (
+        .SLP(1'b0),
+        .SD(1'b0),
+        .CLK(clock),
+        .CEB(~enable),
+        .WEB(~write),
+        .CEBM(1'b0),
+        .WEBM(1'b0),
+        .A(addr),
+        .D(wdata),
+        .BWEB(nwmask),
+        .AM(9'b0),
+        .DM(128'b0),
+        .BWEBM({128{1'b1}}),
+        .BIST(1'b0),
+        .Q(rdata)
+    );
+  end else if (NUM_ENTRIES == 128) begin
+    TS1N28HPCPLVTB128X128M4SWBSO u_sram (
+        .SLP(1'b0),
+        .SD(1'b0),
+        .CLK(clock),
+        .CEB(~enable),
+        .WEB(~write),
+        .CEBM(1'b0),
+        .WEBM(1'b0),
+        .A(addr),
+        .D(wdata),
+        .BWEB(nwmask),
+        .AM(7'b0),
+        .DM(128'b0),
+        .BWEBM({128{1'b1}}),
+        .BIST(1'b0),
+        .Q(rdata)
+    );
+  end else begin
+    initial begin
+      $error("Unsupported SRAM size for TSMC28: %d", NUM_ENTRIES);
+    end
+  end
+
+  reg rvalid_reg;
+  always @(posedge clock) rvalid_reg <= enable;
+  assign rvalid = rvalid_reg;
+
+`elsif USE_TSMC12FFC
   ///////////////////////////
   ///// TSMC12FFC SRAM //////
   ///////////////////////////

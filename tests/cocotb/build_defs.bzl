@@ -49,7 +49,7 @@ VCS_BUILD_ARGS = [
     "-cm",
     "line+cond+tgl+branch+assert",
     "-cm_hier",
-    "../tests/cocotb/coverage_exclude.cfg",
+    "$EXECROOT/tests/cocotb/coverage_exclude.cfg",
     # Required for zero-delay gate-level simulation. Without these, timing violations produce 'X'
     # which causes cocotb to crash with "ValueError: Cannot convert Logic('X') to bool".
     "+notimingcheck",
@@ -59,8 +59,8 @@ VCS_BUILD_ARGS = [
     "-rdynamic",
     "+vcs+lic+wait",
     "-CFLAGS",
-    "-I../hdl/verilog",
-    "../hdl/verilog/sram_backdoor.cc",
+    "-I$EXECROOT/hdl/verilog",
+    "$EXECROOT/hdl/verilog/sram_backdoor.cc",
     # TODO(davidgao): enable this when ready
     # "-xprop=../tests/cocotb/xprop.cfg",
 ]
@@ -89,7 +89,7 @@ VCS_DEFINES = {
 VCS_NETLIST_BUILD_ARGS = [
     arg
     for arg in VCS_BUILD_ARGS
-    if arg not in ["-I../hdl/verilog", "../hdl/verilog/sram_backdoor.cc"]
+    if arg not in ["-I$EXECROOT/hdl/verilog", "$EXECROOT/hdl/verilog/sram_backdoor.cc"]
 ]
 
 VCS_NETLIST_DEFINES = {
