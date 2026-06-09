@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Generate a DC-friendly filelist and patch GUI variables for CoralNPU."""
+"""Generate a DC-friendly filelist and patch GUI variables for CoralNPU.
+
+This tool accepts either:
+  1. An RTL generation label via --bazel-target/--top-module
+  2. A VCS cocotb test label, for example:
+       //tests/cocotb/tutorial:vcs_algo_2x2_test_algo_2x2
+     which is resolved back to the underlying RTL target and top module.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +16,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -54,6 +62,12 @@ def label_to_package(label: str) -> str:
     return label[2:].split(":", 1)[0]
 
 
+def split_label(label: str) -> tuple[str, str]:
+    if not label.startswith("//") or ":" not in label:
+        raise ValueError(f"Unsupported Bazel label: {label}")
+    return tuple(label[2:].split(":", 1))
+
+
 def build_top_sv_path(bazel_target: str, top_module: str) -> Path:
     package = label_to_package(bazel_target)
     return REPO_ROOT / "bazel-bin" / package / f"{top_module}.sv"
@@ -95,6 +109,80 @@ def replace_tcl_var(contents: str, var_name: str, value: str) -> str:
     return contents + replacement + "\n"
 
 
+def _find_macro_blocks(text: str, macro_name: str) -> list[str]:
+    blocks: list[str] = []
+    needle = f"{macro_name}("
+    cursor = 0
+    while True:
+        start = text.find(needle, cursor)
+        if start == -1:
+            break
+        index = start + len(needle)
+        depth = 1
+        while index < len(text) and depth > 0:
+            if text[index] == "(":
+                depth += 1
+            elif text[index] == ")":
+                depth -= 1
+            index += 1
+        blocks.append(text[start:index])
+        cursor = index
+    return blocks
+
+
+def _extract_first(block: str, pattern: str) -> Optional[str]:
+    match = re.search(pattern, block, re.DOTALL)
+    return match.group(1) if match else None
+
+
+def _parse_cocotb_suites(build_path: Path) -> list[dict[str, str]]:
+    text = build_path.read_text(encoding="utf-8")
+    suites: list[dict[str, str]] = []
+    for block in _find_macro_blocks(text, "cocotb_test_suite"):
+        name = _extract_first(block, r'name\s*=\s*"([^"]+)"')
+        hdl_toplevel = _extract_first(block, r'"hdl_toplevel"\s*:\s*"([^"]+)"')
+        vcs_verilog_source = _extract_first(
+            block,
+            r'vcs_verilog_sources\s*=\s*\[\s*"([^"]+)"',
+        )
+        if name and hdl_toplevel and vcs_verilog_source:
+            suites.append(
+                {
+                    "name": name,
+                    "hdl_toplevel": hdl_toplevel,
+                    "vcs_verilog_source": vcs_verilog_source,
+                }
+            )
+    return suites
+
+
+def resolve_from_test_label(label: str) -> tuple[str, str]:
+    package, target = split_label(label)
+    if not target.startswith("vcs_"):
+        raise ValueError(
+            f"Expected a VCS cocotb test label, got target '{target}' from {label}"
+        )
+
+    build_path = REPO_ROOT / package / "BUILD"
+    if not build_path.exists():
+        raise FileNotFoundError(f"BUILD file not found for {label}: {build_path}")
+
+    suites = _parse_cocotb_suites(build_path)
+    matches: list[dict[str, str]] = []
+    for suite in suites:
+        suite_target = f"vcs_{suite['name']}"
+        if target == suite_target or target.startswith(f"{suite_target}_"):
+            matches.append(suite)
+
+    if not matches:
+        raise ValueError(
+            f"Could not map test label {label} to a cocotb_test_suite in {build_path}"
+        )
+
+    suite = max(matches, key=lambda item: len(item["name"]))
+    return suite["vcs_verilog_source"], suite["hdl_toplevel"]
+
+
 def render_gui_setup(gui_path: Path, design_name: str, vcs_option: str, backup: bool) -> None:
     original = gui_path.read_text(encoding="utf-8")
     if backup:
@@ -129,6 +217,15 @@ def build_defines(sram_impl: str, extra_defines: list[str]) -> list[str]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "label",
+        nargs="?",
+        help=(
+            "Optional Bazel label. If a VCS cocotb test label is provided, "
+            "the script resolves the corresponding synthesis RTL target "
+            "and top module automatically."
+        ),
+    )
     parser.add_argument("--bazel-target", default=DEFAULT_BAZEL_TARGET)
     parser.add_argument("--bazel-config", default="synthesis")
     parser.add_argument("--top-module", default=DEFAULT_TOP)
@@ -156,13 +253,24 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
 
+    bazel_target = args.bazel_target
+    top_module = args.top_module
+    resolved_from_label = False
+
+    if args.label:
+        if args.label.startswith("//") and ":vcs_" in args.label:
+            bazel_target, top_module = resolve_from_test_label(args.label)
+            resolved_from_label = True
+        elif args.label.startswith("//"):
+            bazel_target = args.label
+
     dc_root = DEFAULT_DC_ROOT.resolve()
     gui_path = Path(args.gui_path).resolve() if args.gui_path else dc_root / "global_scripts" / "synopsys_dc.setup.gui"
     run_dir = dc_root / "run"
     filelist = Path(args.filelist).resolve() if args.filelist else run_dir / "coralnpu_dc.f"
-    top_sv = build_top_sv_path(args.bazel_target, args.top_module)
+    top_sv = build_top_sv_path(bazel_target, top_module)
 
-    maybe_bazel_build(args.bazel_target, args.bazel_config, args.skip_bazel_build)
+    maybe_bazel_build(bazel_target, args.bazel_config, args.skip_bazel_build)
 
     if not top_sv.exists():
         print(f"Top-level SystemVerilog file not found: {top_sv}", file=sys.stderr)
@@ -176,11 +284,15 @@ def main() -> int:
 
     write_filelist(filelist, top_sv, defines, include_dirs)
     vcs_option = f"-f {filelist.name}"
-    render_gui_setup(gui_path, args.top_module, vcs_option, backup=not args.no_backup)
+    render_gui_setup(gui_path, top_module, vcs_option, backup=not args.no_backup)
 
+    if resolved_from_label:
+        print(f"Resolved test label: {args.label}")
+    print(f"RTL target        : {bazel_target}")
+    print(f"Top module        : {top_module}")
     print(f"Generated filelist: {filelist}")
     print(f"Patched GUI file: {gui_path}")
-    print(f"GUI_DESIGN_NAME={args.top_module}")
+    print(f"GUI_DESIGN_NAME={top_module}")
     print(f"GUI_VCS_OPTION={vcs_option}")
 
     if args.run_dc:

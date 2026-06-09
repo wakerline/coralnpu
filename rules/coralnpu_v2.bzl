@@ -109,6 +109,16 @@ def _coralnpu_v2_binary_impl(ctx):
         user_compile_flags = ctx.attr.copts,
         defines = ctx.attr.defines,
     )
+    if ctx.files.objects:
+        object_outputs = cc_common.create_compilation_outputs(
+            objects = depset(ctx.files.objects),
+        )
+        compilation_outputs = cc_common.merge_compilation_outputs(
+            compilation_outputs = [
+                compilation_outputs,
+                object_outputs,
+            ],
+        )
     linking_outputs = cc_common.link(
         name = "{}.elf".format(ctx.label.name),
         actions = ctx.actions,
@@ -202,6 +212,7 @@ _coralnpu_v2_binary = _coralnpu_v2_rule(
         "srcs": attr.label_list(allow_files = True),
         "deps": attr.label_list(allow_empty = True, providers = [CcInfo]),
         "hdrs": attr.label_list(allow_files = [".h"], allow_empty = True),
+        "objects": attr.label_list(allow_files = [".o"], allow_empty = True),
         "copts": attr.string_list(),
         "defines": attr.string_list(),
         "linkopts": attr.string_list(),

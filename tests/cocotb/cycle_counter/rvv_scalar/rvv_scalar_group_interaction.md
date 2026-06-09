@@ -1,0 +1,8 @@
+| case | expected_order | load_dispatch_cycles | compute_dispatch_cycles | cross_group_same_cycle | group_dispatch_separated | lifetime_overlap | dual_dispatch_excluded_overlap | note |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| two_vector_loads_then_two_computes | loads_before_computes | 242;242 | 242;244 | yes | no | 15 | no | at least one load and compute co-dispatched; load-group and compute-group dispatch-to-retire windows overlap; load/compute dispatch order is mixed |
+| two_computes_then_two_vector_loads | computes_before_loads | 263;265 | 263;263 | yes | no | 8 | no | at least one load and compute co-dispatched; load-group and compute-group dispatch-to-retire windows overlap; load/compute dispatch order is mixed |
+| vector_load_compute_load_compute | mixed | 285;285 | 285;287 | yes | no | 15 | no | at least one load and compute co-dispatched; load-group and compute-group dispatch-to-retire windows overlap; load/compute dispatch order is mixed |
+| vector_compute_load_compute_load | mixed | 308;308 | 306;308 | yes | no | 10 | no | at least one load and compute co-dispatched; load-group and compute-group dispatch-to-retire windows overlap; load/compute dispatch order is mixed |
+| four_vector_loads_then_four_computes | loads_before_computes | 329;331;331;331 | 331;332;332;334 | yes | no | 23 | no | at least one load and compute co-dispatched; load-group and compute-group dispatch-to-retire windows overlap; load/compute dispatch order is mixed |
+| four_computes_then_four_vector_loads | computes_before_loads | 364;364;364;364 | 361;362;362;362 | no | yes | 7 | yes | no load/compute pair co-dispatched in the same cycle; load-group and compute-group dispatch-to-retire windows overlap; all computes dispatched before loads |

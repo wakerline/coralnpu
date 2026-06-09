@@ -1,0 +1,13 @@
+generated/
+logs/
+__pycache__/
+scripts/__pycache__/
+tests/__pycache__/
+*.output/
+*.elf
+dlr_ti_model
+onnx/float/model.onnx
+onnx/float/model_aux.h
+onnx/quant/model.onnx
+onnx/quant/model_aux.h
+golden_vectors/*_test_vector.c

@@ -48,6 +48,16 @@ cc_toolchain_config(
     # The compiler itself finds headers via its own discovery — we just
     # need to cover the roots that host GCC / Clang actually use.
     cxx_builtin_include_directories = [
+        "/opt/rh/gcc-toolset-14/root/usr/include/c++/14",
+        "/opt/rh/gcc-toolset-14/root/usr/include/c++/14/x86_64-redhat-linux",
+        "/opt/rh/gcc-toolset-14/root/usr/include/c++/14/backward",
+        "/usr/lib/clang/20/include",
+        "/usr/include/c++/14",
+        "/usr/include/x86_64-linux-gnu/c++/14",
+        "/usr/include/c++/14/backward",
+        "/usr/lib/llvm-19/lib/clang/19/include",
+        "/usr/local/include",
+        "/usr/include/x86_64-linux-gnu",
         "/usr/include",
         "/usr/local/include",
         "/usr/lib",

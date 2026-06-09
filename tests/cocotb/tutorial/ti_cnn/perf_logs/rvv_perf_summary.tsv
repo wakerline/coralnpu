@@ -1,0 +1,11 @@
+model	cycles	macs	operations	performance_op_per_cycle	utilization_percent	real_seconds	status
+rvv_cnn_ts_gen_base_100	454565	13288	26576	0.058465	2.923234	178.0	PASS
+rvv_cnn_ts_gen_base_100_int8	45873	13288	26576	0.579339	28.966930	38.4	PASS
+rvv_cnn_ts_gen_base_1k						900.0	TIMEOUT_900s
+rvv_cnn_ts_gen_base_1k_int8	767285	140752	281504	0.366883	18.344160	374.7	PASS
+rvv_cnn_ts_gen_base_4k	1071362	66896	133792	0.124880	6.244015	403.7	PASS
+rvv_cnn_ts_gen_base_4k_int8	559678	66896	133792	0.239052	11.952587	225.7	PASS
+rvv_cnn_ts_gen_base_6k	1822672	103952	207904	0.114066	5.703275	664.8	PASS
+rvv_cnn_ts_gen_base_6k_int8	1212543	103952	207904	0.171461	8.573057	440.4	PASS
+rvv_cnn_ts_gen_base_13k						900.1	TIMEOUT_900s
+rvv_cnn_ts_gen_base_13k_int8						900.0	TIMEOUT_900s

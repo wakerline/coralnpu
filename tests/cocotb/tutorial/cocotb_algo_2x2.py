@@ -20,8 +20,7 @@ from coralnpu_test_utils.core_mini_axi_interface import CoreMiniAxiInterface
 from cocotb.triggers import ClockCycles
 
 
-@cocotb.test()
-async def test_algo_2x2(dut):
+async def _run_algo_2x2(dut):
     core_mini_axi = CoreMiniAxiInterface(dut)
     await core_mini_axi.init()
     await core_mini_axi.reset()
@@ -68,3 +67,13 @@ async def test_algo_2x2(dut):
     assert done == 1
     assert status == 0
     assert (outputs == expected).all()
+
+
+@cocotb.test()
+async def test_algo_2x2(dut):
+    await _run_algo_2x2(dut)
+
+
+@cocotb.test()
+async def test_algo_2x2_rvv(dut):
+    await _run_algo_2x2(dut)

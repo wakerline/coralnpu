@@ -1,0 +1,52 @@
+OpenJDK 64-Bit Server VM warning: Options -Xverify:none and -noverify were deprecated in JDK 13 and will likely be removed in a future release.
+Computing main repo mapping: 
+Computing main repo mapping: 
+DEBUG: /home/wangyy/.cache/bazel/_bazel_wangyy/f5fc6ae1de374dadc178c2e803fe3ac1/external/tflite_micro/third_party/repo.bzl:86:14: 
+Warning: skipping import of repository 'bazel_skylib' because it already exists.
+Computing main repo mapping: 
+WARNING: Streamed test output requested. All tests will be run locally, without sharding, one at a time
+Loading: 
+Loading: 0 packages loaded
+Analyzing: target //tests/cocotb/tutorial/ti_cnn:cocotb_ti_cnn_test_ti_cnn_models (1 packages loaded, 0 targets configured)
+Analyzing: target //tests/cocotb/tutorial/ti_cnn:cocotb_ti_cnn_test_ti_cnn_models (1 packages loaded, 0 targets configured)
+
+Analyzing: target //tests/cocotb/tutorial/ti_cnn:cocotb_ti_cnn_test_ti_cnn_models (107 packages loaded, 1836 targets configured)
+
+Analyzing: target //tests/cocotb/tutorial/ti_cnn:cocotb_ti_cnn_test_ti_cnn_models (249 packages loaded, 18711 targets configured)
+
+INFO: Analyzed target //tests/cocotb/tutorial/ti_cnn:cocotb_ti_cnn_test_ti_cnn_models (249 packages loaded, 18844 targets configured).
+[1,426 / 2,443] checking cached actions
+[2,443 / 2,444] [Prepa] Testing //tests/cocotb/tutorial/ti_cnn:cocotb_ti_cnn_test_ti_cnn_models
+[2,443 / 2,444] Testing //tests/cocotb/tutorial/ti_cnn:cocotb_ti_cnn_test_ti_cnn_models; 1s linux-sandbox
+     -.--ns INFO     gpi                                ..mbed/gpi_embed.cpp:93   in _embed_init_python              Using Python 3.11.9 interpreter at /home/wangyy/.cache/bazel/_bazel_wangyy/f5fc6ae1de374dadc178c2e803fe3ac1/sandbox/linux-sandbox/1/execroot/coralnpu_hw/bazel-out/k8-fastbuild/bin/tests/cocotb/tutorial/ti_cnn/cocotb_ti_cnn_test_ti_cnn_models_cocotb_runner.sh.runfiles/python311_x86_64-unknown-linux-gnu/bin/python3
+     -.--ns INFO     gpi                                ../gpi/GpiCommon.cpp:79   in gpi_print_registered_impl       VPI registered
+     0.00ns INFO     cocotb                             Running on Verilator version 5.032
+     0.00ns INFO     cocotb                             Seeding Python random module with supplied seed 42
+     0.00ns INFO     cocotb                             Initialized cocotb v2.0.0 from /home/wangyy/.cache/bazel/_bazel_wangyy/f5fc6ae1de374dadc178c2e803fe3ac1/sandbox/linux-sandbox/1/execroot/coralnpu_hw/bazel-out/k8-fastbuild/bin/tests/cocotb/tutorial/ti_cnn/cocotb_ti_cnn_test_ti_cnn_models_cocotb_runner.sh.runfiles/coralnpu_pip_deps_cocotb/cocotb
+Cannot read termcap database;
+using dumb terminal settings.
+     0.00ns WARNING  py.warnings                        /home/wangyy/.cache/bazel/_bazel_wangyy/f5fc6ae1de374dadc178c2e803fe3ac1/sandbox/linux-sandbox/1/execroot/coralnpu_hw/bazel-out/k8-fastbuild/bin/tests/cocotb/tutorial/ti_cnn/cocotb_ti_cnn_test_ti_cnn_models_cocotb_runner.sh.runfiles/coralnpu_pip_deps_cocotb/cocotb/_init.py:102: DeprecationWarning: COCOTB_TESTCASE is deprecated in favor of COCOTB_TEST_FILTER
+                                                          _setup_regression_manager()
+     0.00ns INFO     cocotb                             Running tests
+     0.00ns INFO     cocotb.regression                  running test_ti_cnn.test_ti_cnn_models (1/1)
+1517811.25ns INFO     cocotb.RvvCoreMiniHighmemAxi       rvv_cnn_ts_gen_base_6k_int8 passed: cycles=1212543 macs=103952 operations=207904 performance=0.171461 OP/cycle utilization=8.573057% output=[ 96 -70]
+1517811.25ns INFO     cocotb.regression                  test_ti_cnn.test_ti_cnn_models passed
+1517811.25ns INFO     cocotb.regression                  ****************************************************************************************
+                                                         ** TEST                            STATUS  SIM TIME (ns)  REAL TIME (s)  RATIO (ns/s) **
+                                                         ****************************************************************************************
+                                                         ** test_ti_cnn.test_ti_cnn_models   PASS     1517811.25         418.57       3626.23  **
+                                                         ****************************************************************************************
+                                                         ** TESTS=1 PASS=1 FAIL=0 SKIP=0              1517811.25         418.58       3626.12  **
+                                                         ****************************************************************************************
+- :0: Verilog $finish
+[2,443 / 2,444] Testing //tests/cocotb/tutorial/ti_cnn:cocotb_ti_cnn_test_ti_cnn_models; 424s linux-sandbox
+INFO: Found 1 test target...
+Target //tests/cocotb/tutorial/ti_cnn:cocotb_ti_cnn_test_ti_cnn_models up-to-date:
+  bazel-bin/tests/cocotb/tutorial/ti_cnn/cocotb_ti_cnn_test_ti_cnn_models_cocotb_runner.sh
+INFO: Elapsed time: 438.321s, Critical Path: 428.40s
+INFO: 2 processes: 2 linux-sandbox.
+INFO: Build completed successfully, 2 total actions
+//tests/cocotb/tutorial/ti_cnn:cocotb_ti_cnn_test_ti_cnn_models          PASSED in 424.6s
+
+Executed 1 out of 1 test: 1 test passes.
+There were tests whose specified size is too big. Use the --test_verbose_timeout_warnings command line option to see which ones these are.

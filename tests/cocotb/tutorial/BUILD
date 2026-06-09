@@ -40,6 +40,18 @@ ALGO_2X2_TESTCASES = [
 ]
 # END_TESTCASES_FOR_algo_2x2
 
+# BEGIN_TESTCASES_FOR_algo_2x2_rvv
+ALGO_2X2_RVV_TESTCASES = [
+    "test_algo_2x2_rvv",
+]
+# END_TESTCASES_FOR_algo_2x2_rvv
+
+# BEGIN_TESTCASES_FOR_algo_2x2_highmem
+ALGO_2X2_HIGHMEM_TESTCASES = [
+    "test_algo_2x2_highmem",
+]
+# END_TESTCASES_FOR_algo_2x2_highmem
+
 cocotb_test_suite(
     name = "tutorial",
     simulators = [
@@ -125,7 +137,6 @@ cocotb_test_suite(
         "data": [":algo_2x2_test.elf"],
         "size": "small",
     },
-    vcs_size = "large",
     vcs_timeout = "long",
     vcs_build_args = VCS_BUILD_ARGS,
     vcs_data = [
@@ -138,6 +149,70 @@ cocotb_test_suite(
     verilator_model = "//tests/cocotb:core_mini_axi_model",
 )
 
+cocotb_test_suite(
+    name = "algo_2x2_rvv",
+    simulators = [
+        "verilator",
+        "vcs",
+    ],
+    testcases = ALGO_2X2_RVV_TESTCASES,
+    testcases_vname = "ALGO_2X2_RVV_TESTCASES",
+    tests_kwargs = {
+        "waves": False,
+        "hdl_toplevel": "RvvCoreMiniAxi",
+        "seed": "42",
+        "test_module": ["cocotb_algo_2x2.py"],
+        "deps": [
+            "//coralnpu_test_utils:core_mini_axi_sim_interface",
+            "@bazel_tools//tools/python/runfiles",
+        ],
+        "data": [":algo_2x2_test.elf"],
+        "size": "small",
+    },
+    vcs_timeout = "long",
+    vcs_build_args = VCS_BUILD_ARGS,
+    vcs_data = [
+        ":algo_2x2_test.elf",
+        "//tests/cocotb:coverage_exclude.cfg",
+    ],
+    vcs_defines = VCS_DEFINES,
+    vcs_test_args = VCS_TEST_ARGS,
+    vcs_verilog_sources = ["//hdl/chisel/src/coralnpu:rvv_core_mini_axi_cc_library_verilog"],
+    verilator_model = "//tests/cocotb:rvv_core_mini_axi_model",
+)
+
+cocotb_test_suite(
+    name = "algo_2x2_highmem",
+    simulators = [
+        "verilator",
+        "vcs",
+    ],
+    testcases = ALGO_2X2_HIGHMEM_TESTCASES,
+    testcases_vname = "ALGO_2X2_HIGHMEM_TESTCASES",
+    tests_kwargs = {
+        "waves": False,
+        "hdl_toplevel": "RvvCoreMiniHighmemAxi",
+        "seed": "42",
+        "test_module": ["cocotb_algo_2x2_highmem.py"],
+        "deps": [
+            "//coralnpu_test_utils:core_mini_axi_sim_interface",
+            "@bazel_tools//tools/python/runfiles",
+        ],
+        "data": [":algo_2x2_highmem_test.elf"],
+        "size": "small",
+    },
+    vcs_timeout = "long",
+    vcs_build_args = VCS_BUILD_ARGS,
+    vcs_data = [
+        ":algo_2x2_highmem_test.elf",
+        "//tests/cocotb:coverage_exclude.cfg",
+    ],
+    vcs_defines = VCS_DEFINES,
+    vcs_test_args = VCS_TEST_ARGS,
+    vcs_verilog_sources = ["//hdl/chisel/src/coralnpu:rvv_core_mini_highmem_axi_cc_library_verilog"],
+    verilator_model = "//tests/cocotb:rvv_core_mini_highmem_axi_model",
+)
+
 coralnpu_v2_binary(
     name = "coralnpu_v2_program",
     srcs = ["program.cc"],
@@ -146,6 +221,14 @@ coralnpu_v2_binary(
 coralnpu_v2_binary(
     name = "algo_2x2_test",
     srcs = ["algo_2x2_highmem_test.cc"],
+    semihosting = True,
+)
+
+coralnpu_v2_binary(
+    name = "algo_2x2_highmem_test",
+    srcs = ["algo_2x2_highmem_test.cc"],
+    itcm_size_kbytes = 1024,
+    dtcm_size_kbytes = 1024,
     semihosting = True,
 )
 

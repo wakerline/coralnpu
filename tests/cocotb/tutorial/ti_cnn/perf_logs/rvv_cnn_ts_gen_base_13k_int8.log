@@ -1,0 +1,8 @@
+Another command holds the client lock: 
+pid=653534
+owner=client
+cwd=/home/wangyy/002_research/coralnpu
+
+Waiting for it to complete...
+
+[TIMEOUT]

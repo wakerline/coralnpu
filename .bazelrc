@@ -79,6 +79,10 @@ build:vcs --action_env=CCACHE_DISABLE=1
 test:vcs --action_env=CCACHE_DISABLE=1
 run:vcs --action_env=CCACHE_DISABLE=1
 
+#build --action_env=CCACHE_DISABLE=1
+#test --action_env=CCACHE_DISABLE=1
+#run --action_env=CCACHE_DISABLE=1
+
 # Add config to enable VCS targets.
 build:vcs --build_tag_filters="vcs"
 test:vcs --build_tag_filters="vcs"
