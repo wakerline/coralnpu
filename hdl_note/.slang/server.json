@@ -1,0 +1,16 @@
+{
+  "flags": "-f verilog/rvv/rvv_slang_hdl_note.f",
+  "build": "verilog/rvv/rvv_slang_hdl_note.f",
+  "index": [
+    {
+      "dirs": [
+        "verilog",
+        "verilog/rvv"
+      ],
+      "excludeDirs": [
+        "verilog/rvv/sve",
+        "target"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+    "verilog.preprocessor.defines": [
+        "VLEN_128",
+        "USE_GENERIC",
+        "DISPATCH3",
+        "ARBITER_ON"
+    ],
+    "verilog.slangServer.enabled": true,
+    "files.watcherExclude": {
+        "**/target/**": true
+    }
+}
