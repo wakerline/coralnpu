@@ -5,6 +5,7 @@
 `include "rvv_backend_sva.svh"
 `endif
 
+`ifdef ZVE32F_ON
 module rvv_backend_fdiv_wrapper(
   clk,
   rst_n,
@@ -183,3 +184,4 @@ module rvv_backend_fdiv_wrapper(
   endgenerate
 
 endmodule
+`endif // ZVE32F_ON

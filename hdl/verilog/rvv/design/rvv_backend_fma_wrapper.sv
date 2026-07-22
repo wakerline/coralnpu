@@ -14,6 +14,7 @@
 //to CVT
 //VFCVT_F2I, VFCVT_F2I, VFCVT_F2IT, VFCVT_F2IT, VFCVT_I2F, VFCVT_I2F
 
+`ifdef ZVE32F_ON
 module rvv_backend_fma_wrapper(
   //global
   clk,
@@ -997,3 +998,4 @@ module rvv_backend_fma_wrapper(
   end
 
 endmodule
+`endif // ZVE32F_ON

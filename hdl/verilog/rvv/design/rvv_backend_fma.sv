@@ -6,6 +6,7 @@
 // this module decode floating point instruction to sub uop unit
 // and pass results from these submodules to ROB
 
+`ifdef ZVE32F_ON
 module rvv_backend_fma( 
   clk, 
   rst_n,          
@@ -153,3 +154,4 @@ module rvv_backend_fma(
   endgenerate
 
 endmodule
+`endif // ZVE32F_ON

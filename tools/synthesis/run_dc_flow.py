@@ -28,8 +28,6 @@ DEFAULT_TOP = "RvvCoreMiniHighmemAxi"
 DEFAULT_DEFINES = [
     "SYNTHESIS",
     "VLEN_128",
-    "ZVE32F_ON",
-    "TB_SUPPORT",
 ]
 DEFAULT_INCLUDE_DIRS = [
     REPO_ROOT / "hdl" / "verilog" / "rvv" / "inc",
@@ -185,29 +183,55 @@ def resolve_from_test_label(label: str) -> tuple[str, str]:
 
 def render_gui_setup(gui_path: Path, design_name: str, vcs_option: str, backup: bool) -> None:
     original = gui_path.read_text(encoding="utf-8")
-    # if backup:
-    #     backup_path = gui_path.with_suffix(gui_path.suffix + ".orig")
-    #     if not backup_path.exists():
-    #         shutil.copyfile(gui_path, backup_path)
+    if backup:
+        backup_path = gui_path.with_suffix(gui_path.suffix + ".orig")
+        if not backup_path.exists():
+            shutil.copyfile(gui_path, backup_path)
 
     rendered = replace_tcl_var(original, "GUI_DESIGN_NAME", design_name)
     rendered = replace_tcl_var(rendered, "GUI_VCS_OPTION", vcs_option)
     gui_path.write_text(rendered, encoding="utf-8")
 
 
-def build_defines(sram_impl: str, extra_defines: list[str]) -> list[str]:
+def normalize_define(item: str) -> str:
+    if item.startswith("+define+"):
+        item = item.removeprefix("+define+")
+    elif item.startswith("-D"):
+        item = item.removeprefix("-D")
+    item = item.strip()
+    if not item:
+        raise ValueError("Empty define is not supported")
+    return item
+
+
+def add_define(defines: list[str], item: str) -> None:
+    item = normalize_define(item)
+    if item not in defines:
+        defines.append(item)
+
+
+def build_defines(
+    sram_impl: str,
+    extra_defines: list[str],
+    tb_support: bool,
+    zve32f_on: bool,
+) -> list[str]:
     defines = list(DEFAULT_DEFINES)
 
     if sram_impl == "generic":
-        defines.append("USE_GENERIC")
+        add_define(defines, "USE_GENERIC")
     elif sram_impl == "tsmc28":
-        defines.append("USE_TSMC28")
+        add_define(defines, "USE_TSMC28")
     else:
         raise ValueError(f"Unsupported SRAM implementation: {sram_impl}")
 
+    if tb_support:
+        add_define(defines, "TB_SUPPORT")
+    if zve32f_on:
+        add_define(defines, "ZVE32F_ON")
+
     for item in extra_defines:
-        if item not in defines:
-            defines.append(item)
+        add_define(defines, item)
 
     if "USE_TSMC28" in defines and "USE_GENERIC" in defines:
         defines = [item for item in defines if item != "USE_GENERIC"]
@@ -229,6 +253,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bazel-target", default=DEFAULT_BAZEL_TARGET)
     parser.add_argument("--bazel-config", default="synthesis")
     parser.add_argument("--top-module", default=DEFAULT_TOP)
+    parser.add_argument("--dc-root", default=str(DEFAULT_DC_ROOT))
     parser.add_argument("--gui-path", default="")
     parser.add_argument("--filelist", default="")
     parser.add_argument(
@@ -237,7 +262,22 @@ def parse_args() -> argparse.Namespace:
         default="tsmc28",
         help="Select which SRAM implementation macro is emitted into the filelist.",
     )
-    parser.add_argument("--define", action="append", default=[])
+    parser.add_argument(
+        "--tb-support",
+        action="store_true",
+        help="Emit +define+TB_SUPPORT. Disabled by default for synthesis.",
+    )
+    parser.add_argument(
+        "--zve32f-on",
+        action="store_true",
+        help="Emit +define+ZVE32F_ON for RVV floating-point builds.",
+    )
+    parser.add_argument(
+        "--define",
+        action="append",
+        default=[],
+        help="Additional define. Accepts NAME, +define+NAME, or -DNAME.",
+    )
     parser.add_argument("--extra-include-dir", action="append", default=[])
     parser.add_argument("--skip-bazel-build", action="store_true")
     parser.add_argument("--no-backup", action="store_true")
@@ -264,7 +304,7 @@ def main() -> int:
         elif args.label.startswith("//"):
             bazel_target = args.label
 
-    dc_root = DEFAULT_DC_ROOT.resolve()
+    dc_root = Path(args.dc_root).resolve()
     gui_path = Path(args.gui_path).resolve() if args.gui_path else dc_root / "global_scripts" / "synopsys_dc.setup.gui"
     run_dir = dc_root / "run"
     filelist = Path(args.filelist).resolve() if args.filelist else run_dir / "coralnpu_dc.f"
@@ -276,14 +316,19 @@ def main() -> int:
         print(f"Top-level SystemVerilog file not found: {top_sv}", file=sys.stderr)
         return 1
 
-    defines = build_defines(args.sram_impl, args.define)
+    defines = build_defines(
+        args.sram_impl,
+        args.define,
+        tb_support=args.tb_support,
+        zve32f_on=args.zve32f_on,
+    )
 
     include_dirs = list(DEFAULT_INCLUDE_DIRS)
     for path in args.extra_include_dir:
         include_dirs.append(Path(path).resolve())
 
     write_filelist(filelist, top_sv, defines, include_dirs)
-    vcs_option = f"-f {filelist.name}"
+    vcs_option = f"-f {filelist}"
     render_gui_setup(gui_path, top_module, vcs_option, backup=not args.no_backup)
 
     if resolved_from_label:
@@ -291,9 +336,10 @@ def main() -> int:
     print(f"RTL target        : {bazel_target}")
     print(f"Top module        : {top_module}")
     print(f"Generated filelist: {filelist}")
-    print(f"Patched GUI file: {gui_path}")
+    print(f"Patched GUI file  : {gui_path}")
     print(f"GUI_DESIGN_NAME={top_module}")
     print(f"GUI_VCS_OPTION={vcs_option}")
+    print(f"Defines           : {', '.join(defines)}")
 
     if args.run_dc:
         cmd = ["bash", args.dc_cmd]

@@ -324,7 +324,7 @@ module multi_fifo
         end
       end 
       else if(POP_CLEAR) begin
-        always_ff @(posedge clk or negedge rst_n) begin
+        always_ff @(posedge clk ) begin //去除rst_n
           if (clear)
             for (int j=0; j<DEPTH; j++) begin
               mem[j] <= '0;

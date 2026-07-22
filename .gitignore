@@ -34,6 +34,9 @@ dc/v1-dc/run/command.log
 dc/v1-dc/run/elaborate.log
 dc/v1-dc/run/filenames.log
 
+dc/v1-dc/global_scripts/synopsys_dc.setup.gui
+dc/v1-dc/run/coralnpu_dc.f
+
 # VCS / Verdi generated files
 vcs/simv
 vcs/simv.daidir/

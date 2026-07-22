@@ -3,6 +3,7 @@
 `include "rvv_backend.svh"
 `endif
 
+`ifdef ZVE32F_ON
 module rvv_backend_freduction(
   clk,
   rst_n,
@@ -395,3 +396,4 @@ module rvv_backend_freduction(
   );
 
 endmodule
+`endif // ZVE32F_ON
