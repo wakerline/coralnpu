@@ -1,4 +1,3 @@
-
 `ifndef HDL_VERILOG_RVV_DESIGN_RVV_SVH
 `include "rvv_backend.svh"
 `endif
@@ -34,18 +33,29 @@ module rvv_backend_decode_unit_lsu
   logic   [`REGFILE_INDEX_WIDTH-1:0]  inst_vd;          // inst original encoding[11:7]
   RVVOpCode                           inst_opcode;      // inst original encoding[6:0]
 
+  logic   [`XLEN-1:0]                 rs1;    
+  logic                               csr_vill;
   logic   [`VSTART_WIDTH-1:0]         csr_vstart;
   logic   [`VL_WIDTH-1:0]             csr_vl;
   logic   [`VL_WIDTH-1:0]             evl;
-  RVVConfigState                      vector_csr_lsu;
   RVVSEW                              csr_sew;
   RVVLMUL                             csr_lmul;
+  RVVLMUL                             reduced_lmul;  
+`ifdef ZVT_ON
+  logic   [1:0]                       csr_mtwiden;
+  logic   [$clog2(`TE):0]             csr_tm;
+  logic   [$clog2(`TE):0]             csr_tn;
+  TSS_t                               tss;
+`endif  
   EMUL_e                              emul_vd;          
   EMUL_e                              emul_vs2;          
   EMUL_e                              emul_vd_nf; 
   EMUL_e                              emul_max; 
   logic   [`UOP_INDEX_WIDTH-1:0]      uop_index_max;         
   EEW_e                               eew_vd;          
+`ifdef ZVT_ON
+  EEW_e                               eew_mt;
+`endif
   EEW_e                               eew_vs2;          
   EEW_e                               eew_max;         
   logic                               valid_lsu;
@@ -70,7 +80,6 @@ module rvv_backend_decode_unit_lsu
   logic                               check_lmul;
   logic                               check_evl_not_0;
   logic                               check_vstart_sle_evl;
-  logic                               check_frm;
   FUNCT6_u                            funct6_lsu;
   logic                               force_vma_agnostic; 
   logic                               force_vta_agnostic; 
@@ -80,6 +89,9 @@ module rvv_backend_decode_unit_lsu
   localparam  SEW_8     = 3'b000;
   localparam  SEW_16    = 3'b101;
   localparam  SEW_32    = 3'b110;
+  localparam  TILESEW8  = 3'b000;
+  localparam  TILESEW16 = 3'b001;
+  localparam  TILESEW32 = 3'b010;
 
 //
 // decode
@@ -92,32 +104,29 @@ module rvv_backend_decode_unit_lsu
   assign inst_funct3    = inst_valid ? inst.bits[7:5] : 'b0;
   assign inst_vd        = inst_valid ? inst.bits[4:0] : 'b0;
   assign inst_opcode    = inst_valid ? inst.opcode : LOAD;
-  assign vector_csr_lsu = inst_valid ? inst.arch_state : RVVConfigState'('0);
+  assign rs1            = inst_valid ? inst.rs1 : 'b0;
+  assign csr_vill       = inst_valid ? inst.arch_state.vill : 'b0;
   assign csr_vstart     = inst_valid ? inst.arch_state.vstart : 'b0;
   assign csr_vl         = inst_valid ? inst.arch_state.vl : 'b0;
   assign csr_sew        = inst_valid ? inst.arch_state.sew : SEW8;
-  assign csr_lmul       = inst_valid ? inst.arch_state.lmul : LMULRESERVED;
-  
+  assign csr_lmul       = inst_valid ? inst.arch_state.lmul_orig : LMULRESERVED;
+  assign reduced_lmul   = inst_valid ? inst.arch_state.lmul : LMULRESERVED;  
+  `ifdef ZVT_ON
+  assign csr_mtwiden    = inst_valid ? inst.arch_state.mtwiden : 'b0;
+  assign csr_tm         = inst_valid ? inst.arch_state.tm : 'b0;
+  assign csr_tn         = csr_vl[$clog2(`TE):0];
+  assign tss.tile       = rs1[30:27];
+  assign tss.pattern    = rs1[24];
+  assign tss.index      = rs1[$clog2(`TE)-1:0];
+`endif
+
 // decode funct6
   // valid signal
+  assign valid_lsu_opcode = inst_opcode==LOAD || inst_opcode==STORE;
+
   assign valid_lsu = valid_lsu_opcode&valid_lsu_mop&inst_valid;
-
-  // identify load or store
+  
   always_comb begin
-    funct6_lsu.lsu_funct6.lsu_is_store = IS_LOAD;
-    valid_lsu_opcode                   = 'b0;
-
-    case(inst_opcode)
-      LOAD: begin
-        funct6_lsu.lsu_funct6.lsu_is_store = IS_LOAD;
-        valid_lsu_opcode                   = 1'b1;
-      end
-      STORE: begin
-        funct6_lsu.lsu_funct6.lsu_is_store = IS_STORE;
-        valid_lsu_opcode                   = 1'b1;
-      end
-    endcase
-
   // lsu_mop distinguishes unit-stride, constant-stride, unordered index, ordered index
   // lsu_umop identifies what unit-stride instruction belong to when lsu_mop=US
     // initial 
@@ -168,17 +177,24 @@ module rvv_backend_decode_unit_lsu
         valid_lsu_mop                    = 1'b1;
         funct6_lsu.lsu_funct6.lsu_is_seg = (inst_nf!=NF1) ? IS_SEGMENT : NONE;
       end
+      `ifdef ZVT_ON
+      TILE_LDST: begin
+        funct6_lsu.lsu_funct6.lsu_mop    = TILELDST;  
+        valid_lsu_mop                    = 1'b1;
+        funct6_lsu.lsu_funct6.lsu_is_seg = NONE;
+      end
+      `endif
     endcase
   end
 
 // get EMUL
   always_comb begin
     // initial
-    emul_vd         = EMUL_NONE;
-    emul_vs2        = EMUL_NONE;
-    emul_vd_nf      = EMUL_NONE;
-    emul_max        = EMUL_NONE;
-    uop_index_max   = 'd0;
+    emul_vd       = EMUL_NONE;
+    emul_vs2      = EMUL_NONE;
+    emul_vd_nf    = EMUL_NONE;
+    emul_max      = EMUL_NONE;
+    uop_index_max = 'd0;
 
     if (valid_lsu) begin  
       case(funct6_lsu.lsu_funct6.lsu_mop)
@@ -198,6 +214,12 @@ module rvv_backend_decode_unit_lsu
                     {SEW_8,SEW8},
                     {SEW_16,SEW16},
                     {SEW_32,SEW32}: begin            
+                      case(reduced_lmul)
+                        LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                        LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                        LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1_4,
                         LMUL1_2,
@@ -205,91 +227,96 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL1;
                           emul_max      = EMUL1;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d0);
                         end
                         LMUL2: begin
-                          emul_vd       = EMUL_e'(csr_lmul);
-                          emul_vd_nf    = EMUL_e'(csr_lmul);
-                          emul_max      = EMUL_e'(csr_lmul);
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                          emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                          emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
+                          emul_max      = EMUL_e'({1'b0, csr_lmul});
                         end
                         LMUL4: begin
-                          emul_vd       = EMUL_e'(csr_lmul);
-                          emul_vd_nf    = EMUL_e'(csr_lmul);
-                          emul_max      = EMUL_e'(csr_lmul);
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                          emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                          emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
+                          emul_max      = EMUL_e'({1'b0, csr_lmul});
                         end
                         LMUL8: begin
-                          emul_vd       = EMUL_e'(csr_lmul);
-                          emul_vd_nf    = EMUL_e'(csr_lmul);
-                          emul_max      = EMUL_e'(csr_lmul);
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                          emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                          emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
+                          emul_max      = EMUL_e'({1'b0, csr_lmul});
                         end
                       endcase
                     end
                     // 2:1
                     {SEW_16,SEW8},
                     {SEW_32,SEW16}: begin            
+                      case(reduced_lmul)
+                        LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                        LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                        LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1_4,
                         LMUL1_2: begin
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL1;
                           emul_max      = EMUL1;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d0);
                         end
                         LMUL1: begin
                           emul_vd       = EMUL2;
                           emul_vd_nf    = EMUL2;
                           emul_max      = EMUL2;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                         end
                         LMUL2: begin
                           emul_vd       = EMUL4;
                           emul_vd_nf    = EMUL4;
                           emul_max      = EMUL4;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                         end
                         LMUL4: begin
                           emul_vd       = EMUL8;
                           emul_vd_nf    = EMUL8;
                           emul_max      = EMUL8;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                         end
                       endcase
                     end
                     // 4:1
                     {SEW_32,SEW8}: begin            
+                      case(reduced_lmul)
+                        LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                        LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                        LMUL2:   uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1_4: begin
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL1;
                           emul_max      = EMUL1;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d0);
                         end
                         LMUL1_2: begin    
                           emul_vd       = EMUL2;
                           emul_vd_nf    = EMUL2;
                           emul_max      = EMUL2;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                         end
                         LMUL1: begin
                           emul_vd       = EMUL4;
                           emul_vd_nf    = EMUL4;
                           emul_max      = EMUL4;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                         end
                         LMUL2: begin
                           emul_vd       = EMUL8;
                           emul_vd_nf    = EMUL8;
                           emul_max      = EMUL8;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                         end
                       endcase
                     end
                     // 1:2
                     {SEW_8,SEW16},
                     {SEW_16,SEW32}: begin            
+                      case(reduced_lmul)
+                        LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                        LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1_2,
                         LMUL1,
@@ -297,24 +324,25 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL1;
                           emul_max      = EMUL1;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d0);
                         end
                         LMUL4: begin
                           emul_vd       = EMUL2;
                           emul_vd_nf    = EMUL2;
                           emul_max      = EMUL2;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                         end
                         LMUL8: begin
                           emul_vd       = EMUL4;
                           emul_vd_nf    = EMUL4;
                           emul_max      = EMUL4;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                         end
                       endcase
                     end
                     // 1:4
                     {SEW_8,SEW32}: begin            
+                      case(reduced_lmul)
+                        LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1,
                         LMUL2,
@@ -322,13 +350,11 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL1;
                           emul_max      = EMUL1;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d0);
                         end
                         LMUL8: begin
                           emul_vd       = EMUL2;
                           emul_vd_nf    = EMUL2;
                           emul_max      = EMUL2;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                         end
                       endcase
                     end
@@ -340,6 +366,14 @@ module rvv_backend_decode_unit_lsu
                     {SEW_8,SEW8},
                     {SEW_16,SEW16},
                     {SEW_32,SEW32}: begin            
+                      case(reduced_lmul)
+                        LMUL1_4,
+                        LMUL1_2,
+                        LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                        LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                        LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1_4,
                         LMUL1_2,
@@ -347,73 +381,86 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL2;
                           emul_max      = EMUL2;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                         end
                         LMUL2: begin
-                          emul_vd       = EMUL_e'(csr_lmul);
+                          emul_vd       = EMUL_e'({1'b0, csr_lmul});
                           emul_vd_nf    = EMUL4;
                           emul_max      = EMUL4;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                         end
                         LMUL4: begin
-                          emul_vd       = EMUL_e'(csr_lmul);
+                          emul_vd       = EMUL_e'({1'b0, csr_lmul});
                           emul_vd_nf    = EMUL8;
                           emul_max      = EMUL8;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                         end
                       endcase
                     end
                     // 2:1
                     {SEW_16,SEW8},
                     {SEW_32,SEW16}: begin            
+                      case(reduced_lmul)
+                        LMUL1_4,
+                        LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                        LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                        LMUL2:   uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1_4,
                         LMUL1_2: begin
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL2;
                           emul_max      = EMUL2;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                         end
                         LMUL1: begin
                           emul_vd       = EMUL2;
                           emul_vd_nf    = EMUL4;
                           emul_max      = EMUL4;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                         end
                         LMUL2: begin
                           emul_vd       = EMUL4;
                           emul_vd_nf    = EMUL8;
                           emul_max      = EMUL8;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                         end
                       endcase
                     end
                     // 4:1
                     {SEW_32,SEW8}: begin            
+                      case(reduced_lmul)
+                        LMUL1_4: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                        LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                        LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1_4: begin
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL2;
                           emul_max      = EMUL2;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                         end
                         LMUL1_2: begin    
                           emul_vd       = EMUL2;
                           emul_vd_nf    = EMUL4;
                           emul_max      = EMUL4;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                         end
                         LMUL1: begin
                           emul_vd       = EMUL4;
                           emul_vd_nf    = EMUL8;
                           emul_max      = EMUL8;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                         end
                       endcase
                     end
                     // 1:2
                     {SEW_8,SEW16},
                     {SEW_16,SEW32}: begin            
+                      case(reduced_lmul)
+                        LMUL1_4,
+                        LMUL1_2,
+                        LMUL1,
+                        LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                        LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                        LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1_2,
                         LMUL1,
@@ -421,24 +468,30 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL2;
                           emul_max      = EMUL2;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                         end
                         LMUL4: begin
                           emul_vd       = EMUL2;
                           emul_vd_nf    = EMUL4;
                           emul_max      = EMUL4;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                         end
                         LMUL8: begin
                           emul_vd       = EMUL4;
                           emul_vd_nf    = EMUL8;
                           emul_max      = EMUL8;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                         end
                       endcase
                     end
                     // 1:4
                     {SEW_8,SEW32}: begin            
+                      case(reduced_lmul)
+                        LMUL1_4,
+                        LMUL1_2,
+                        LMUL1,
+                        LMUL2,
+                        LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                        LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1,
                         LMUL2,
@@ -446,13 +499,11 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL2;
                           emul_max      = EMUL2;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                         end
                         LMUL8: begin
                           emul_vd       = EMUL2;
                           emul_vd_nf    = EMUL4;
                           emul_max      = EMUL4;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                         end
                       endcase
                     end
@@ -464,6 +515,13 @@ module rvv_backend_decode_unit_lsu
                     {SEW_8,SEW8},
                     {SEW_16,SEW16},
                     {SEW_32,SEW32}: begin            
+                      case(reduced_lmul)
+                        LMUL1_4,
+                        LMUL1_2,
+                        LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
+                        LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1_4,
                         LMUL1_2,
@@ -471,55 +529,68 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL3;
                           emul_max      = EMUL3;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
                         end
                         LMUL2: begin
-                          emul_vd       = EMUL_e'(csr_lmul);
+                          emul_vd       = EMUL_e'({1'b0, csr_lmul});
                           emul_vd_nf    = EMUL6;
                           emul_max      = EMUL6;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                         end
                       endcase
                     end
                     // 2:1
                     {SEW_16,SEW8},
                     {SEW_32,SEW16}: begin            
+                      case(reduced_lmul)
+                        LMUL1_4,
+                        LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
+                        LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1_4,
                         LMUL1_2: begin
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL3;
                           emul_max      = EMUL3;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
                         end
                         LMUL1: begin
                           emul_vd       = EMUL2;
                           emul_vd_nf    = EMUL6;
                           emul_max      = EMUL6;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                         end
                       endcase
                     end
                     // 4:1
                     {SEW_32,SEW8}: begin            
+                      case(reduced_lmul)
+                        LMUL1_4: uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
+                        LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1_4: begin
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL3;
                           emul_max      = EMUL3;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
                         end
                         LMUL1_2: begin    
                           emul_vd       = EMUL2;
                           emul_vd_nf    = EMUL6;
                           emul_max      = EMUL6;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                         end
                       endcase
                     end
                     // 1:2
                     {SEW_8,SEW16},
                     {SEW_16,SEW32}: begin            
+                      case(reduced_lmul)
+                        LMUL1_4,
+                        LMUL1_2,
+                        LMUL1,
+                        LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
+                        LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1_2,
                         LMUL1,
@@ -527,18 +598,25 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL3;
                           emul_max      = EMUL3;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
                         end
                         LMUL4: begin
                           emul_vd       = EMUL2;
                           emul_vd_nf    = EMUL6;
                           emul_max      = EMUL6;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                         end
                       endcase
                     end
                     // 1:4
                     {SEW_8,SEW32}: begin            
+                      case(reduced_lmul)
+                        LMUL1_4,
+                        LMUL1_2,
+                        LMUL1,
+                        LMUL2,
+                        LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
+                        LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1,
                         LMUL2,
@@ -546,13 +624,11 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL3;
                           emul_max      = EMUL3;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
                         end
                         LMUL8: begin
                           emul_vd       = EMUL2;
                           emul_vd_nf    = EMUL6;
                           emul_max      = EMUL6;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                         end
                       endcase
                     end
@@ -564,6 +640,13 @@ module rvv_backend_decode_unit_lsu
                     {SEW_8,SEW8},
                     {SEW_16,SEW16},
                     {SEW_32,SEW32}: begin            
+                      case(reduced_lmul)
+                        LMUL1_4,
+                        LMUL1_2,
+                        LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                        LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1_4,
                         LMUL1_2,
@@ -571,55 +654,68 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL4;
                           emul_max      = EMUL4;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                         end
                         LMUL2: begin
-                          emul_vd       = EMUL_e'(csr_lmul);
+                          emul_vd       = EMUL_e'({1'b0, csr_lmul});
                           emul_vd_nf    = EMUL8;
                           emul_max      = EMUL8;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                         end
                       endcase
                     end
                     // 2:1
                     {SEW_16,SEW8},
                     {SEW_32,SEW16}: begin            
+                      case(reduced_lmul)
+                        LMUL1_4,
+                        LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                        LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1_4,
                         LMUL1_2: begin
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL4;
                           emul_max      = EMUL4;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                         end
                         LMUL1: begin
                           emul_vd       = EMUL2;
                           emul_vd_nf    = EMUL8;
                           emul_max      = EMUL8;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                         end
                       endcase
                     end
                     // 4:1
                     {SEW_32,SEW8}: begin            
+                      case(reduced_lmul)
+                        LMUL1_4: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                        LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1_4: begin
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL4;
                           emul_max      = EMUL4;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                         end
                         LMUL1_2: begin    
                           emul_vd       = EMUL2;
                           emul_vd_nf    = EMUL8;
                           emul_max      = EMUL8;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                         end
                       endcase
                     end
                     // 1:2
                     {SEW_8,SEW16},
                     {SEW_16,SEW32}: begin            
+                      case(reduced_lmul)
+                        LMUL1_4,
+                        LMUL1_2,
+                        LMUL1,
+                        LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                        LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1_2,
                         LMUL1,
@@ -627,18 +723,25 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL4;
                           emul_max      = EMUL4;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                         end
                         LMUL4: begin
                           emul_vd       = EMUL2;
                           emul_vd_nf    = EMUL8;
                           emul_max      = EMUL8;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                         end
                       endcase
                     end
                     // 1:4
                     {SEW_8,SEW32}: begin            
+                      case(reduced_lmul)
+                        LMUL1_4,
+                        LMUL1_2,
+                        LMUL1,
+                        LMUL2,
+                        LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                        LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                      endcase
+
                       case(csr_lmul)
                         LMUL1,
                         LMUL2,
@@ -646,13 +749,11 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL4;
                           emul_max      = EMUL4;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                         end
                         LMUL8: begin
                           emul_vd       = EMUL2;
                           emul_vd_nf    = EMUL8;
                           emul_max      = EMUL8;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                         end
                       endcase
                     end
@@ -664,6 +765,8 @@ module rvv_backend_decode_unit_lsu
                     {SEW_8,SEW8},
                     {SEW_16,SEW16},
                     {SEW_32,SEW32}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
+
                       case(csr_lmul)
                         LMUL1_4,
                         LMUL1_2,
@@ -671,37 +774,40 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL5;
                           emul_max      = EMUL5;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
                         end
                       endcase
                     end
                     // 2:1
                     {SEW_16,SEW8},
                     {SEW_32,SEW16}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
+
                       case(csr_lmul)
                         LMUL1_4,
                         LMUL1_2: begin
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL5;
                           emul_max      = EMUL5;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
                         end
                       endcase
                     end
                     // 4:1
                     {SEW_32,SEW8}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
+
                       case(csr_lmul)
                         LMUL1_4: begin
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL5;
                           emul_max      = EMUL5;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
                         end
                       endcase
                     end
                     // 1:2
                     {SEW_8,SEW16},
                     {SEW_16,SEW32}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
+
                       case(csr_lmul)
                         LMUL1_2,
                         LMUL1,
@@ -709,12 +815,13 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL5;
                           emul_max      = EMUL5;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
                         end
                       endcase
                     end
                     // 1:4
                     {SEW_8,SEW32}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
+
                       case(csr_lmul)
                         LMUL1,
                         LMUL2,
@@ -722,7 +829,6 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL5;
                           emul_max      = EMUL5;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
                         end
                       endcase
                     end
@@ -734,6 +840,8 @@ module rvv_backend_decode_unit_lsu
                     {SEW_8,SEW8},
                     {SEW_16,SEW16},
                     {SEW_32,SEW32}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+
                       case(csr_lmul)
                         LMUL1_4,
                         LMUL1_2,
@@ -741,37 +849,40 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL6;
                           emul_max      = EMUL6;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                         end
                       endcase
                     end
                     // 2:1
                     {SEW_16,SEW8},
                     {SEW_32,SEW16}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+
                       case(csr_lmul)
                         LMUL1_4,
                         LMUL1_2: begin
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL6;
                           emul_max      = EMUL6;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                         end
                       endcase
                     end                
                     // 4:1
                     {SEW_32,SEW8}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+
                       case(csr_lmul)
                         LMUL1_4: begin
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL6;
                           emul_max      = EMUL6;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                         end
                       endcase
                     end
                     // 1:2
                     {SEW_8,SEW16},
                     {SEW_16,SEW32}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+
                       case(csr_lmul)
                         LMUL1_2,
                         LMUL1,
@@ -779,12 +890,13 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL6;
                           emul_max      = EMUL6;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                         end
                       endcase
                     end
                     // 1:4
                     {SEW_8,SEW32}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+
                       case(csr_lmul)
                         LMUL1,
                         LMUL2,
@@ -792,7 +904,6 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL6;
                           emul_max      = EMUL6;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                         end
                       endcase
                     end
@@ -804,6 +915,8 @@ module rvv_backend_decode_unit_lsu
                     {SEW_8,SEW8},
                     {SEW_16,SEW16},
                     {SEW_32,SEW32}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
+
                       case(csr_lmul)
                         LMUL1_4,
                         LMUL1_2,
@@ -811,37 +924,40 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL7;
                           emul_max      = EMUL7;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
                         end
                       endcase
                     end
                     // 2:1
                     {SEW_16,SEW8},
                     {SEW_32,SEW16}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
+
                       case(csr_lmul)
                         LMUL1_4,
                         LMUL1_2: begin
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL7;
                           emul_max      = EMUL7;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
                         end
                       endcase
                     end
                     // 4:1
                     {SEW_32,SEW8}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
+
                       case(csr_lmul)
                         LMUL1_4: begin
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL7;
                           emul_max      = EMUL7;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
                         end
                       endcase
                     end
                     // 1:2
                     {SEW_8,SEW16},
                     {SEW_16,SEW32}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
+
                       case(csr_lmul)
                         LMUL1_2,
                         LMUL1,
@@ -849,12 +965,13 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL7;
                           emul_max      = EMUL7;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
                         end
                       endcase
                     end
                     // 1:4
                     {SEW_8,SEW32}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
+
                       case(csr_lmul)
                         LMUL1,
                         LMUL2,
@@ -862,7 +979,6 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL7;
                           emul_max      = EMUL7;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
                         end
                       endcase
                     end
@@ -874,6 +990,8 @@ module rvv_backend_decode_unit_lsu
                     {SEW_8,SEW8},
                     {SEW_16,SEW16},
                     {SEW_32,SEW32}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+
                       case(csr_lmul)
                         LMUL1_4,
                         LMUL1_2,
@@ -881,37 +999,40 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL8;
                           emul_max      = EMUL8;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                         end
                       endcase
                     end
                     // 2:1
                     {SEW_16,SEW8},
                     {SEW_32,SEW16}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+
                       case(csr_lmul)
                         LMUL1_4,
                         LMUL1_2: begin
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL8;
                           emul_max      = EMUL8;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                         end
                       endcase
                     end
                     // 4:1
                     {SEW_32,SEW8}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+
                       case(csr_lmul)
                         LMUL1_4: begin
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL8;
                           emul_max      = EMUL8;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                         end
                       endcase
                     end
                     // 1:2
                     {SEW_8,SEW16},
                     {SEW_16,SEW32}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+
                       case(csr_lmul)
                         LMUL1_2,
                         LMUL1,
@@ -919,12 +1040,13 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL8;
                           emul_max      = EMUL8;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                         end
                       endcase
                     end
                     // 1:4
                     {SEW_8,SEW32}: begin            
+                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+
                       case(csr_lmul)
                         LMUL1,
                         LMUL2,
@@ -932,7 +1054,6 @@ module rvv_backend_decode_unit_lsu
                           emul_vd       = EMUL1;
                           emul_vd_nf    = EMUL8;
                           emul_max      = EMUL8;
-                          uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                         end
                       endcase
                     end
@@ -979,7 +1100,6 @@ module rvv_backend_decode_unit_lsu
                   emul_vd       = EMUL1;
                   emul_vd_nf    = EMUL1;
                   emul_max      = EMUL1;
-                  uop_index_max = (`UOP_INDEX_WIDTH)'('d0);
                 end
               endcase
             end
@@ -999,6 +1119,12 @@ module rvv_backend_decode_unit_lsu
                 {SEW_8,SEW8},
                 {SEW_16,SEW16},
                 {SEW_32,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2,
@@ -1006,91 +1132,96 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL1;
                       emul_max      = EMUL1;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d0);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
-                      emul_max      = EMUL_e'(csr_lmul);
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
+                      emul_max      = EMUL_e'({1'b0, csr_lmul});
                     end
                     LMUL4: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
-                      emul_max      = EMUL_e'(csr_lmul);
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
+                      emul_max      = EMUL_e'({1'b0, csr_lmul});
                     end
                     LMUL8: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
-                      emul_max      = EMUL_e'(csr_lmul);
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
+                      emul_max      = EMUL_e'({1'b0, csr_lmul});
                     end
                   endcase
                 end
                 // 2:1
                 {SEW_16,SEW8},
                 {SEW_32,SEW16}: begin            
+                  case(reduced_lmul)
+                    LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL1;
                       emul_max      = EMUL1;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d0);
                     end
                     LMUL1: begin
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL2;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                     end
                     LMUL2: begin
                       emul_vd       = EMUL4;
                       emul_vd_nf    = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL4: begin
                       emul_vd       = EMUL8;
                       emul_vd_nf    = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 4:1
                 {SEW_32,SEW8}: begin            
+                  case(reduced_lmul)
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL2:   uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL1;
                       emul_max      = EMUL1;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d0);
                     end
                     LMUL1_2: begin    
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL2;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                     end
                     LMUL1: begin
                       emul_vd       = EMUL4;
                       emul_vd_nf    = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL2: begin
                       emul_vd       = EMUL8;
                       emul_vd_nf    = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 1:2
                 {SEW_8,SEW16},
                 {SEW_16,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_2,
                     LMUL1,
@@ -1098,24 +1229,25 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL1;
                       emul_max      = EMUL1;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d0);
                     end
                     LMUL4: begin
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL2;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                     end
                     LMUL8: begin
                       emul_vd       = EMUL4;
                       emul_vd_nf    = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                   endcase
                 end
                 // 1:4
                 {SEW_8,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1,
                     LMUL2,
@@ -1123,13 +1255,11 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL1;
                       emul_max      = EMUL1;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d0);
                     end
                     LMUL8: begin
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL2;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                     end
                   endcase
                 end
@@ -1141,6 +1271,14 @@ module rvv_backend_decode_unit_lsu
                 {SEW_8,SEW8},
                 {SEW_16,SEW16},
                 {SEW_32,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2,
@@ -1148,73 +1286,86 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL2;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                     end
                     LMUL2: begin
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL4: begin
                       emul_vd       = EMUL4;
                       emul_vd_nf    = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 2:1
                 {SEW_16,SEW8},
                 {SEW_32,SEW16}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL2:   uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL2;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                     end
                     LMUL1: begin
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL2: begin
                       emul_vd       = EMUL4;
                       emul_vd_nf    = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 4:1
                 {SEW_32,SEW8}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL2;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                     end
                     LMUL1_2: begin    
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL1: begin
                       emul_vd       = EMUL4;
                       emul_vd_nf    = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 1:2
                 {SEW_8,SEW16},
                 {SEW_16,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1,
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_2,
                     LMUL1,
@@ -1222,24 +1373,30 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL2;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                     end
                     LMUL4: begin
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL8: begin
                       emul_vd       = EMUL4;
                       emul_vd_nf    = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 1:4
                 {SEW_8,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1,
+                    LMUL2,
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1,
                     LMUL2,
@@ -1247,13 +1404,11 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL2;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                     end
                     LMUL8: begin
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                   endcase
                 end
@@ -1265,6 +1420,13 @@ module rvv_backend_decode_unit_lsu
                 {SEW_8,SEW8},
                 {SEW_16,SEW16},
                 {SEW_32,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2,
@@ -1272,55 +1434,68 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL3;
                       emul_max      = EMUL3;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL6;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                   endcase
                 end
                 // 2:1
                 {SEW_16,SEW8},
                 {SEW_32,SEW16}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL3;
                       emul_max      = EMUL3;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
                     end
                     LMUL1: begin
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL6;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                   endcase
                 end
                 // 4:1
                 {SEW_32,SEW8}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4: uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL3;
                       emul_max      = EMUL3;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
                     end
                     LMUL1_2: begin    
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL6;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                   endcase
                 end
                 // 1:2
                 {SEW_8,SEW16},
                 {SEW_16,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1,
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_2,
                     LMUL1,
@@ -1328,18 +1503,25 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL3;
                       emul_max      = EMUL3;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
                     end
                     LMUL4: begin
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL6;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                   endcase
                 end
                 // 1:4
                 {SEW_8,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1,
+                    LMUL2,
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
+                    LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1,
                     LMUL2,
@@ -1347,13 +1529,11 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL3;
                       emul_max      = EMUL3;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
                     end
                     LMUL8: begin
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL6;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                   endcase
                 end
@@ -1365,6 +1545,13 @@ module rvv_backend_decode_unit_lsu
                 {SEW_8,SEW8},
                 {SEW_16,SEW16},
                 {SEW_32,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2,
@@ -1372,55 +1559,68 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 2:1
                 {SEW_16,SEW8},
                 {SEW_32,SEW16}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL1: begin
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 4:1
                 {SEW_32,SEW8}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL1_2: begin    
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 1:2
                 {SEW_8,SEW16},
                 {SEW_16,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1,
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_2,
                     LMUL1,
@@ -1428,18 +1628,25 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL4: begin
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 1:4
                 {SEW_8,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1,
+                    LMUL2,
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1,
                     LMUL2,
@@ -1447,13 +1654,11 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL8: begin
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
@@ -1465,6 +1670,8 @@ module rvv_backend_decode_unit_lsu
                 {SEW_8,SEW8},
                 {SEW_16,SEW16},
                 {SEW_32,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2,
@@ -1472,37 +1679,40 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL5;
                       emul_max      = EMUL5;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
                     end
                   endcase
                 end
                 // 2:1
                 {SEW_16,SEW8},
                 {SEW_32,SEW16}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL5;
                       emul_max      = EMUL5;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
                     end
                   endcase
                 end
                 // 4:1
                 {SEW_32,SEW8}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
+
                   case(csr_lmul)
                     LMUL1_4: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL5;
                       emul_max      = EMUL5;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
                     end
                   endcase
                 end
                 // 1:2
                 {SEW_8,SEW16},
                 {SEW_16,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
+
                   case(csr_lmul)
                     LMUL1_2,
                     LMUL1,
@@ -1510,12 +1720,13 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL5;
                       emul_max      = EMUL5;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
                     end
                   endcase
                 end
                 // 1:4
                 {SEW_8,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
+
                   case(csr_lmul)
                     LMUL1,
                     LMUL2,
@@ -1523,7 +1734,6 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL5;
                       emul_max      = EMUL5;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
                     end
                   endcase
                 end
@@ -1535,6 +1745,8 @@ module rvv_backend_decode_unit_lsu
                 {SEW_8,SEW8},
                 {SEW_16,SEW16},
                 {SEW_32,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2,
@@ -1542,37 +1754,40 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL6;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                   endcase
                 end
                 // 2:1
                 {SEW_16,SEW8},
                 {SEW_32,SEW16}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL6;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                   endcase
                 end                
                 // 4:1
                 {SEW_32,SEW8}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+
                   case(csr_lmul)
                     LMUL1_4: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL6;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                   endcase
                 end
                 // 1:2
                 {SEW_8,SEW16},
                 {SEW_16,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+
                   case(csr_lmul)
                     LMUL1_2,
                     LMUL1,
@@ -1580,12 +1795,13 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL6;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                   endcase
                 end
                 // 1:4
                 {SEW_8,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+
                   case(csr_lmul)
                     LMUL1,
                     LMUL2,
@@ -1593,7 +1809,6 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL6;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                   endcase
                 end
@@ -1605,6 +1820,8 @@ module rvv_backend_decode_unit_lsu
                 {SEW_8,SEW8},
                 {SEW_16,SEW16},
                 {SEW_32,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2,
@@ -1612,37 +1829,40 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL7;
                       emul_max      = EMUL7;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
                     end
                   endcase
                 end
                 // 2:1
                 {SEW_16,SEW8},
                 {SEW_32,SEW16}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL7;
                       emul_max      = EMUL7;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
                     end
                   endcase
                 end
                 // 4:1
                 {SEW_32,SEW8}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
+
                   case(csr_lmul)
                     LMUL1_4: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL7;
                       emul_max      = EMUL7;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
                     end
                   endcase
                 end
                 // 1:2
                 {SEW_8,SEW16},
                 {SEW_16,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
+
                   case(csr_lmul)
                     LMUL1_2,
                     LMUL1,
@@ -1650,12 +1870,13 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL7;
                       emul_max      = EMUL7;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
                     end
                   endcase
                 end
                 // 1:4
                 {SEW_8,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
+
                   case(csr_lmul)
                     LMUL1,
                     LMUL2,
@@ -1663,7 +1884,6 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL7;
                       emul_max      = EMUL7;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
                     end
                   endcase
                 end
@@ -1675,6 +1895,8 @@ module rvv_backend_decode_unit_lsu
                 {SEW_8,SEW8},
                 {SEW_16,SEW16},
                 {SEW_32,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2,
@@ -1682,37 +1904,40 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 2:1
                 {SEW_16,SEW8},
                 {SEW_32,SEW16}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 4:1
                 {SEW_32,SEW8}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+
                   case(csr_lmul)
                     LMUL1_4: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 1:2
                 {SEW_8,SEW16},
                 {SEW_16,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+
                   case(csr_lmul)
                     LMUL1_2,
                     LMUL1,
@@ -1720,12 +1945,13 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 1:4
                 {SEW_8,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+
                   case(csr_lmul)
                     LMUL1,
                     LMUL2,
@@ -1733,7 +1959,6 @@ module rvv_backend_decode_unit_lsu
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
@@ -1757,6 +1982,12 @@ module rvv_backend_decode_unit_lsu
                 {SEW_8,SEW8},
                 {SEW_16,SEW16},
                 {SEW_32,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2,
@@ -1765,34 +1996,36 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL1;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL1;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d0);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
-                      emul_vs2       = EMUL_e'(csr_lmul);
-                      emul_max      = EMUL_e'(csr_lmul);
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
+                      emul_vs2      = EMUL_e'({1'b0, csr_lmul});
+                      emul_max      = EMUL_e'({1'b0, csr_lmul});
                     end
                     LMUL4: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
-                      emul_vs2       = EMUL_e'(csr_lmul);
-                      emul_max      = EMUL_e'(csr_lmul);
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
+                      emul_vs2      = EMUL_e'({1'b0, csr_lmul});
+                      emul_max      = EMUL_e'({1'b0, csr_lmul});
                     end
                     LMUL8: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
-                      emul_vs2       = EMUL_e'(csr_lmul);
-                      emul_max      = EMUL_e'(csr_lmul);
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
+                      emul_vs2      = EMUL_e'({1'b0, csr_lmul});
+                      emul_max      = EMUL_e'({1'b0, csr_lmul});
                     end
                   endcase
                 end
                 // 2:1
                 {SEW_16,SEW8},
                 {SEW_32,SEW16}: begin            
+                  case(reduced_lmul)
+                    LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2: begin
@@ -1800,67 +2033,71 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL1;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL1;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d0);
                     end
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
                       emul_vs2      = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL4: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
                       emul_vs2      = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 4:1
                 {SEW_32,SEW8}: begin            
+                  case(reduced_lmul)
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL2:   uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL1;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL1;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d0);
                     end
                     LMUL1_2: begin    
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL1;
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                     end
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
                       emul_vs2      = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
                       emul_vs2      = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 1:2
                 {SEW_8,SEW16},
                 {SEW_16,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_2,
                     LMUL1: begin
@@ -1868,61 +2105,59 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL1;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL1;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d0);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
                       emul_vs2      = EMUL1;
-                      emul_max      = EMUL_e'(csr_lmul);
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                      emul_max      = EMUL_e'({1'b0, csr_lmul});
                     end
                     LMUL4: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
                       emul_vs2      = EMUL2;
-                      emul_max      = EMUL_e'(csr_lmul);
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                      emul_max      = EMUL_e'({1'b0, csr_lmul});
                     end
                     LMUL8: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
                       emul_vs2      = EMUL4;
-                      emul_max      = EMUL_e'(csr_lmul);
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                      emul_max      = EMUL_e'({1'b0, csr_lmul});
                     end
                   endcase
                 end
                 // 1:4
                 {SEW_8,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL8: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL1;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL1;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d0);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
                       emul_vs2      = EMUL1;
-                      emul_max      = EMUL_e'(csr_lmul);
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                      emul_max      = EMUL_e'({1'b0, csr_lmul});
                     end
                     LMUL4: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
                       emul_vs2      = EMUL1;
-                      emul_max      = EMUL_e'(csr_lmul);
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                      emul_max      = EMUL_e'({1'b0, csr_lmul});
                     end
                     LMUL8: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
-                      emul_vd_nf    = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
+                      emul_vd_nf    = EMUL_e'({1'b0, csr_lmul});
                       emul_vs2      = EMUL2;
-                      emul_max      = EMUL_e'(csr_lmul);
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                      emul_max      = EMUL_e'({1'b0, csr_lmul});
                     end
                   endcase
                 end
@@ -1934,6 +2169,14 @@ module rvv_backend_decode_unit_lsu
                 {SEW_8,SEW8},
                 {SEW_16,SEW16},
                 {SEW_32,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2,
@@ -1942,27 +2185,32 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL2;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL4;
-                      emul_vs2       = EMUL_e'(csr_lmul);
+                      emul_vs2      = EMUL_e'({1'b0, csr_lmul});
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL4: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL8;
-                      emul_vs2       = EMUL_e'(csr_lmul);
+                      emul_vs2      = EMUL_e'({1'b0, csr_lmul});
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 2:1
                 {SEW_16,SEW8},
                 {SEW_32,SEW16}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL2:   uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                    LMUL4:   uop_index_max = (`UOP_INDEX_WIDTH)'('d15);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2: begin
@@ -1970,67 +2218,74 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL2;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                     end
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL2;
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL2: begin
                       emul_vd       = EMUL2;
                       emul_vd_nf    = EMUL4;
                       emul_vs2      = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                     LMUL4: begin
                       emul_vd       = EMUL4;
                       emul_vd_nf    = EMUL8;
                       emul_vs2      = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d15);
                     end
                   endcase
                 end
                 // 4:1
                 {SEW_32,SEW8}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                    LMUL2:   uop_index_max = (`UOP_INDEX_WIDTH)'('d15);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL2;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                     end
                     LMUL1_2: begin    
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL2;
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL2;
                       emul_vs2      = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL4;
                       emul_vs2      = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d15);
                     end
                   endcase
                 end
                 // 1:2
                 {SEW_8,SEW16},
                 {SEW_16,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_2,
                     LMUL1: begin
@@ -2038,47 +2293,49 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL2;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL4;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL4: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL8;
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 1:4
                 {SEW_8,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL4: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL2;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL2;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL4;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL4: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL8;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
@@ -2090,6 +2347,13 @@ module rvv_backend_decode_unit_lsu
                 {SEW_8,SEW8},
                 {SEW_16,SEW16},
                 {SEW_32,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2,
@@ -2098,20 +2362,25 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL3;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL3;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL6;
-                      emul_vs2       = EMUL_e'(csr_lmul);
+                      emul_vs2      = EMUL_e'({1'b0, csr_lmul});
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                   endcase
                 end
                 // 2:1
                 {SEW_16,SEW8},
                 {SEW_32,SEW16}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                    LMUL2:   uop_index_max = (`UOP_INDEX_WIDTH)'('d11);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2: begin
@@ -2119,60 +2388,67 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL3;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL3;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
                     end
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL3;
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL3;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL6;
                       emul_vs2      = EMUL4;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d11);
                     end
                   endcase
                 end
                 // 4:1
                 {SEW_32,SEW8}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4: uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d11);
+                    LMUL2:   uop_index_max = (`UOP_INDEX_WIDTH)'('d23);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL3;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL3;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
                     end
                     LMUL1_2: begin    
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL3;
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL3;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                     LMUL1: begin    
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL3;
                       emul_vs2      = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d11);
                     end
                     LMUL2: begin    
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL6;
                       emul_vs2      = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d23);
                     end
                   endcase
                 end
                 // 1:2
                 {SEW_8,SEW16},
                 {SEW_16,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_2,
                     LMUL1: begin
@@ -2180,33 +2456,36 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL3;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL3;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL6;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                   endcase
                 end
                 // 1:4
                 {SEW_8,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL3;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL3;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d2);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL6;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                   endcase
                 end
@@ -2218,6 +2497,13 @@ module rvv_backend_decode_unit_lsu
                 {SEW_8,SEW8},
                 {SEW_16,SEW16},
                 {SEW_32,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2,
@@ -2226,20 +2512,25 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL4;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL8;
-                      emul_vs2       = EMUL_e'(csr_lmul);
+                      emul_vs2      = EMUL_e'({1'b0, csr_lmul});
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 2:1
                 {SEW_16,SEW8},
                 {SEW_32,SEW16}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                    LMUL2:   uop_index_max = (`UOP_INDEX_WIDTH)'('d15);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2: begin
@@ -2247,60 +2538,67 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL4;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL4;
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL8;
                       emul_vs2      = EMUL4;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d15);
                     end
                   endcase
                 end
                 // 4:1
                 {SEW_32,SEW8}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d15);
+                    LMUL2:   uop_index_max = (`UOP_INDEX_WIDTH)'('d31);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL4;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL1_2: begin    
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL4;
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                     LMUL1: begin    
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL4;
                       emul_vs2      = EMUL4;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d15);
                     end
                     LMUL2: begin    
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL8;
                       emul_vs2      = EMUL8;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d31);
                     end
                   endcase
                 end
                 // 1:2
                 {SEW_8,SEW16},
                 {SEW_16,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_2,
                     LMUL1: begin
@@ -2308,33 +2606,36 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL4;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL8;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 1:4
                 {SEW_8,SEW32}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2,
+                    LMUL1: uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                    LMUL2: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL4;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL4;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
                     end
                     LMUL2: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL8;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
@@ -2346,6 +2647,8 @@ module rvv_backend_decode_unit_lsu
                 {SEW_8,SEW8},
                 {SEW_16,SEW16},
                 {SEW_32,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2,
@@ -2354,13 +2657,18 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL5;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL5;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
                     end
                   endcase
                 end
                 // 2:1
                 {SEW_16,SEW8},
                 {SEW_32,SEW16}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d9);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2: begin
@@ -2368,46 +2676,49 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL5;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL5;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
                     end
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL5;
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL5;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d9);
                     end
                   endcase
                 end
                 // 4:1
                 {SEW_32,SEW8}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4: uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d9);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d19);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL5;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL5;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
                     end
                     LMUL1_2: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL5;
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL5;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d9);
                     end
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL5;
                       emul_vs2      = EMUL4;
                       emul_max      = EMUL5;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d19);
                     end
                   endcase
                 end
                 // 1:2
                 {SEW_8,SEW16},
                 {SEW_16,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
+
                   case(csr_lmul)
                     LMUL1_2,
                     LMUL1: begin
@@ -2415,19 +2726,19 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL5;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL5;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
                     end
                   endcase
                 end
                 // 1:4
                 {SEW_8,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
+
                   case(csr_lmul)
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL5;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL5;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d4);
                     end
                   endcase
                 end
@@ -2439,6 +2750,8 @@ module rvv_backend_decode_unit_lsu
                 {SEW_8,SEW8},
                 {SEW_16,SEW16},
                 {SEW_32,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2,
@@ -2447,13 +2760,18 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL6;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                   endcase
                 end
                 // 2:1
                 {SEW_16,SEW8},
                 {SEW_32,SEW16}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d11);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2: begin
@@ -2461,46 +2779,49 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL6;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL6;
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d11);
                     end
                   endcase
                 end                
                 // 4:1
                 {SEW_32,SEW8}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4: uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d11);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d23);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL6;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                     LMUL1_2: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL6;
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d11);
                     end
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL6;
                       emul_vs2      = EMUL4;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d23);
                     end
                   endcase
                 end
                 // 1:2
                 {SEW_8,SEW16},
                 {SEW_16,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+
                   case(csr_lmul)
                     LMUL1_2,
                     LMUL1: begin
@@ -2508,19 +2829,19 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL6;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                   endcase
                 end
                 // 1:4
                 {SEW_8,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
+
                   case(csr_lmul)
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL6;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL6;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d5);
                     end
                   endcase
                 end
@@ -2532,6 +2853,8 @@ module rvv_backend_decode_unit_lsu
                 {SEW_8,SEW8},
                 {SEW_16,SEW16},
                 {SEW_32,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2,
@@ -2540,13 +2863,18 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL7;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL7;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
                     end
                   endcase
                 end
                 // 2:1
                 {SEW_16,SEW8},
                 {SEW_32,SEW16}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d13);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2: begin
@@ -2554,46 +2882,49 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL7;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL7;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
                     end
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL7;
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL7;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d13);
                     end
                   endcase
                 end
                 // 4:1
                 {SEW_32,SEW8}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4: uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d13);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d27);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL7;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL7;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
                     end
                     LMUL1_2: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL7;
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL7;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d13);
                     end
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL7;
                       emul_vs2      = EMUL4;
                       emul_max      = EMUL7;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d27);
                     end
                   endcase
                 end
                 // 1:2
                 {SEW_8,SEW16},
                 {SEW_16,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
+
                   case(csr_lmul)
                     LMUL1_2,
                     LMUL1: begin
@@ -2601,19 +2932,19 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL7;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL7;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
                     end
                   endcase
                 end
                 // 1:4
                 {SEW_8,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
+
                   case(csr_lmul)
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL7;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL7;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d6);
                     end
                   endcase
                 end
@@ -2625,6 +2956,8 @@ module rvv_backend_decode_unit_lsu
                 {SEW_8,SEW8},
                 {SEW_16,SEW16},
                 {SEW_32,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2,
@@ -2633,13 +2966,18 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL8;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 2:1
                 {SEW_16,SEW8},
                 {SEW_32,SEW16}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4,
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d15);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4,
                     LMUL1_2: begin
@@ -2647,46 +2985,49 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL8;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL8;
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d15);
                     end
                   endcase
                 end
                 // 4:1
                 {SEW_32,SEW8}: begin            
+                  case(reduced_lmul)
+                    LMUL1_4: uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+                    LMUL1_2: uop_index_max = (`UOP_INDEX_WIDTH)'('d15);
+                    LMUL1:   uop_index_max = (`UOP_INDEX_WIDTH)'('d31);
+                  endcase
+
                   case(csr_lmul)
                     LMUL1_4: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL8;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                     LMUL1_2: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL8;
                       emul_vs2      = EMUL2;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d15);
                     end
                     LMUL1: begin
-                      emul_vd       = EMUL_e'(csr_lmul);
+                      emul_vd       = EMUL_e'({1'b0, csr_lmul});
                       emul_vd_nf    = EMUL8;
                       emul_vs2      = EMUL4;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d31);
                     end
                   endcase
                 end
                 // 1:2
                 {SEW_8,SEW16},
                 {SEW_16,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+
                   case(csr_lmul)
                     LMUL1_2,
                     LMUL1: begin
@@ -2694,19 +3035,19 @@ module rvv_backend_decode_unit_lsu
                       emul_vd_nf    = EMUL8;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
                 // 1:4
                 {SEW_8,SEW32}: begin            
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
+
                   case(csr_lmul)
                     LMUL1: begin
                       emul_vd       = EMUL1;
                       emul_vd_nf    = EMUL8;
                       emul_vs2      = EMUL1;
                       emul_max      = EMUL8;
-                      uop_index_max = (`UOP_INDEX_WIDTH)'('d7);
                     end
                   endcase
                 end
@@ -2714,6 +3055,28 @@ module rvv_backend_decode_unit_lsu
             end
           endcase
         end
+
+      `ifdef ZVT_ON
+        TILELDST: begin
+          case(csr_lmul)
+            LMUL4: begin
+              case(csr_sew)
+                SEW8: begin
+                  emul_max      = EMUL1;
+                end
+                SEW16: begin
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d1);
+                  emul_max      = EMUL2;
+                end
+                SEW32: begin
+                  uop_index_max = (`UOP_INDEX_WIDTH)'('d3);
+                  emul_max      = EMUL4;
+                end
+              endcase
+            end
+          endcase
+        end
+      `endif
       endcase
     end
   end
@@ -2721,6 +3084,9 @@ module rvv_backend_decode_unit_lsu
 // get EEW 
   always_comb begin
     // initial
+  `ifdef ZVT_ON
+    eew_mt  = EEW_NONE;
+  `endif
     eew_vd  = EEW_NONE;
     eew_vs2 = EEW_NONE;
     eew_max = EEW_NONE;  
@@ -2823,6 +3189,30 @@ module rvv_backend_decode_unit_lsu
             end
           endcase
         end
+      `ifdef ZVT_ON
+        TILELDST: begin
+          case({csr_sew, csr_mtwiden})
+            {SEW8, 2'd3},
+            {SEW16, 2'd2},
+            {SEW32, 2'd1}: begin
+              case(inst_funct6[5:3])
+                TILESEW8:  begin
+                  eew_mt  = EEW8;
+                  eew_max = EEW8;
+                end
+                TILESEW16: begin
+                  eew_mt  = EEW16;
+                  eew_max = EEW16;
+                end
+                TILESEW32: begin
+                  eew_mt  = EEW32;
+                  eew_max = EEW32;
+                end
+              endcase
+            end
+          endcase
+        end
+      `endif      
       endcase
     end
   end
@@ -3001,16 +3391,17 @@ module rvv_backend_decode_unit_lsu
           check_special = (inst_opcode==LOAD) ? check_vd_overlap_v0&check_vd_overlap_vs2 : 1'b1;
         end        
       end
+
+      `ifdef ZVT_ON
+        TILE_LDST: begin
+          check_special = inst_vm&(csr_vstart<=(`VSTART_WIDTH)'(tss.index));
+        end
+      `endif
     endcase
   end
 
   //check common requirements for all instructions
   assign check_common = check_vd_align&check_vs2_align&check_vd_in_range&check_sew&check_lmul
-                      `ifdef ZVE32F_ON
-                        `ifdef CHECK_FRM
-                        &check_frm
-                        `endif
-                      `endif
                         &check_evl_not_0&check_vstart_sle_evl;
 
   // check whether vd is aligned to emul_vd
@@ -3156,11 +3547,6 @@ module rvv_backend_decode_unit_lsu
   // check vstart < evl
   assign check_vstart_sle_evl = {1'b0,csr_vstart} < evl;
 
-`ifdef ZVE32F_ON
-  // check FP rounding mode is legal
-  assign check_frm = inst.arch_state.frm < 3'd5;
-`endif
-
   `ifdef ASSERT_ON
     `ifdef TB_SUPPORT
       `rvv_forbid((inst_valid==1'b1)&(inst_encoding_correct==1'b0))
@@ -3186,6 +3572,9 @@ module rvv_backend_decode_unit_lsu
   assign lcmd.eew_vs1            = EEW_NONE;
   assign lcmd.eew_vs2            = eew_vs2;
   assign lcmd.eew_vd             = eew_vd;
+`ifdef ZVT_ON
+  assign lcmd.eew_mt             = eew_mt;
+`endif
   assign lcmd.eew_max            = eew_max;
   assign lcmd.emul_vs1           = EMUL_NONE;
   assign lcmd.emul_vs2           = emul_vs2;

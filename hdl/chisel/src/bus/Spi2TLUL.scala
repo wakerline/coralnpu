@@ -17,10 +17,8 @@ package bus
 import chisel3._
 import common.MuBi4
 
-import coralnpu.Parameters
-
-class Spi2TLUL(p: Parameters) extends Module {
-  val tlul_p = new TLULParameters(p)
+class Spi2TLUL(p: TLULParameters) extends Module {
+  val tlul_p = p
   val io     = IO(new Bundle {
     val spi = new Bundle {
       val clk  = Input(Clock())
@@ -28,7 +26,8 @@ class Spi2TLUL(p: Parameters) extends Module {
       val mosi = Input(Bool())
       val miso = Output(Bool())
     }
-    val tl = new OpenTitanTileLink.Host2Device(new TLULParameters(p))
+    val tl        = new OpenTitanTileLink.Host2Device(p)
+    val sys_rst_o = Output(Bool())
   })
 
   val v2 = Module(new Spi2TLULV2(p))
@@ -60,4 +59,6 @@ class Spi2TLUL(p: Parameters) extends Module {
   v2.io.q_tl_d.bits <> io.tl.d.bits
   v2.io.q_tl_d.valid := io.tl.d.valid
   io.tl.d.ready      := v2.io.q_tl_d.ready
+
+  io.sys_rst_o := v2.io.sys_rst_o
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 module top;
   reg clk = 0;
@@ -87,98 +87,98 @@ module top;
 
   // Instantiation of the DUT
   `DUT_MODULE dut (
-    .io_aclk(clk),
-    .io_aresetn(resetn),
-    .io_boot_addr(boot_addr),
-    .io_te(te),
-    .io_irq(irq),
-    .io_timer_irq(timer_irq),
-    .io_software_irq(software_irq),
-    .io_halted(halted),
-    .io_fault(fault),
-    .io_wfi(wfi),
+      .io_aclk(clk),
+      .io_aresetn(resetn),
+      .io_boot_addr(boot_addr),
+      .io_te(te),
+      .io_irq(irq),
+      .io_timer_irq(timer_irq),
+      .io_software_irq(software_irq),
+      .io_halted(halted),
+      .io_fault(fault),
+      .io_wfi(wfi),
 
-    // Slave AXI (tied off)
-    .io_axi_slave_write_addr_ready(slave_awready),
-    .io_axi_slave_write_addr_valid(1'b0),
-    .io_axi_slave_write_addr_bits_addr(32'h0),
-    .io_axi_slave_write_addr_bits_prot(3'h0),
-    .io_axi_slave_write_addr_bits_id(6'h0),
-    .io_axi_slave_write_addr_bits_len(8'h0),
-    .io_axi_slave_write_addr_bits_size(3'h0),
-    .io_axi_slave_write_addr_bits_burst(2'h0),
-    .io_axi_slave_write_addr_bits_lock(1'b0),
-    .io_axi_slave_write_addr_bits_cache(4'h0),
-    .io_axi_slave_write_addr_bits_qos(4'h0),
-    .io_axi_slave_write_addr_bits_region(4'h0),
-    .io_axi_slave_write_data_ready(slave_wready),
-    .io_axi_slave_write_data_valid(1'b0),
-    .io_axi_slave_write_data_bits_data(128'h0),
-    .io_axi_slave_write_data_bits_last(1'b0),
-    .io_axi_slave_write_data_bits_strb(16'h0),
-    .io_axi_slave_write_resp_ready(1'b0),
-    .io_axi_slave_write_resp_valid(slave_bvalid),
-    .io_axi_slave_write_resp_bits_id(slave_bid),
-    .io_axi_slave_write_resp_bits_resp(slave_bresp),
-    .io_axi_slave_read_addr_ready(slave_arready),
-    .io_axi_slave_read_addr_valid(1'b0),
-    .io_axi_slave_read_addr_bits_addr(32'h0),
-    .io_axi_slave_read_addr_bits_prot(3'h0),
-    .io_axi_slave_read_addr_bits_id(6'h0),
-    .io_axi_slave_read_addr_bits_len(8'h0),
-    .io_axi_slave_read_addr_bits_size(3'h0),
-    .io_axi_slave_read_addr_bits_burst(2'h0),
-    .io_axi_slave_read_addr_bits_lock(1'b0),
-    .io_axi_slave_read_addr_bits_cache(4'h0),
-    .io_axi_slave_read_addr_bits_qos(4'h0),
-    .io_axi_slave_read_addr_bits_region(4'h0),
-    .io_axi_slave_read_data_ready(1'b0),
-    .io_axi_slave_read_data_valid(slave_rvalid),
-    .io_axi_slave_read_data_bits_data(slave_rdata),
-    .io_axi_slave_read_data_bits_id(slave_rid),
-    .io_axi_slave_read_data_bits_resp(slave_rresp),
-    .io_axi_slave_read_data_bits_last(slave_rlast),
+      // Slave AXI (tied off)
+      .io_axi_slave_write_addr_ready(slave_awready),
+      .io_axi_slave_write_addr_valid(1'b0),
+      .io_axi_slave_write_addr_bits_addr(32'h0),
+      .io_axi_slave_write_addr_bits_prot(3'h0),
+      .io_axi_slave_write_addr_bits_id(6'h0),
+      .io_axi_slave_write_addr_bits_len(8'h0),
+      .io_axi_slave_write_addr_bits_size(3'h0),
+      .io_axi_slave_write_addr_bits_burst(2'h0),
+      .io_axi_slave_write_addr_bits_lock(1'b0),
+      .io_axi_slave_write_addr_bits_cache(4'h0),
+      .io_axi_slave_write_addr_bits_qos(4'h0),
+      .io_axi_slave_write_addr_bits_region(4'h0),
+      .io_axi_slave_write_data_ready(slave_wready),
+      .io_axi_slave_write_data_valid(1'b0),
+      .io_axi_slave_write_data_bits_data(128'h0),
+      .io_axi_slave_write_data_bits_last(1'b0),
+      .io_axi_slave_write_data_bits_strb(16'h0),
+      .io_axi_slave_write_resp_ready(1'b0),
+      .io_axi_slave_write_resp_valid(slave_bvalid),
+      .io_axi_slave_write_resp_bits_id(slave_bid),
+      .io_axi_slave_write_resp_bits_resp(slave_bresp),
+      .io_axi_slave_read_addr_ready(slave_arready),
+      .io_axi_slave_read_addr_valid(1'b0),
+      .io_axi_slave_read_addr_bits_addr(32'h0),
+      .io_axi_slave_read_addr_bits_prot(3'h0),
+      .io_axi_slave_read_addr_bits_id(6'h0),
+      .io_axi_slave_read_addr_bits_len(8'h0),
+      .io_axi_slave_read_addr_bits_size(3'h0),
+      .io_axi_slave_read_addr_bits_burst(2'h0),
+      .io_axi_slave_read_addr_bits_lock(1'b0),
+      .io_axi_slave_read_addr_bits_cache(4'h0),
+      .io_axi_slave_read_addr_bits_qos(4'h0),
+      .io_axi_slave_read_addr_bits_region(4'h0),
+      .io_axi_slave_read_data_ready(1'b0),
+      .io_axi_slave_read_data_valid(slave_rvalid),
+      .io_axi_slave_read_data_bits_data(slave_rdata),
+      .io_axi_slave_read_data_bits_id(slave_rid),
+      .io_axi_slave_read_data_bits_resp(slave_rresp),
+      .io_axi_slave_read_data_bits_last(slave_rlast),
 
-    // Master AXI
-    .io_axi_master_write_addr_ready(master_awready),
-    .io_axi_master_write_addr_valid(master_awvalid),
-    .io_axi_master_write_addr_bits_addr(master_awaddr),
-    .io_axi_master_write_addr_bits_prot(master_awprot),
-    .io_axi_master_write_addr_bits_id(master_awid),
-    .io_axi_master_write_addr_bits_len(master_awlen),
-    .io_axi_master_write_addr_bits_size(master_awsize),
-    .io_axi_master_write_addr_bits_burst(master_awburst),
-    .io_axi_master_write_addr_bits_lock(master_awlock),
-    .io_axi_master_write_addr_bits_cache(master_awcache),
-    .io_axi_master_write_addr_bits_qos(master_awqos),
-    .io_axi_master_write_addr_bits_region(master_awregion),
-    .io_axi_master_write_data_ready(master_wready),
-    .io_axi_master_write_data_valid(master_wvalid),
-    .io_axi_master_write_data_bits_data(master_wdata),
-    .io_axi_master_write_data_bits_last(master_wlast),
-    .io_axi_master_write_data_bits_strb(master_wstrb),
-    .io_axi_master_write_resp_ready(master_bready),
-    .io_axi_master_write_resp_valid(master_bvalid),
-    .io_axi_master_write_resp_bits_id(master_bid),
-    .io_axi_master_write_resp_bits_resp(master_bresp),
-    .io_axi_master_read_addr_ready(master_arready),
-    .io_axi_master_read_addr_valid(master_arvalid),
-    .io_axi_master_read_addr_bits_addr(master_araddr),
-    .io_axi_master_read_addr_bits_prot(master_arprot),
-    .io_axi_master_read_addr_bits_id(master_arid),
-    .io_axi_master_read_addr_bits_len(master_arlen),
-    .io_axi_master_read_addr_bits_size(master_arsize),
-    .io_axi_master_read_addr_bits_burst(master_arburst),
-    .io_axi_master_read_addr_bits_lock(master_arlock),
-    .io_axi_master_read_addr_bits_cache(master_arcache),
-    .io_axi_master_read_addr_bits_qos(master_arqos),
-    .io_axi_master_read_addr_bits_region(master_arregion),
-    .io_axi_master_read_data_ready(master_rready),
-    .io_axi_master_read_data_valid(master_rvalid),
-    .io_axi_master_read_data_bits_data(master_rdata),
-    .io_axi_master_read_data_bits_id(master_rid),
-    .io_axi_master_read_data_bits_resp(master_rresp),
-    .io_axi_master_read_data_bits_last(master_rlast)
+      // Master AXI
+      .io_axi_master_write_addr_ready(master_awready),
+      .io_axi_master_write_addr_valid(master_awvalid),
+      .io_axi_master_write_addr_bits_addr(master_awaddr),
+      .io_axi_master_write_addr_bits_prot(master_awprot),
+      .io_axi_master_write_addr_bits_id(master_awid),
+      .io_axi_master_write_addr_bits_len(master_awlen),
+      .io_axi_master_write_addr_bits_size(master_awsize),
+      .io_axi_master_write_addr_bits_burst(master_awburst),
+      .io_axi_master_write_addr_bits_lock(master_awlock),
+      .io_axi_master_write_addr_bits_cache(master_awcache),
+      .io_axi_master_write_addr_bits_qos(master_awqos),
+      .io_axi_master_write_addr_bits_region(master_awregion),
+      .io_axi_master_write_data_ready(master_wready),
+      .io_axi_master_write_data_valid(master_wvalid),
+      .io_axi_master_write_data_bits_data(master_wdata),
+      .io_axi_master_write_data_bits_last(master_wlast),
+      .io_axi_master_write_data_bits_strb(master_wstrb),
+      .io_axi_master_write_resp_ready(master_bready),
+      .io_axi_master_write_resp_valid(master_bvalid),
+      .io_axi_master_write_resp_bits_id(master_bid),
+      .io_axi_master_write_resp_bits_resp(master_bresp),
+      .io_axi_master_read_addr_ready(master_arready),
+      .io_axi_master_read_addr_valid(master_arvalid),
+      .io_axi_master_read_addr_bits_addr(master_araddr),
+      .io_axi_master_read_addr_bits_prot(master_arprot),
+      .io_axi_master_read_addr_bits_id(master_arid),
+      .io_axi_master_read_addr_bits_len(master_arlen),
+      .io_axi_master_read_addr_bits_size(master_arsize),
+      .io_axi_master_read_addr_bits_burst(master_arburst),
+      .io_axi_master_read_addr_bits_lock(master_arlock),
+      .io_axi_master_read_addr_bits_cache(master_arcache),
+      .io_axi_master_read_addr_bits_qos(master_arqos),
+      .io_axi_master_read_addr_bits_region(master_arregion),
+      .io_axi_master_read_data_ready(master_rready),
+      .io_axi_master_read_data_valid(master_rvalid),
+      .io_axi_master_read_data_bits_data(master_rdata),
+      .io_axi_master_read_data_bits_id(master_rid),
+      .io_axi_master_read_data_bits_resp(master_rresp),
+      .io_axi_master_read_data_bits_last(master_rlast)
   );
 
   // Clock generator
@@ -189,7 +189,7 @@ module top;
 
   // Write channel handling
   assign master_awready = 1'b1;
-  assign master_wready = 1'b1;
+  assign master_wready  = 1'b1;
 
   reg bvalid_reg = 0;
   reg [5:0] bid_reg = 0;
@@ -201,7 +201,7 @@ module top;
     if (master_awvalid && master_wvalid) begin
       for (int i = 0; i < 16; i++) begin
         if (master_wstrb[i]) begin
-          mailbox[i*8 +: 8] <= master_wdata[i*8 +: 8];
+          mailbox[i*8+:8] <= master_wdata[i*8+:8];
         end
       end
       bvalid_reg <= 1'b1;
@@ -261,11 +261,11 @@ module top;
 
     // Release reset
     #20;
-    dut.csr.resetReg = 32'h0; // Backdoor release internal CSR reset and un-gate clock!
+    dut.csr.resetReg = 32'h0;  // Backdoor release internal CSR reset and un-gate clock!
     resetn = 1;
   end
 
-  int cycles_limit = 100000000; // Default limit is 100M cycles!
+  int cycles_limit = 100000000;  // Default limit is 100M cycles!
   initial begin
     if ($value$plusargs("cycles=%d", cycles_limit)) begin
       // Override dynamically!

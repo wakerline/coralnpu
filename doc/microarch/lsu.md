@@ -141,4 +141,3 @@ For the RVVCore, the LSU contains the following interfaces:
 | lsu2rvv.data   | UInt(128)         | The vector data to write back for load operations.                |
 | lsu2rvv.last   | Bool              | If this transaction is a store or not.                            |
 | lsu2rvv.ready  | Bool (input)      | If the transaction is accepted. Used in a ready-valid hand-shake. |
-

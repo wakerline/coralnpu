@@ -6,7 +6,7 @@ case class MemorySize(bytes: Int) {
 }
 
 object MemorySize {
-  def fromBytes(bytes: Int): MemorySize = MemorySize(bytes)
+  def fromBytes(bytes: Int): MemorySize   = MemorySize(bytes)
   def fromKBytes(kBytes: Int): MemorySize = MemorySize(kBytes * 1024)
   def fromMBytes(mBytes: Int): MemorySize = MemorySize(mBytes * 1024 * 1024)
 }

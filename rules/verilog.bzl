@@ -32,54 +32,59 @@ def collect_verilog_files(targets, files = None):
         targets = [targets]
 
     transitive_dags = []
+    raw_files_depsets = []
     for target in targets:
         if VerilogInfo in target:
             transitive_dags.append(target[VerilogInfo].dag)
+        else:
+            raw_files_depsets.append(target.files)
 
     transitive_srcs = depset([], transitive = transitive_dags)
 
     flat_srcs = []
     for verilog_info_struct in transitive_srcs.to_list():
-        for src in verilog_info_struct.srcs:
-            flat_srcs.append(src)
+        flat_srcs.extend(verilog_info_struct.srcs)
 
-    for f in files:
-        flat_srcs.append(f)
+    if raw_files_depsets:
+        flat_srcs.extend(depset(transitive = raw_files_depsets).to_list())
+
+    flat_srcs.extend(files)
 
     return depset(flat_srcs)
 
 def _verilog_zip_bundle_impl(ctx):
-  # Gather all sources
-  all_srcs = collect_verilog_files(ctx.attr.lib).to_list()
+    # Gather all sources
+    all_srcs = collect_verilog_files(ctx.attr.lib).to_list()
 
-  # Build up zip command
-  zipper_args = ["cf", ctx.outputs.zip.path]
-  for f in all_srcs:
-    zipper_args.append(f.path)
+    # Build up zip command
+    zipper_args = ["cf", ctx.outputs.zip.path]
+    for f in all_srcs:
+        zipper_args.append(f.path)
 
-  # Run zip command.
-  ctx.actions.run(
-    inputs = all_srcs,
-    outputs = [ctx.outputs.zip],
-    executable = ctx.executable._zipper,
-    arguments = zipper_args,
-    progress_message = "Creating zip...",
-    mnemonic = "zipper",
-  )
+    # Run zip command.
+    ctx.actions.run(
+        inputs = all_srcs,
+        outputs = [ctx.outputs.zip],
+        executable = ctx.executable._zipper,
+        arguments = zipper_args,
+        progress_message = "Creating zip...",
+        mnemonic = "zipper",
+    )
 
 verilog_zip_bundle = rule(
-  implementation = _verilog_zip_bundle_impl,
-  attrs = {
-    "lib": attr.label(
-      doc = "The verilog_library to bundle.",
-      providers = [ VerilogInfo, ],
-    ),
-    "_zipper": attr.label(
-        default = Label("@bazel_tools//tools/zip:zipper"),
-        cfg = "host",
-        executable=True),
-  },
-  outputs = {
-    "zip": "%{name}.zip",
-  },
+    implementation = _verilog_zip_bundle_impl,
+    attrs = {
+        "lib": attr.label(
+            doc = "The verilog_library to bundle.",
+            providers = [VerilogInfo],
+        ),
+        "_zipper": attr.label(
+            default = Label("@bazel_tools//tools/zip:zipper"),
+            cfg = "host",
+            executable = True,
+        ),
+    },
+    outputs = {
+        "zip": "%{name}.zip",
+    },
 )

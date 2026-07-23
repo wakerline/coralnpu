@@ -36,23 +36,23 @@ package transaction_item_pkg;
   typedef enum logic [1:0] {
     AXI_READ  = 2'b01,
     AXI_WRITE = 2'b10,
-    AXI_RDWR  = 2'b11 // Could be used for modeling exclusive access etc.
+    AXI_RDWR  = 2'b11   // Could be used for modeling exclusive access etc.
   } axi_txn_type_e;
 
   // Helper enum for burst type (defined outside class for broader use)
   typedef enum logic [1:0] {
-      AXI_BURST_FIXED = 2'b00,
-      AXI_BURST_INCR  = 2'b01,
-      AXI_BURST_WRAP  = 2'b10,
-      AXI_BURST_RSVD  = 2'b11
+    AXI_BURST_FIXED = 2'b00,
+    AXI_BURST_INCR  = 2'b01,
+    AXI_BURST_WRAP  = 2'b10,
+    AXI_BURST_RSVD  = 2'b11
   } axi_burst_type_e;
 
   // Helper enum for AXI response types
   typedef enum logic [1:0] {
-      AXI_OKAY  = 2'b00,
-      AXI_EXOKAY = 2'b01,
-      AXI_SLVERR = 2'b10,
-      AXI_DECERR = 2'b11
+    AXI_OKAY   = 2'b00,
+    AXI_EXOKAY = 2'b01,
+    AXI_SLVERR = 2'b10,
+    AXI_DECERR = 2'b11
   } axi_resp_e;
 
   class axi_transaction extends uvm_sequence_item;
@@ -61,34 +61,34 @@ package transaction_item_pkg;
     rand axi_txn_type_e txn_type;
 
     // Address Phase Fields
-    rand logic [IDWIDTH-1:0]   id;
-    rand logic [AWIDTH-1:0]  addr;
-    rand logic [7:0]         len;   // Burst length (0=1 beat, 1=2 beats.. 255=256 beats)
-    rand logic [2:0]         size;  // Transfer size (e.g., 3'b100 = 16 bytes if DWIDTH=128)
-    rand axi_burst_type_e   burst;  // Burst type (FIXED, INCR, WRAP)
-    rand logic               lock;
-    rand logic [3:0]         cache;
-    rand logic [2:0]         prot;
-    rand logic [3:0]         qos;
-    rand logic [3:0]         region;
+    rand logic [IDWIDTH-1:0] id;
+    rand logic [AWIDTH-1:0] addr;
+    rand logic [7:0] len;  // Burst length (0=1 beat, 1=2 beats.. 255=256 beats)
+    rand logic [2:0] size;  // Transfer size (e.g., 3'b100 = 16 bytes if DWIDTH=128)
+    rand axi_burst_type_e burst;  // Burst type (FIXED, INCR, WRAP)
+    rand logic lock;
+    rand logic [3:0] cache;
+    rand logic [2:0] prot;
+    rand logic [3:0] qos;
+    rand logic [3:0] region;
 
     // Data Phase Fields
-    rand logic [DWIDTH-1:0] data[$]; // Queue for data
-    rand logic [DWIDTH/8-1:0] strb[$]; // Queue for strobes
+    rand logic [DWIDTH-1:0] data[$];  // Queue for data
+    rand logic [DWIDTH/8-1:0] strb[$];  // Queue for strobes
 
     // Response Phase Fields (Captured by monitor or sequence)
-    logic [1:0]         resp; // BRESP or RRESP
+    logic [1:0] resp;  // BRESP or RRESP
 
     // Constraints
     constraint c_burst_len {
       if (txn_type == AXI_WRITE) {
-          data.size() == len + 1;
-          strb.size() == len + 1;
+        data.size() == len + 1;
+        strb.size() == len + 1;
       }
       len <= 255;
-      size <= $clog2(DWIDTH/8);
+      size <= $clog2(DWIDTH / 8);
     }
-    constraint c_valid_type { txn_type inside {AXI_READ, AXI_WRITE}; }
+    constraint c_valid_type {txn_type inside {AXI_READ, AXI_WRITE};}
 
     // UVM automation fields
     `uvm_object_utils_begin(axi_transaction)
@@ -103,8 +103,8 @@ package transaction_item_pkg;
       `uvm_field_int(prot, UVM_DEFAULT)
       `uvm_field_int(qos, UVM_DEFAULT)
       `uvm_field_int(region, UVM_DEFAULT)
-      `uvm_field_queue_int(data, UVM_DEFAULT | UVM_HEX) // Use queue int macro
-      `uvm_field_queue_int(strb, UVM_DEFAULT | UVM_HEX) // Use queue int macro
+      `uvm_field_queue_int(data, UVM_DEFAULT | UVM_HEX)  // Use queue int macro
+      `uvm_field_queue_int(strb, UVM_DEFAULT | UVM_HEX)  // Use queue int macro
       `uvm_field_int(resp, UVM_DEFAULT | UVM_NOCOMPARE)
     `uvm_object_utils_end
 

@@ -20,54 +20,52 @@ import org.scalatest.freespec.AnyFreeSpec
 
 import bus._
 
-class CounterAxiPeripheral extends Module { //extends AxiCsrInterface(3) {
-  val io = IO(new Bundle{
+class CounterAxiPeripheral extends Module { // extends AxiCsrInterface(3) {
+  val io = IO(new Bundle {
     val count = Output(UInt(32.W))
-    val axi = Flipped(new AxiMasterIO(32, 32, 6))
+    val axi   = Flipped(new AxiMasterIO(32, 32, 6))
   })
 
-  val count = RegInit(0.U(32.W))
-  val limit = RegInit(256.U(32.W))
-  val enable = RegInit(0.U(32.W))  // Counts if non-zero
+  val count  = RegInit(0.U(32.W))
+  val limit  = RegInit(256.U(32.W))
+  val enable = RegInit(0.U(32.W)) // Counts if non-zero
 
   val readMap = Map.apply(
-      "count" -> (0, count),
-      "limit" -> (4, limit),
-      "enable" -> (8, enable),
+    "count"  -> (0, count),
+    "limit"  -> (4, limit),
+    "enable" -> (8, enable)
   )
   io.axi.read <> ConnectAxiRead(6, readMap)
 
   val writeMap = Map.apply(
-      "count" -> 0,
-      "limit" -> 4,
-      "enable" -> 8,
+    "count"  -> 0,
+    "limit"  -> 4,
+    "enable" -> 8
   )
   val (writes, writeData) = ConnectAxiWrite(6, writeMap, io.axi.write)
 
-  val hasWrite = Wire(Bool())
+  val hasWrite     = Wire(Bool())
   val axiWriteAddr = Wire(UInt(32.W))
   val axiWriteData = Wire(UInt(32.W))
-  hasWrite := false.B
+  hasWrite     := false.B
   axiWriteAddr := 0.U
   axiWriteData := 0.U
 
-  val increment = enable =/= 0.U
-  val incCount = count + increment
+  val increment     = enable =/= 0.U
+  val incCount      = count + increment
   val overflowCount = Mux(incCount >= limit, 0.U, incCount)
   count := Mux(writes("count"), writeData, overflowCount)
 
-  when (writes("limit")) {
+  when(writes("limit")) {
     limit := writeData
   }
 
-  when (writes("enable")) {
+  when(writes("enable")) {
     enable := writeData
   }
 
   io.count := count
 }
-
-
 
 class PeripheralInterfaceSpec extends AnyFreeSpec with ChiselSim {
   "Does Nothing" in {

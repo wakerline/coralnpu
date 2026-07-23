@@ -23,7 +23,6 @@
 # For more details on why this override exists and how we plan to remove it
 # when transitioning to Bzlmod, see the README.md in this directory.
 
-
 workspace(name = "coralnpu_sim")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")

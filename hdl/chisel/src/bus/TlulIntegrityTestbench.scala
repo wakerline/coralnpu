@@ -16,11 +16,9 @@ package bus
 
 import chisel3._
 import chisel3.util._
-import coralnpu.Parameters
 
-/**
-  * A testbench DUT that instantiates all TlulIntegrity modules so they can be
-  * tested with cocotb in a single simulation.
+/** A testbench DUT that instantiates all TlulIntegrity modules so they can be tested with cocotb in
+  * a single simulation.
   */
 class TlulIntegrityTestbench(p: TLULParameters) extends Module {
   val io = IO(new Bundle {
@@ -29,7 +27,7 @@ class TlulIntegrityTestbench(p: TLULParameters) extends Module {
     val req_gen_a_o = Decoupled(new OpenTitanTileLink.A_Channel(p))
 
     // 2. RequestIntegrityCheck instance
-    val req_check_a_i = Flipped(Decoupled(new OpenTitanTileLink.A_Channel(p)))
+    val req_check_a_i   = Flipped(Decoupled(new OpenTitanTileLink.A_Channel(p)))
     val req_check_fault = Output(Bool())
 
     // 4. ResponseIntegrityGen instance
@@ -37,7 +35,7 @@ class TlulIntegrityTestbench(p: TLULParameters) extends Module {
     val rsp_gen_d_o = Decoupled(new OpenTitanTileLink.D_Channel(p))
 
     // 5. ResponseIntegrityCheck instance
-    val rsp_check_d_i = Flipped(Decoupled(new OpenTitanTileLink.D_Channel(p)))
+    val rsp_check_d_i   = Flipped(Decoupled(new OpenTitanTileLink.D_Channel(p)))
     val rsp_check_fault = Output(Bool())
 
   })
@@ -45,41 +43,42 @@ class TlulIntegrityTestbench(p: TLULParameters) extends Module {
   // 1. RequestIntegrityGen instance
   val req_gen = Module(new RequestIntegrityGen(p))
   req_gen.io.a_i <> io.req_gen_a_i.bits
-  io.req_gen_a_o.bits := req_gen.io.a_o
+  io.req_gen_a_o.bits  := req_gen.io.a_o
   io.req_gen_a_o.valid := io.req_gen_a_i.valid
   io.req_gen_a_i.ready := io.req_gen_a_o.ready
 
   // 2. RequestIntegrityCheck instance
   val req_check = Module(new RequestIntegrityCheck(p))
-  req_check.io.a_i := io.req_check_a_i.bits
-  io.req_check_fault := req_check.io.fault
+  req_check.io.a_i       := io.req_check_a_i.bits
+  io.req_check_fault     := req_check.io.fault
   io.req_check_a_i.ready := true.B // Always ready to check
 
   // 4. ResponseIntegrityGen instance
   val rsp_gen = Module(new ResponseIntegrityGen(p))
-  rsp_gen.io.d_i := io.rsp_gen_d_i.bits
-  io.rsp_gen_d_o.bits := rsp_gen.io.d_o
+  rsp_gen.io.d_i       := io.rsp_gen_d_i.bits
+  io.rsp_gen_d_o.bits  := rsp_gen.io.d_o
   io.rsp_gen_d_o.valid := io.rsp_gen_d_i.valid
   io.rsp_gen_d_i.ready := io.rsp_gen_d_o.ready
 
   // 5. ResponseIntegrityCheck instance
   val rsp_check = Module(new ResponseIntegrityCheck(p))
-  rsp_check.io.d_i := io.rsp_check_d_i.bits
-  io.rsp_check_fault := rsp_check.io.fault
+  rsp_check.io.d_i       := io.rsp_check_d_i.bits
+  io.rsp_check_fault     := rsp_check.io.fault
   io.rsp_check_d_i.ready := true.B
 
 }
 
-import _root_.circt.stage.{ChiselStage,FirtoolOption}
+import _root_.circt.stage.{ChiselStage, FirtoolOption}
 import chisel3.stage.ChiselGeneratorAnnotation
 import scala.annotation.nowarn
 
 @nowarn
 object EmitTlulIntegrityTestbench extends App {
-  val p = new Parameters
-  p.lsuDataBits = 128
+  val tlul_p = new TLULParameters(dataBits = 128, addrBits = 32, idBits = 6)
   (new ChiselStage).execute(
     Array("--target", "systemverilog") ++ args,
-    Seq(ChiselGeneratorAnnotation(() => new TlulIntegrityTestbench(new bus.TLULParameters(p)))) ++ Seq(FirtoolOption("-enable-layers=Verification"))
+    Seq(ChiselGeneratorAnnotation(() => new TlulIntegrityTestbench(tlul_p))) ++ Seq(
+      FirtoolOption("-enable-layers=Verification")
+    )
   )
 }

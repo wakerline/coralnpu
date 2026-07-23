@@ -38,7 +38,8 @@ class spike_cosim_checker extends uvm_object;
     spike_svc = spike_trace_service::type_id::create("spike_svc");
     if (spike_svc.open_trace(spike_log_path)) begin
       spike_enabled = 1;
-      `uvm_info("SPIKE_CHECK", $sformatf("Spike 3-way cosim enabled. Log: %s", spike_log_path), UVM_LOW)
+      `uvm_info("SPIKE_CHECK", $sformatf("Spike 3-way cosim enabled. Log: %s", spike_log_path),
+                UVM_LOW)
     end
   endfunction
 
@@ -46,7 +47,14 @@ class spike_cosim_checker extends uvm_object;
   // Synchronizes the Spike log to the retired RTL instruction and verifies
   // that all register writes reported by Spike match the RTL state.
   function void check_instruction(retired_instr_info_s rtl_info,
-                                  virtual rvviTrace #(.ILEN(32), .XLEN(32), .FLEN(32), .VLEN(128), .NHART(1), .RETIRE(8)) rvvi_vif,
+                                  virtual rvviTrace #(
+                                      .ILEN  (32),
+                                      .XLEN  (32),
+                                      .FLEN  (32),
+                                      .VLEN  (128),
+                                      .NHART (1),
+                                      .RETIRE(8)
+                                  ) rvvi_vif,
                                   input bit [31:0] skip_mask);
     if (!spike_enabled) return;
 
@@ -58,118 +66,144 @@ class spike_cosim_checker extends uvm_object;
 
     // Attempt 1: If already synced, check if the next log entry matches the retired PC.
     if (spike_synced) begin
-       spike_instr_txn_t t = spike_svc.get_next_instruction();
-       if (!t.is_valid || t.pc != rtl_info.pc) begin
-          // Out of sync (e.g., due to a trap or discontinuity).
-          // Push back the mismatched transaction and trigger a re-seek.
-          `uvm_info("SPIKE_RESYNC", $sformatf("Spike out of sync at PC 0x%h (Spike 0x%h). Resyncing...", rtl_info.pc, t.pc), UVM_MEDIUM)
-          spike_synced = 0;
-          if (t.is_valid) spike_svc.push_front(t);
-       end else begin
-          current_spike_txns.push_back(t);
-       end
+      spike_instr_txn_t t = spike_svc.get_next_instruction();
+      if (!t.is_valid || t.pc != rtl_info.pc) begin
+        // Out of sync (e.g., due to a trap or discontinuity).
+        // Push back the mismatched transaction and trigger a re-seek.
+        `uvm_info("SPIKE_RESYNC", $sformatf(
+                                      "Spike out of sync at PC 0x%h (Spike 0x%h). Resyncing...",
+                                      rtl_info.pc, t.pc), UVM_MEDIUM)
+        spike_synced = 0;
+        if (t.is_valid) spike_svc.push_front(t);
+      end else begin
+        current_spike_txns.push_back(t);
+      end
     end
 
     // Attempt 2: If not synced (initially or lost sync), seek the log to the correct PC.
     if (!spike_synced) begin
-       if (!spike_svc.seek_to_pc(rtl_info.pc)) begin
-          `uvm_error("SPIKE_SYNC", $sformatf("Could not sync Spike log to PC 0x%h. Disabling Spike checks.", rtl_info.pc))
-          spike_enabled = 0;
-          return;
-       end
-       spike_synced = 1;
-       current_spike_txns.push_back(spike_svc.get_next_instruction());
+      if (!spike_svc.seek_to_pc(rtl_info.pc)) begin
+        `uvm_error("SPIKE_SYNC",
+                   $sformatf("Could not sync Spike log to PC 0x%h. Disabling Spike checks.",
+                             rtl_info.pc))
+        spike_enabled = 0;
+        return;
+      end
+      spike_synced = 1;
+      current_spike_txns.push_back(spike_svc.get_next_instruction());
     end
 
     // Collect any additional writes for the same PC (e.g., for multi-register vector ops).
     forever begin
-        spike_instr_txn_t next_t = spike_svc.get_next_instruction();
-        if (next_t.is_valid && next_t.pc == rtl_info.pc) begin
-            current_spike_txns.push_back(next_t);
-        end else begin
-            if (next_t.is_valid) spike_svc.push_front(next_t);
-            break;
-        end
+      spike_instr_txn_t next_t = spike_svc.get_next_instruction();
+      if (next_t.is_valid && next_t.pc == rtl_info.pc) begin
+        current_spike_txns.push_back(next_t);
+      end else begin
+        if (next_t.is_valid) spike_svc.push_front(next_t);
+        break;
+      end
     end
 
     // Perform Comparisons
     if (current_spike_txns.size() == 0) begin
-       `uvm_error("SPIKE_EOF", "Spike log ended unexpectedly while searching for PC")
-       spike_enabled = 0;
-       return;
+      `uvm_error("SPIKE_EOF", "Spike log ended unexpectedly while searching for PC")
+      spike_enabled = 0;
+      return;
     end
 
-    `uvm_info("SPIKE_MATCH", $sformatf("Spike PC match: 0x%h (commit count: %0d)", rtl_info.pc, current_spike_txns.size()), UVM_HIGH)
+    `uvm_info("SPIKE_MATCH", $sformatf(
+              "Spike PC match: 0x%h (commit count: %0d)", rtl_info.pc, current_spike_txns.size()),
+              UVM_HIGH)
 
-    foreach(current_spike_txns[k]) begin
-        // 1. GPR Verification
-        if (current_spike_txns[k].has_gpr_write && current_spike_txns[k].rd != 0) begin
-           if (skip_mask[current_spike_txns[k].rd]) begin
-              `uvm_info("SPIKE_SKIP", $sformatf("Skipping GPR[x%0d] verification at PC 0x%h due to dirty mask",
-                         current_spike_txns[k].rd, rtl_info.pc), UVM_LOW)
-           end else if (!rtl_info.x_wb[current_spike_txns[k].rd]) begin
-              `uvm_fatal("SPIKE_GPR_MISMATCH", $sformatf("GPR[x%0d] mismatch at PC 0x%h. Spike wrote 0x%h but RTL did not.",
-                         current_spike_txns[k].rd, rtl_info.pc, current_spike_txns[k].wdata))
-           end else begin
-              logic [31:0] rtl_val = rvvi_vif.x_wdata[0][rtl_info.retire_index][current_spike_txns[k].rd];
-              if (rtl_val != current_spike_txns[k].wdata) begin
-                  `uvm_fatal("SPIKE_VAL_MISMATCH", $sformatf("GPR[x%0d] value mismatch at PC 0x%h. RTL: 0x%h, Spike: 0x%h",
-                             current_spike_txns[k].rd, rtl_info.pc, rtl_val, current_spike_txns[k].wdata))
-              end
-           end
+    foreach (current_spike_txns[k]) begin
+      // 1. GPR Verification
+      if (current_spike_txns[k].has_gpr_write && current_spike_txns[k].rd != 0) begin
+        if (skip_mask[current_spike_txns[k].rd]) begin
+          `uvm_info("SPIKE_SKIP",
+                    $sformatf("Skipping GPR[x%0d] verification at PC 0x%h due to dirty mask",
+                              current_spike_txns[k].rd, rtl_info.pc), UVM_LOW)
+        end else if (!rtl_info.x_wb[current_spike_txns[k].rd]) begin
+          `uvm_fatal("SPIKE_GPR_MISMATCH",
+                     $sformatf("GPR[x%0d] mismatch at PC 0x%h. Spike wrote 0x%h but RTL did not.",
+                               current_spike_txns[k].rd, rtl_info.pc, current_spike_txns[k].wdata))
+        end else begin
+          logic [31:0] rtl_val = rvvi_vif.x_wdata[0][rtl_info.retire_index][current_spike_txns[k].rd];
+          if (rtl_val != current_spike_txns[k].wdata) begin
+            `uvm_fatal("SPIKE_VAL_MISMATCH",
+                       $sformatf("GPR[x%0d] value mismatch at PC 0x%h. RTL: 0x%h, Spike: 0x%h",
+                                 current_spike_txns[k].rd, rtl_info.pc, rtl_val,
+                                 current_spike_txns[k].wdata))
+          end
         end
+      end
 
-        // 2. FPR Verification
-        if (current_spike_txns[k].has_fpr_write) begin
-           if (!rtl_info.f_wb[current_spike_txns[k].rd]) begin
-              `uvm_fatal("SPIKE_FPR_MISMATCH", $sformatf("FPR[f%0d] mismatch at PC 0x%h. Spike wrote 0x%h but RTL did not.",
-                         current_spike_txns[k].rd, rtl_info.pc, current_spike_txns[k].wdata))
-           end else begin
-              logic [31:0] rtl_val = rvvi_vif.f_wdata[0][rtl_info.retire_index][current_spike_txns[k].rd];
-              if (rtl_val != current_spike_txns[k].wdata) begin
-                  `uvm_fatal("SPIKE_VAL_MISMATCH", $sformatf("FPR[f%0d] value mismatch at PC 0x%h. RTL: 0x%h, Spike: 0x%h",
-                             current_spike_txns[k].rd, rtl_info.pc, rtl_val, current_spike_txns[k].wdata))
-              end
-           end
+      // 2. FPR Verification
+      if (current_spike_txns[k].has_fpr_write) begin
+        if (!rtl_info.f_wb[current_spike_txns[k].rd]) begin
+          `uvm_fatal("SPIKE_FPR_MISMATCH",
+                     $sformatf("FPR[f%0d] mismatch at PC 0x%h. Spike wrote 0x%h but RTL did not.",
+                               current_spike_txns[k].rd, rtl_info.pc, current_spike_txns[k].wdata))
+        end else begin
+          logic [31:0] rtl_val = rvvi_vif.f_wdata[0][rtl_info.retire_index][current_spike_txns[k].rd];
+          if (rtl_val != current_spike_txns[k].wdata) begin
+            `uvm_fatal("SPIKE_VAL_MISMATCH",
+                       $sformatf("FPR[f%0d] value mismatch at PC 0x%h. RTL: 0x%h, Spike: 0x%h",
+                                 current_spike_txns[k].rd, rtl_info.pc, rtl_val,
+                                 current_spike_txns[k].wdata))
+          end
         end
+      end
 
-        // 3. VPR Verification
-        if (current_spike_txns[k].has_vpr_write) begin
-           if (!rtl_info.v_wb[current_spike_txns[k].rd]) begin
-              `uvm_fatal("SPIKE_VPR_MISMATCH", $sformatf("VPR[v%0d] mismatch at PC 0x%h. Spike wrote 0x%h but RTL did not.",
-                         current_spike_txns[k].rd, rtl_info.pc, current_spike_txns[k].v_wdata))
-           end else begin
-              logic [127:0] rtl_val = rvvi_vif.v_wdata[0][rtl_info.retire_index][current_spike_txns[k].rd];
-              if (rtl_val != current_spike_txns[k].v_wdata) begin
-                  `uvm_fatal("SPIKE_VAL_MISMATCH", $sformatf("VPR[v%0d] value mismatch at PC 0x%h. RTL: 0x%h, Spike: 0x%h",
-                             current_spike_txns[k].rd, rtl_info.pc, rtl_val, current_spike_txns[k].v_wdata))
-              end
-           end
+      // 3. VPR Verification
+      if (current_spike_txns[k].has_vpr_write) begin
+        if (!rtl_info.v_wb[current_spike_txns[k].rd]) begin
+          `uvm_fatal("SPIKE_VPR_MISMATCH",
+                     $sformatf("VPR[v%0d] mismatch at PC 0x%h. Spike wrote 0x%h but RTL did not.",
+                               current_spike_txns[k].rd, rtl_info.pc,
+                               current_spike_txns[k].v_wdata))
+        end else begin
+          logic [127:0] rtl_val = rvvi_vif.v_wdata[0][rtl_info.retire_index][current_spike_txns[k].rd];
+          if (rtl_val != current_spike_txns[k].v_wdata) begin
+            `uvm_fatal("SPIKE_VAL_MISMATCH",
+                       $sformatf("VPR[v%0d] value mismatch at PC 0x%h. RTL: 0x%h, Spike: 0x%h",
+                                 current_spike_txns[k].rd, rtl_info.pc, rtl_val,
+                                 current_spike_txns[k].v_wdata))
+          end
         end
+      end
     end
 
     // 4. Verify RTL did not write registers that Spike missed (GPR/FPR/VPR masks)
     // (This ensures one-to-one mapping between simulator state updates)
     for (int r = 1; r < 32; r++) begin
-        if (rtl_info.x_wb[r]) begin
-           bit found = 0;
-           if (skip_mask[r]) continue;
-           foreach(current_spike_txns[k]) if (current_spike_txns[k].has_gpr_write && current_spike_txns[k].rd == r) found = 1;
-           if (!found) `uvm_fatal("SPIKE_GPR_MISMATCH", $sformatf("RTL wrote GPR[x%0d] at PC 0x%h but Spike did not.", r, rtl_info.pc))
-        end
-        if (rtl_info.f_wb[r]) begin
-           bit found = 0;
-           foreach(current_spike_txns[k]) if (current_spike_txns[k].has_fpr_write && current_spike_txns[k].rd == r) found = 1;
-           if (!found) `uvm_fatal("SPIKE_FPR_MISMATCH", $sformatf("RTL wrote FPR[f%0d] at PC 0x%h but Spike did not.", r, rtl_info.pc))
-        end
-        if (rtl_info.v_wb[r]) begin
-           bit found = 0;
-           foreach(current_spike_txns[k]) if (current_spike_txns[k].has_vpr_write && current_spike_txns[k].rd == r) found = 1;
-           if (!found) `uvm_fatal("SPIKE_VPR_MISMATCH", $sformatf("RTL wrote VPR[v%0d] at PC 0x%h but Spike did not.", r, rtl_info.pc))
-        end
+      if (rtl_info.x_wb[r]) begin
+        bit found = 0;
+        if (skip_mask[r]) continue;
+        foreach (current_spike_txns[k])
+        if (current_spike_txns[k].has_gpr_write && current_spike_txns[k].rd == r) found = 1;
+        if (!found)
+          `uvm_fatal("SPIKE_GPR_MISMATCH", $sformatf(
+                     "RTL wrote GPR[x%0d] at PC 0x%h but Spike did not.", r, rtl_info.pc))
+      end
+      if (rtl_info.f_wb[r]) begin
+        bit found = 0;
+        foreach (current_spike_txns[k])
+        if (current_spike_txns[k].has_fpr_write && current_spike_txns[k].rd == r) found = 1;
+        if (!found)
+          `uvm_fatal("SPIKE_FPR_MISMATCH", $sformatf(
+                     "RTL wrote FPR[f%0d] at PC 0x%h but Spike did not.", r, rtl_info.pc))
+      end
+      if (rtl_info.v_wb[r]) begin
+        bit found = 0;
+        foreach (current_spike_txns[k])
+        if (current_spike_txns[k].has_vpr_write && current_spike_txns[k].rd == r) found = 1;
+        if (!found)
+          `uvm_fatal("SPIKE_VPR_MISMATCH", $sformatf(
+                     "RTL wrote VPR[v%0d] at PC 0x%h but Spike did not.", r, rtl_info.pc))
+      end
     end
   endfunction
 
 endclass
 
-`endif // SPIKE_COSIM_CHECKER_SV
+`endif  // SPIKE_COSIM_CHECKER_SV

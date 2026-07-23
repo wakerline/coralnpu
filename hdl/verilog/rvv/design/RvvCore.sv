@@ -163,17 +163,16 @@ module RvvCore #(parameter N = 4,
     UOP_LSU2RVV_t     [`NUM_LSU-1:0]          uop_lsu_lsu2rvv;
     always_comb begin
       for (int i = 0; i < `NUM_LSU; i++) begin
-        `ifdef TB_SUPPORT
-              uop_lsu_lsu2rvv[i].uop_pc = 0;
-              uop_lsu_lsu2rvv[i].uop_index = 0;
-        `endif
-
         uop_lsu_lsu2rvv[i].vregfile_write_valid = (
             uop_lsu_valid_lsu2rvv[i] && !uop_lsu_last_lsu2rvv[i]);
         uop_lsu_lsu2rvv[i].vregfile_write_addr = uop_lsu_addr_lsu2rvv[i];
         uop_lsu_lsu2rvv[i].vregfile_write_data = uop_lsu_wdata_lsu2rvv[i];
         uop_lsu_lsu2rvv[i].lsu_vstore_last = (
             uop_lsu_valid_lsu2rvv[i] && uop_lsu_last_lsu2rvv[i]);
+        `ifdef TB_SUPPORT
+              uop_lsu_lsu2rvv[i].uop_pc = 0;
+              uop_lsu_lsu2rvv[i].uop_index = 0;
+        `endif
       end
     end
 
@@ -234,6 +233,14 @@ module RvvCore #(parameter N = 4,
     trap_valid_rvs2rvv = 0;
   end
 
+  // Tie-off VME LSU interfaces
+  // TODO: Support these
+`ifdef ZVT_ON
+  logic                 uop_vme2lsu_vld_dummy;
+  UOP_VME2LSU_t         uop_vme2lsu_dummy;
+  logic                 uop_lsu2vme_rdy_dummy;
+`endif
+
   logic   [`ISSUE_LANE-1:0] insts_ready_cq2rvs;
   logic rvv_backend_idle;
   assign rvv_idle = rvv_backend_idle && (frontend_cmd_valid == 0);
@@ -281,6 +288,14 @@ module RvvCore #(parameter N = 4,
       .rd_valid_rob2rt_o(rd_valid_rob2rt_o),
       .rvv_idle(rvv_backend_idle),
       .rd_rob2rt_o(rd_rob2rt_o)
+`ifdef ZVT_ON
+      ,.uop_vme2lsu_vld(uop_vme2lsu_vld_dummy),
+      .uop_vme2lsu(uop_vme2lsu_dummy),
+      .uop_vme2lsu_rdy(1'b0),
+      .uop_lsu2vme_vld(1'b0),
+      .uop_lsu2vme('0),
+      .uop_lsu2vme_rdy(uop_lsu2vme_rdy_dummy)
+`endif
   );
 
   // Connect vxsat signals to outputs (fixes C3 bug)

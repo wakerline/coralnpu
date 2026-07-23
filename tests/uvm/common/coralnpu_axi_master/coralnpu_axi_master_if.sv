@@ -19,60 +19,63 @@
 //----------------------------------------------------------------------------
 interface coralnpu_axi_master_if #(
     parameter int unsigned AWIDTH = 32,
-    parameter int unsigned DWIDTH = 128, // Matches DUT Slave port
-    parameter int unsigned IDWIDTH = 6   // Matches DUT Slave port
-  ) (input logic clk, input logic resetn);
+    parameter int unsigned DWIDTH = 128,  // Matches DUT Slave port
+    parameter int unsigned IDWIDTH = 6  // Matches DUT Slave port
+) (
+    input logic clk,
+    input logic resetn
+);
 
   // Signal declarations (Master drives AW, W, AR; receives B, R)
   // Write Address Channel
-  logic                 awvalid;
-  logic [IDWIDTH-1:0]   awid;
-  logic [AWIDTH-1:0]    awaddr;
-  logic [7:0]           awlen;
-  logic [2:0]           awsize;
-  logic [1:0]           awburst;
-  logic                 awlock;
-  logic [3:0]           awcache;
-  logic [2:0]           awprot;
-  logic [3:0]           awqos;
-  logic [3:0]           awregion;
-  logic                 awready;
+  logic                awvalid;
+  logic [ IDWIDTH-1:0] awid;
+  logic [  AWIDTH-1:0] awaddr;
+  logic [         7:0] awlen;
+  logic [         2:0] awsize;
+  logic [         1:0] awburst;
+  logic                awlock;
+  logic [         3:0] awcache;
+  logic [         2:0] awprot;
+  logic [         3:0] awqos;
+  logic [         3:0] awregion;
+  logic                awready;
 
   // Write Data Channel
-  logic                 wvalid;
-  logic [IDWIDTH-1:0]   wid;
-  logic [DWIDTH-1:0]    wdata;
-  logic [DWIDTH/8-1:0]  wstrb;
-  logic                 wlast;
-  logic                 wready;
+  logic                wvalid;
+  logic [ IDWIDTH-1:0] wid;
+  logic [  DWIDTH-1:0] wdata;
+  logic [DWIDTH/8-1:0] wstrb;
+  logic                wlast;
+  logic                wready;
 
   // Write Response Channel
-  logic                 bvalid;
-  logic [IDWIDTH-1:0]   bid;
-  logic [1:0]           bresp;
-  logic                 bready;
+  logic                bvalid;
+  logic [ IDWIDTH-1:0] bid;
+  logic [         1:0] bresp;
+  logic                bready;
 
   // Read Address Channel
-  logic                 arvalid;
-  logic [IDWIDTH-1:0]   arid;
-  logic [AWIDTH-1:0]    araddr;
-  logic [7:0]           arlen;
-  logic [2:0]           arsize;
-  logic [1:0]           arburst;
-  logic                 arlock;
-  logic [3:0]           arcache;
-  logic [2:0]           arprot;
-  logic [3:0]           arqos;
-  logic [3:0]           arregion;
-  logic                 arready;
+  logic                arvalid;
+  logic [ IDWIDTH-1:0] arid;
+  logic [  AWIDTH-1:0] araddr;
+  logic [         7:0] arlen;
+  logic [         2:0] arsize;
+  logic [         1:0] arburst;
+  logic                arlock;
+  logic [         3:0] arcache;
+  logic [         2:0] arprot;
+  logic [         3:0] arqos;
+  logic [         3:0] arregion;
+  logic                arready;
 
   // Read Data Channel
-  logic                 rvalid;
-  logic [IDWIDTH-1:0]   rid;
-  logic [DWIDTH-1:0]    rdata;
-  logic [1:0]           rresp;
-  logic                 rlast;
-  logic                 rready;
+  logic                rvalid;
+  logic [ IDWIDTH-1:0] rid;
+  logic [  DWIDTH-1:0] rdata;
+  logic [         1:0] rresp;
+  logic                rlast;
+  logic                rready;
 
   // Clocking block for Testbench Master Driver
   clocking tb_master_cb @(posedge clk);
@@ -87,39 +90,39 @@ interface coralnpu_axi_master_if #(
     output arvalid;
     output rready;
     // Inputs sampled by TB Master
-    input  awready;
-    input  wready;
-    input  bid, bresp, bvalid;
-    input  arready;
-    input  rid, rdata, rresp, rlast, rvalid;
+    input awready;
+    input wready;
+    input bid, bresp, bvalid;
+    input arready;
+    input rid, rdata, rresp, rlast, rvalid;
   endclocking : tb_master_cb
 
   // Modport for Testbench Master Driver component
-  modport TB_MASTER_DRIVER (clocking tb_master_cb, input clk, input resetn);
+  modport TB_MASTER_DRIVER(clocking tb_master_cb, input clk, input resetn);
 
   // Modport for connecting to the DUT's Slave port
-  modport DUT_SLAVE_PORT (
-    input   clk, resetn,
+  modport DUT_SLAVE_PORT(
+      input clk, resetn,
 
-    input   awvalid,
-    input   awid, awaddr, awlen, awsize, awburst, awlock, awcache, awprot, awqos, awregion,
-    output  awready,
+      input awvalid,
+      input awid, awaddr, awlen, awsize, awburst, awlock, awcache, awprot, awqos, awregion,
+      output awready,
 
-    input   wvalid,
-    input   wid, wdata, wstrb, wlast,
-    output  wready,
+      input wvalid,
+      input wid, wdata, wstrb, wlast,
+      output wready,
 
-    input   arvalid,
-    input   arid, araddr, arlen, arsize, arburst, arlock, arcache, arprot, arqos, arregion,
-    output  arready,
+      input arvalid,
+      input arid, araddr, arlen, arsize, arburst, arlock, arcache, arprot, arqos, arregion,
+      output arready,
 
-    output  bvalid,
-    output  bid, bresp,
-    output  bready,
+      output bvalid,
+      output bid, bresp,
+      output bready,
 
-    output  rvalid,
-    output  rid, rdata, rresp, rlast,
-    output  rready
+      output rvalid,
+      output rid, rdata, rresp, rlast,
+      output rready
   );
 
 endinterface : coralnpu_axi_master_if

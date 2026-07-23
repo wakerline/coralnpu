@@ -58,17 +58,18 @@ object Gather {
 //        written in this scatter operation. Same length as `valid`, `indices`
 //        and `data` inputs.
 object Scatter {
-  def apply[T <: Data](valid: Vec[Bool],
-                       indices: Vec[UInt],
-                       data: Vec[T]): (Vec[T], Vec[Bool], Vec[Bool]) = {
+  def apply[T <: Data](
+    valid: Vec[Bool],
+    indices: Vec[UInt],
+    data: Vec[T]
+  ): (Vec[T], Vec[Bool], Vec[Bool]) = {
     assert(valid.length == data.length)
     assert(indices.length == data.length)
-    val dtype = chiselTypeOf(data(0))
+    val dtype      = chiselTypeOf(data(0))
     val indexWidth = indices(0).getWidth
     // Prevent scattering to a unreasonably wide vector. Limit to ~65k elements.
     assert(indexWidth <= 16)
     val resultLength = 1 << indexWidth
-
 
     // Generate resultMask and indicesSelected using a "selectionMatrix".
     // resultMask tracks which bytes of a busLine are active for this
@@ -78,11 +79,11 @@ object Scatter {
     // The selection matrix is a indicesSelected.length row by resultMask.length
     // col binary matrix.
     val validMatrix = (0 until indices.length).map(idx =>
-        Mux(valid(idx), UIntToOH(indices(idx)), 0.U(resultLength.W)))
-    val valueSet = validMatrix.scan(0.U(resultLength.W))(_|_)
-    val selectionMatrix = (0 until indices.length).map(
-        idx => validMatrix(idx) & ~valueSet(idx))
-    val resultMask = VecInit(selectionMatrix.reduce(_|_).asBools)
+      Mux(valid(idx), UIntToOH(indices(idx)), 0.U(resultLength.W))
+    )
+    val valueSet        = validMatrix.scan(0.U(resultLength.W))(_ | _)
+    val selectionMatrix = (0 until indices.length).map(idx => validMatrix(idx) & ~valueSet(idx))
+    val resultMask      = VecInit(selectionMatrix.reduce(_ | _).asBools)
     val indicesSelected = VecInit(selectionMatrix.map(x => (x =/= 0.U)))
 
     // Assertions
@@ -91,18 +92,17 @@ object Scatter {
     // (0 until resultLength).foreach(
     //     i => assert(PopCount(selectionMatrix.map(_(i))) <= 1.U))
     // Check indicesSelected is contained in valid
-    assert(PopCount((0 until indices.length).map(
-        i => indicesSelected(i) & ~valid(i))) === 0.U)
+    assert(PopCount((0 until indices.length).map(i => indicesSelected(i) & ~valid(i))) === 0.U)
 
     // TODO(derekjchow): Review semantics for "ordered" and "unordered", and
     // implement behaviours correctly.
 
     val result = Wire(Vec(resultLength, dtype))
     for (i <- 0 until resultLength) {
-      result(i) := MuxCase(0.U.asTypeOf(dtype),
-                           (0 until indices.length).map(idx =>
-        (valid(idx) && (indices(idx) === i.U)) -> data(idx)
-      ))
+      result(i) := MuxCase(
+        0.U.asTypeOf(dtype),
+        (0 until indices.length).map(idx => (valid(idx) && (indices(idx) === i.U)) -> data(idx))
+      )
     }
 
     (result, resultMask, indicesSelected)

@@ -19,7 +19,7 @@ import chisel3.util._
 
 import bus.AxiMasterIO
 import common._
-import _root_.circt.stage.{ChiselStage,FirtoolOption}
+import _root_.circt.stage.{ChiselStage, FirtoolOption}
 import chisel3.stage.ChiselGeneratorAnnotation
 import scala.annotation.nowarn
 
@@ -37,9 +37,9 @@ object L1DCacheBank {
 
 class L1DCache(p: Parameters) extends Module {
   val io = IO(new Bundle {
-    val dbus = Flipped(new DBusIO(p))
-    val axi = new AxiMasterIO(p.axi1AddrBits, p.axi1DataBits, p.axi1IdBits)
-    val flush = Flipped(new DFlushIO(p))
+    val dbus     = Flipped(new DBusIO(p))
+    val axi      = new AxiMasterIO(p.axi1AddrBits, p.axi1DataBits, p.axi1IdBits)
+    val flush    = Flipped(new DFlushIO(p))
     val volt_sel = Input(Bool())
   })
   io.axi.defaults()
@@ -50,22 +50,22 @@ class L1DCache(p: Parameters) extends Module {
   val bank0 = Module(new L1DCacheBank(p))
   val bank1 = Module(new L1DCacheBank(p))
 
-  val linebit = log2Ceil(p.lsuDataBits / 8)
+  val linebit   = log2Ceil(p.lsuDataBits / 8)
   val linebytes = 1 << linebit
 
   // Remove bank select bit from address.
   def BankInAddress(addr: UInt): UInt = {
-    assert(addr.getWidth == 32)
-    val output = Cat(addr(31, linebit + 1), addr(linebit - 1, 0))
-    assert(output.getWidth == 31)
+    assert(addr.getWidth == p.lsuAddrBits)
+    val output = Cat(addr(p.lsuAddrBits - 1, linebit + 1), addr(linebit - 1, 0))
+    assert(output.getWidth == (p.lsuAddrBits - 1))
     output
   }
 
   // Add bank select bit to address.
   def BankOutAddress(addr: UInt, bank: Int): UInt = {
-    assert(addr.getWidth == 31)
-    val output = Cat(addr(30, linebit), bank.U(1.W), addr(linebit - 1, 0))
-    assert(output.getWidth == 32)
+    assert(addr.getWidth == (p.axi1AddrBits - 1))
+    val output = Cat(addr(p.axi1AddrBits - 2, linebit), bank.U(1.W), addr(linebit - 1, 0))
+    assert(output.getWidth == p.axi1AddrBits)
     output
   }
 
@@ -74,19 +74,20 @@ class L1DCache(p: Parameters) extends Module {
   // ---------------------------------------------------------------------------
   // Data bus multiplexor.
   val lineend = (io.dbus.addr(linebit - 1, 0) + io.dbus.size) > linebytes.U
-  val dempty = io.dbus.size === 0.U
-  val dsel0 = io.dbus.addr(linebit) === 0.U && !dempty || lineend
-  val dsel1 = io.dbus.addr(linebit) === 1.U && !dempty || lineend
-  val preread = ~io.dbus.addr(11, linebit) =/= 0.U && !io.dbus.write && !dempty  // Within 4KB
-  val addrA = Mux(io.dbus.addr(linebit), BankInAddress(io.dbus.adrx), BankInAddress(io.dbus.addr))
-  val addrB = Mux(io.dbus.addr(linebit), BankInAddress(io.dbus.addr), BankInAddress(io.dbus.adrx))
-  val rsel = Reg(Vec(linebytes, Bool()))
+  val dempty  = io.dbus.size === 0.U
+  val dsel0   = io.dbus.addr(linebit) === 0.U && !dempty || lineend
+  val dsel1   = io.dbus.addr(linebit) === 1.U && !dempty || lineend
+  val preread = ~io.dbus.addr(11, linebit) =/= 0.U && !io.dbus.write && !dempty // Within 4KB
+  val addrA   = Mux(io.dbus.addr(linebit), BankInAddress(io.dbus.adrx), BankInAddress(io.dbus.addr))
+  val addrB   = Mux(io.dbus.addr(linebit), BankInAddress(io.dbus.addr), BankInAddress(io.dbus.adrx))
+  val rsel    = Reg(Vec(linebytes, Bool()))
 
   assert(!(io.dbus.valid && io.dbus.adrx =/= (io.dbus.addr + linebytes.U)))
 
   // Write masks
   val wmaskSA = ((~0.U(linebytes.W)) << io.dbus.addr(linebit - 1, 0))(linebytes - 1, 0)
-  val wmaskSB = ((~0.U(linebytes.W)) >> (linebytes.U - io.dbus.addr(linebit - 1, 0)))(linebytes - 1, 0)
+  val wmaskSB =
+    ((~0.U(linebytes.W)) >> (linebytes.U - io.dbus.addr(linebit - 1, 0)))(linebytes - 1, 0)
   val wmaskA = io.dbus.wmask & wmaskSA
   val wmaskB = io.dbus.wmask & wmaskSB
   assert(wmaskSA.getWidth == io.dbus.wmask.getWidth)
@@ -115,10 +116,10 @@ class L1DCache(p: Parameters) extends Module {
   bank1.io.dbus.pc    := 0.U
 
   val dbusready = (bank0.io.dbus.ready || !dsel0) &&
-                  (bank1.io.dbus.ready || !dsel1)
+    (bank1.io.dbus.ready || !dsel1)
 
   // Read bank selection.
-  when (io.dbus.valid && dbusready && !io.dbus.write) {
+  when(io.dbus.valid && dbusready && !io.dbus.write) {
     val addr = io.dbus.addr(linebit, 0)
     for (i <- 0 until linebytes) {
       // reverse order to index usage
@@ -130,8 +131,8 @@ class L1DCache(p: Parameters) extends Module {
     if (i < p.lsuDataBits / 8) {
       val d0 = bank0.io.dbus.rdata(8 * i + 7, 8 * i)
       val d1 = bank1.io.dbus.rdata(8 * i + 7, 8 * i)
-      val d = Mux(rsel(i), d1, d0)
-      val r = if (i == 0) d else Cat(d, data)
+      val d  = Mux(rsel(i), d1, d0)
+      val r  = if (i == 0) d else Cat(d, data)
       assert(d.getWidth == 8)
       assert(r.getWidth == (i + 1) * 8)
       RData(r, i + 1)
@@ -146,12 +147,12 @@ class L1DCache(p: Parameters) extends Module {
 
   // dbus transaction must latch until completion.
   val addrLatchActive = RegInit(false.B)
-  val addrLatchData = Reg(UInt(32.W))
+  val addrLatchData   = Reg(UInt(p.lsuAddrBits.W))
 
-  when (io.dbus.valid && !io.dbus.ready && !addrLatchActive) {
+  when(io.dbus.valid && !io.dbus.ready && !addrLatchActive) {
     addrLatchActive := true.B
-    addrLatchData := io.dbus.addr
-  } .elsewhen (addrLatchActive && io.dbus.ready) {
+    addrLatchData   := io.dbus.addr
+  }.elsewhen(addrLatchActive && io.dbus.ready) {
     addrLatchActive := false.B
   }
 
@@ -167,27 +168,34 @@ class L1DCache(p: Parameters) extends Module {
   val raxi1 = !raxi0
 
   io.axi.read.addr.valid     := bank0.io.axi.read.addr.valid || bank1.io.axi.read.addr.valid
-  io.axi.read.addr.bits.addr := Mux(raxi0, BankOutAddress(bank0.io.axi.read.addr.bits.addr, 0),
-                                           BankOutAddress(bank1.io.axi.read.addr.bits.addr, 1))
-  io.axi.read.addr.bits.id   := Mux(raxi0, Cat(0.U(1.W), bank0.io.axi.read.addr.bits.id), Cat(1.U(1.W), bank1.io.axi.read.addr.bits.id))
+  io.axi.read.addr.bits.addr := Mux(
+    raxi0,
+    BankOutAddress(bank0.io.axi.read.addr.bits.addr, 0),
+    BankOutAddress(bank1.io.axi.read.addr.bits.addr, 1)
+  )
+  io.axi.read.addr.bits.id := Mux(
+    raxi0,
+    Cat(0.U(1.W), bank0.io.axi.read.addr.bits.id),
+    Cat(1.U(1.W), bank1.io.axi.read.addr.bits.id)
+  )
   io.axi.read.addr.bits.prot := 2.U
 
   bank0.io.axi.read.addr.ready := io.axi.read.addr.ready && raxi0
   bank1.io.axi.read.addr.ready := io.axi.read.addr.ready && raxi1
 
   bank0.io.axi.read.data.valid := io.axi.read.data.valid && rresp0
-  bank0.io.axi.read.data.bits := io.axi.read.data.bits
+  bank0.io.axi.read.data.bits  := io.axi.read.data.bits
 
   bank1.io.axi.read.data.valid := io.axi.read.data.valid && rresp1
-  bank1.io.axi.read.data.bits := io.axi.read.data.bits
+  bank1.io.axi.read.data.bits  := io.axi.read.data.bits
 
   io.axi.read.data.ready := bank0.io.axi.read.data.ready && rresp0 ||
-                            bank1.io.axi.read.data.ready && rresp1
+    bank1.io.axi.read.data.ready && rresp1
 
   // ---------------------------------------------------------------------------
   // AXI write bus multiplexor.
-  val waxi0 = Wire(Bool())
-  val waxi1 = Wire(Bool())
+  val waxi0  = Wire(Bool())
+  val waxi1  = Wire(Bool())
   val wresp0 = io.axi.write.resp.bits.id(p.axi1IdBits - 1) === 0.U
   val wresp1 = io.axi.write.resp.bits.id(p.axi1IdBits - 1) === 1.U
 
@@ -200,16 +208,22 @@ class L1DCache(p: Parameters) extends Module {
     // Change on last transaction in a line write.
     val wsel = RegInit(false.B)
 
-    when (wsel) {
-      when (bank0.io.axi.write.addr.valid && !bank1.io.axi.write.addr.valid) {
+    when(wsel) {
+      when(bank0.io.axi.write.addr.valid && !bank1.io.axi.write.addr.valid) {
         wsel := false.B
-      } .elsewhen (bank1.io.axi.write.addr.valid && bank1.io.axi.write.addr.ready && bank1.io.axi.write.addr.bits.id === ~0.U((p.axi1IdBits - 1).W)) {
+      }.elsewhen(
+        bank1.io.axi.write.addr.valid && bank1.io.axi.write.addr.ready && bank1.io.axi.write.addr.bits.id === ~0
+          .U((p.axi1IdBits - 1).W)
+      ) {
         wsel := false.B
       }
-    } .otherwise {
-      when (bank1.io.axi.write.addr.valid && !bank0.io.axi.write.addr.valid) {
+    }.otherwise {
+      when(bank1.io.axi.write.addr.valid && !bank0.io.axi.write.addr.valid) {
         wsel := true.B
-      } .elsewhen (bank0.io.axi.write.addr.valid && bank0.io.axi.write.addr.ready && bank0.io.axi.write.addr.bits.id === ~0.U((p.axi1IdBits - 1).W)) {
+      }.elsewhen(
+        bank0.io.axi.write.addr.valid && bank0.io.axi.write.addr.ready && bank0.io.axi.write.addr.bits.id === ~0
+          .U((p.axi1IdBits - 1).W)
+      ) {
         wsel := true.B
       }
     }
@@ -219,15 +233,21 @@ class L1DCache(p: Parameters) extends Module {
   }
 
   io.axi.write.addr.valid := bank0.io.axi.write.addr.valid && waxi0 ||
-                             bank1.io.axi.write.addr.valid && waxi1
-  io.axi.write.addr.bits.addr := Mux(waxi0, BankOutAddress(bank0.io.axi.write.addr.bits.addr, 0),
-                                            BankOutAddress(bank1.io.axi.write.addr.bits.addr, 1))
-  io.axi.write.addr.bits.id := Mux(waxi0, Cat(0.U(1.W), bank0.io.axi.write.addr.bits.id),
-                                          Cat(1.U(1.W), bank1.io.axi.write.addr.bits.id))
+    bank1.io.axi.write.addr.valid && waxi1
+  io.axi.write.addr.bits.addr := Mux(
+    waxi0,
+    BankOutAddress(bank0.io.axi.write.addr.bits.addr, 0),
+    BankOutAddress(bank1.io.axi.write.addr.bits.addr, 1)
+  )
+  io.axi.write.addr.bits.id := Mux(
+    waxi0,
+    Cat(0.U(1.W), bank0.io.axi.write.addr.bits.id),
+    Cat(1.U(1.W), bank1.io.axi.write.addr.bits.id)
+  )
   io.axi.write.addr.bits.prot := 2.U
 
   io.axi.write.data.valid := bank0.io.axi.write.data.valid && waxi0 ||
-                             bank1.io.axi.write.data.valid && waxi1
+    bank1.io.axi.write.data.valid && waxi1
   io.axi.write.data.bits := Mux(waxi0, bank0.io.axi.write.data.bits, bank1.io.axi.write.data.bits)
 
   bank0.io.axi.write.addr.ready := io.axi.write.addr.ready && waxi0
@@ -242,7 +262,7 @@ class L1DCache(p: Parameters) extends Module {
   bank1.io.axi.write.resp.bits  := io.axi.write.resp.bits
 
   io.axi.write.resp.ready := bank0.io.axi.write.resp.ready && wresp0 ||
-                             bank1.io.axi.write.resp.ready && wresp1
+    bank1.io.axi.write.resp.ready && wresp1
 
   assert(!(io.axi.write.addr.valid && !io.axi.write.data.valid))
   assert(!(io.axi.write.addr.valid && (io.axi.write.addr.ready =/= io.axi.write.data.ready)))
@@ -262,26 +282,26 @@ class L1DCache(p: Parameters) extends Module {
   io.flush.ready := bank0.io.flush.ready && bank1.io.flush.ready
 
   // Voltage Selection
-  bank0.io.volt_sel    := io.volt_sel
-  bank1.io.volt_sel    := io.volt_sel
+  bank0.io.volt_sel := io.volt_sel
+  bank1.io.volt_sel := io.volt_sel
 }
 
 class L1DCacheBank(p: Parameters) extends Module {
   // A relatively simple cache block. Only one transaction may post at a time.
   // 2^8 * 256  / 8 = 8KiB    4-way  Tag[31,12] + Index[11,6] + Data[5,0]
-  val slots = p.l1dslots
+  val slots    = p.l1dslots
   val slotBits = log2Ceil(slots)
-  val assoc = 4
-  val sets = slots / assoc
-  val setLsb = log2Ceil(p.lsuDataBits / 8)
-  val setMsb = log2Ceil(sets) + setLsb - 1
-  val tagLsb = setMsb + 1
-  val tagMsb = 30
+  val assoc    = p.l1dassoc
+  val sets     = slots / assoc
+  val setLsb   = log2Ceil(p.lsuDataBits / 8)
+  val setMsb   = log2Ceil(sets) + setLsb - 1
+  val tagLsb   = setMsb + 1
+  val tagMsb   = p.axi1AddrBits - 2
 
   val io = IO(new Bundle {
-    val dbus = Flipped(new DBusIO(p, true))
-    val axi = new AxiMasterIO(p.axi1AddrBits - 1, p.axi1DataBits, p.axi1IdBits - 1)
-    val flush = Flipped(new DFlushIO(p))
+    val dbus     = Flipped(new DBusIO(p, true))
+    val axi      = new AxiMasterIO(p.axi1AddrBits - 1, p.axi1DataBits, p.axi1IdBits - 1)
+    val flush    = Flipped(new DFlushIO(p))
     val volt_sel = Input(Bool())
   })
   io.axi.defaults()
@@ -317,52 +337,54 @@ class L1DCacheBank(p: Parameters) extends Module {
     data.asUInt
   }
 
-  val checkBit = if (p.lsuDataBits == 128) 4
-                 else if (p.lsuDataBits == 256) 5 else 6
-  assert(assoc == 2 ||  assoc == 4 || assoc == 8 || assoc == 16 || assoc == slots)
-  assert(assoc != 2 ||  setLsb == checkBit && setMsb == (checkBit + 6) && tagLsb == (checkBit + 7))
-  assert(assoc != 4 ||  setLsb == checkBit && setMsb == (checkBit + 5) && tagLsb == (checkBit + 6))
-  assert(assoc != 8 ||  setLsb == checkBit && setMsb == (checkBit + 4) && tagLsb == (checkBit + 5))
+  val checkBit =
+    if (p.lsuDataBits == 128) 4
+    else if (p.lsuDataBits == 256) 5
+    else 6
+  assert(assoc == 2 || assoc == 4 || assoc == 8 || assoc == 16 || assoc == slots)
+  assert(assoc != 2 || setLsb == checkBit && setMsb == (checkBit + 6) && tagLsb == (checkBit + 7))
+  assert(assoc != 4 || setLsb == checkBit && setMsb == (checkBit + 5) && tagLsb == (checkBit + 6))
+  assert(assoc != 8 || setLsb == checkBit && setMsb == (checkBit + 4) && tagLsb == (checkBit + 5))
   assert(assoc != 16 || setLsb == checkBit && setMsb == (checkBit + 3) && tagLsb == (checkBit + 4))
   assert(assoc != slots || tagLsb == checkBit)
 
   class Sram_1rwm_256x288 extends BlackBox {
     val io = IO(new Bundle {
-      val clock     = Input(Clock())
-      val valid     = Input(Bool())
-      val write     = Input(Bool())
-      val addr      = Input(UInt(slotBits.W))
-      val wdata     = Input(UInt((256 * 9 / 8).W))
-      val wmask     = Input(UInt((256 * 1 / 8).W))
-      val rdata     = Output(UInt((256 * 9 / 8).W))
-      val volt_sel  = Input(Bool())
+      val clock    = Input(Clock())
+      val valid    = Input(Bool())
+      val write    = Input(Bool())
+      val addr     = Input(UInt(slotBits.W))
+      val wdata    = Input(UInt((256 * 9 / 8).W))
+      val wmask    = Input(UInt((256 * 1 / 8).W))
+      val rdata    = Output(UInt((256 * 9 / 8).W))
+      val volt_sel = Input(Bool())
     })
   }
 
   // Check io.dbus.wmask is in range of addr and size.
   val busbytes = p.lsuDataBits / 8
-  val linemsb = log2Ceil(busbytes)
+  val linemsb  = log2Ceil(busbytes)
   val chkmask0 = (~0.U(busbytes.W)) >> (busbytes.U - io.dbus.size)
   val chkmask1 = Cat(chkmask0, chkmask0) << io.dbus.addr(linemsb - 1, 0)
-  val chkmask = chkmask1(2 * busbytes - 1, busbytes)
+  val chkmask  = chkmask1(2 * busbytes - 1, busbytes)
   assert(!(io.dbus.valid && io.dbus.write) || (io.dbus.wmask & ~chkmask) === 0.U)
 
   // ---------------------------------------------------------------------------
   // CAM state.
-  val valid = RegInit(VecInit(Seq.fill(slots)(false.B)))
-  val dirty = RegInit(VecInit(Seq.fill(slots)(false.B)))
-  val camaddr = Reg(Vec(slots, UInt(32.W)))
-  val mem = Module(new Sram_1rwm_256x288())
+  val valid   = RegInit(VecInit(Seq.fill(slots)(false.B)))
+  val dirty   = RegInit(VecInit(Seq.fill(slots)(false.B)))
+  val camaddr = Reg(Vec(slots, UInt((p.lsuAddrBits - 1).W)))
+  val mem     = Module(new Sram_1rwm_256x288())
 
   val history = Reg(Vec(slots / assoc, Vec(assoc, UInt(log2Ceil(assoc).W))))
 
-  val matchSet = Wire(Vec(slots, Bool()))
+  val matchSet  = Wire(Vec(slots, Bool()))
   val matchAddr = Wire(Vec(assoc, Bool()))
 
-  val matchSlotB = Wire(Vec(slots, Bool()))
-  val matchSlot = matchSlotB.asUInt
+  val matchSlotB   = Wire(Vec(slots, Bool()))
+  val matchSlot    = matchSlotB.asUInt
   val replaceSlotB = Wire(Vec(slots, Bool()))
-  val replaceSlot = replaceSlotB.asUInt
+  val replaceSlot  = replaceSlotB.asUInt
 
   // OR mux lookup of associative entries.
   def camaddrRead(i: Int, value: UInt = 0.U(32.W)): UInt = {
@@ -379,13 +401,13 @@ class L1DCacheBank(p: Parameters) extends Module {
   }
 
   for (i <- 0 until slots) {
-    val set = i / assoc
+    val set      = i / assoc
     val setMatch = if (assoc == slots) true.B else io.dbus.addr(setMsb, setLsb) === set.U
     matchSet(i) := setMatch
   }
 
   for (i <- 0 until slots) {
-    val set = i / assoc
+    val set   = i / assoc
     val index = i % assoc
 
     matchSlotB(i) := valid(i) && matchSet(i) && matchAddr(index)
@@ -427,11 +449,14 @@ class L1DCacheBank(p: Parameters) extends Module {
     val matchValue = history(i)(matchIndex)
 
     // History based on count values so that high set size has less DFF usage.
-    when (io.dbus.valid && io.dbus.ready && (if (assoc == slots) true.B else io.dbus.addr(setMsb, setLsb) === i.U)) {
+    when(
+      io.dbus.valid && io.dbus.ready && (if (assoc == slots) true.B
+                                         else io.dbus.addr(setMsb, setLsb) === i.U)
+    ) {
       for (j <- 0 until assoc) {
-        when (matchSet(j)) {
+        when(matchSet(j)) {
           history(i)(j) := (assoc - 1).U
-        } .elsewhen (history(i)(j) > matchValue) {
+        }.elsewhen(history(i)(j) > matchValue) {
           history(i)(j) := history(i)(j) - 1.U
           assert(history(i)(j) > 0.U)
         }
@@ -442,7 +467,7 @@ class L1DCacheBank(p: Parameters) extends Module {
   // Reset history to unique values within sets.
   // Must be placed below all other assignments.
   // Note the definition is Reg() so will generate an asynchronous reset.
-  when (reset.asBool) {
+  when(reset.asBool) {
     for (i <- 0 until slots / assoc) {
       for (j <- 0 until assoc) {
         history(i)(j) := j.U
@@ -470,98 +495,98 @@ class L1DCacheBank(p: Parameters) extends Module {
   }
 
   val fstate = RegInit(FlushState.sNone)
-  val flush = RegInit(VecInit(Seq.fill(slots)(false.B)))
+  val flush  = RegInit(VecInit(Seq.fill(slots)(false.B)))
 
   // ---------------------------------------------------------------------------
   // AXI interface.
   val ractive = RegInit(false.B)
   val wactive = RegInit(false.B)
-  val active = ractive || wactive
+  val active  = ractive || wactive
 
   assert(!(ractive && fstate =/= FlushState.sNone))
 
   val axiraddrvalid = RegInit(false.B)
   val axirdataready = RegInit(false.B)
 
-  val memwaddrEn = RegInit(false.B)
-  val memwdataEn = RegInit(false.B)
+  val memwaddrEn    = RegInit(false.B)
+  val memwdataEn    = RegInit(false.B)
   val axiwaddrvalid = RegInit(false.B)
   val axiwdatavalid = RegInit(false.B)
-  val axiwdatabuf = Reg(UInt(p.axi1DataBits.W))
-  val axiwstrbbuf = Reg(UInt((p.axi1DataBits / 8).W))
+  val axiwdatabuf   = Reg(UInt(p.axi1DataBits.W))
+  val axiwstrbbuf   = Reg(UInt((p.axi1DataBits / 8).W))
 
-  val axiraddr = Reg(UInt(32.W))
-  val axiwaddr = Reg(UInt(32.W))
+  val axiraddr = Reg(UInt((p.axi1AddrBits - 1).W))
+  val axiwaddr = Reg(UInt((p.axi1AddrBits - 1).W))
 
   val replaceIdReg = Reg(UInt(slotBits.W))
 
   val alignedAddr = Cat(io.dbus.addr(tagMsb, setLsb), 0.U(setLsb.W))
 
-  when (io.dbus.valid && !io.dbus.ready && !active) {
+  when(io.dbus.valid && !io.dbus.ready && !active) {
     ractive := true.B
     wactive := dirty(replaceId)
     assert(!(dirty(replaceId) && !valid(replaceId)))
-    axiraddrvalid := true.B
-    axirdataready := true.B
-    valid(replaceId) := false.B
-    dirty(replaceId) := false.B
-    replaceIdReg := replaceId
+    axiraddrvalid      := true.B
+    axirdataready      := true.B
+    valid(replaceId)   := false.B
+    dirty(replaceId)   := false.B
+    replaceIdReg       := replaceId
     camaddr(replaceId) := alignedAddr
-    axiraddr := alignedAddr
-    axiwaddr := camaddr(replaceId)
+    axiraddr           := alignedAddr
+    axiwaddr           := camaddr(replaceId)
   }
 
   // Writeback pulsed controls to memory.
   memwaddrEn := io.dbus.valid && !io.dbus.ready && !active && dirty(replaceId)
   memwdataEn := memwaddrEn
 
-  when (io.dbus.valid && io.dbus.ready && io.dbus.write) {
+  when(io.dbus.valid && io.dbus.ready && io.dbus.write) {
     dirty(foundId) := true.B
   }
 
-  when (io.axi.read.addr.valid && io.axi.read.addr.ready) {
+  when(io.axi.read.addr.valid && io.axi.read.addr.ready) {
     axiraddrvalid := false.B
   }
 
-  when (io.axi.read.data.valid && io.axi.read.data.ready) {
+  when(io.axi.read.data.valid && io.axi.read.data.ready) {
     valid(replaceIdReg) := true.B
-    axirdataready := false.B
-    ractive := false.B
+    axirdataready       := false.B
+    ractive             := false.B
   }
 
-  when (memwdataEn) {
+  when(memwdataEn) {
     val rdata = mem.io.rdata
-    axiwdatabuf := Mem9to8(rdata)
-    axiwstrbbuf := Mem9to1(rdata)
+    axiwdatabuf   := Mem9to8(rdata)
+    axiwstrbbuf   := Mem9to1(rdata)
     axiwaddrvalid := true.B
     axiwdatavalid := true.B
   }
 
-  when (io.axi.write.addr.valid && io.axi.write.addr.ready) {
+  when(io.axi.write.addr.valid && io.axi.write.addr.ready) {
     axiwaddrvalid := false.B
   }
 
-  when (io.axi.write.data.valid && io.axi.write.data.ready) {
+  when(io.axi.write.data.valid && io.axi.write.data.ready) {
     axiwdatavalid := false.B
   }
 
-  when (io.axi.write.resp.valid && io.axi.write.resp.ready) {
+  when(io.axi.write.resp.valid && io.axi.write.resp.ready) {
     wactive := false.B
   }
 
-  io.axi.read.addr.valid := axiraddrvalid
+  io.axi.read.addr.valid     := axiraddrvalid
   io.axi.read.addr.bits.addr := axiraddr
-  io.axi.read.addr.bits.id := 0.U
+  io.axi.read.addr.bits.id   := 0.U
   io.axi.read.addr.bits.prot := 2.U
-  io.axi.read.data.ready := axirdataready
+  io.axi.read.data.ready     := axirdataready
   assert(!(io.axi.read.data.valid && !io.axi.read.data.ready))
 
   io.axi.write.addr.valid     := axiwaddrvalid
   io.axi.write.addr.bits.id   := 0.U
-  io.axi.write.addr.bits.prot   := 2.U
+  io.axi.write.addr.bits.prot := 2.U
   io.axi.write.addr.bits.addr := axiwaddr
 
-  io.axi.write.resp.ready     := true.B
+  io.axi.write.resp.ready := true.B
 
   io.axi.write.data.valid     := axiwdatavalid
   io.axi.write.data.bits.last := true.B
@@ -578,9 +603,9 @@ class L1DCacheBank(p: Parameters) extends Module {
   val wrespinc = io.axi.write.addr.valid && io.axi.write.addr.ready
   val wrespdec = io.axi.write.resp.valid && io.axi.write.resp.ready
 
-  when (wrespinc && !wrespdec) {
+  when(wrespinc && !wrespdec) {
     wrespcnt := wrespcnt + 1.U
-  } .elsewhen (!wrespinc && wrespdec) {
+  }.elsewhen(!wrespinc && wrespdec) {
     wrespcnt := wrespcnt - 1.U
   }
 
@@ -593,69 +618,71 @@ class L1DCacheBank(p: Parameters) extends Module {
   }
 
   switch(fstate) {
-    is (FlushState.sNone) {
-      when (io.flush.valid && !axiwaddrvalid && !axiwdatavalid && !axiraddrvalid && !axirdataready) {
-        fstate := FlushState.sCapture
+    is(FlushState.sNone) {
+      when(io.flush.valid && !axiwaddrvalid && !axiwdatavalid && !axiraddrvalid && !axirdataready) {
+        fstate       := FlushState.sCapture
         replaceIdReg := foundId
       }
     }
 
-    is (FlushState.sCapture) {
-      fstate := FlushState.sProcess
-      flush(replaceIdReg) := dirty(replaceIdReg)  // matched (without .all)
-      when (io.flush.all) {
+    is(FlushState.sCapture) {
+      fstate              := FlushState.sProcess
+      flush(replaceIdReg) := dirty(replaceIdReg) // matched (without .all)
+      when(io.flush.all) {
         for (i <- 0 until slots) {
           flush(i) := dirty(i)
         }
       }
     }
 
-    is (FlushState.sProcess) {
-      when (flush.asUInt === 0.U) {
+    is(FlushState.sProcess) {
+      when(flush.asUInt === 0.U) {
         fstate := FlushState.sAxiresp
-      } .otherwise {
-        fstate := FlushState.sMemwaddr
+      }.otherwise {
+        fstate     := FlushState.sMemwaddr
         memwaddrEn := true.B
       }
       replaceIdReg := flushId
     }
 
-    is (FlushState.sMemwaddr) {
+    is(FlushState.sMemwaddr) {
       assert(memwaddrEn)
-      fstate := FlushState.sMemwdata
-      axiwaddr := camaddr(replaceIdReg)
+      fstate              := FlushState.sMemwdata
+      axiwaddr            := camaddr(replaceIdReg)
       flush(replaceIdReg) := false.B
       dirty(replaceIdReg) := false.B
-      when (io.flush.clean) {
+      when(io.flush.clean) {
         valid(replaceIdReg) := false.B
       }
     }
 
-    is (FlushState.sMemwdata) {
+    is(FlushState.sMemwdata) {
       assert(memwdataEn)
       fstate := FlushState.sAxiready
     }
 
-    is (FlushState.sAxiready) {
-      when ((!axiwaddrvalid || io.axi.write.addr.valid && io.axi.write.addr.ready) &&
-            (!axiwdatavalid || io.axi.write.data.valid && io.axi.write.data.ready)) {
+    is(FlushState.sAxiready) {
+      when(
+        (!axiwaddrvalid || io.axi.write.addr.valid && io.axi.write.addr.ready) &&
+          (!axiwdatavalid || io.axi.write.data.valid && io.axi.write.data.ready)
+      ) {
         fstate := FlushState.sProcess
       }
     }
 
-    is (FlushState.sAxiresp) {
-      when (wrespcnt === 0.U) {
+    is(FlushState.sAxiresp) {
+      when(wrespcnt === 0.U) {
         fstate := FlushState.sEnd
       }
     }
 
-    is (FlushState.sEnd) {
+    is(FlushState.sEnd) {
       // Must complete the handshake as there are multiple banks.
-      when (io.flush.ready && !io.flush.valid) {
+      when(io.flush.ready && !io.flush.valid) {
         fstate := FlushState.sNone
       }
-      when (io.flush.clean) {
-        when (io.flush.all) {
+      when(io.flush.clean) {
+        when(io.flush.all) {
           for (i <- 0 until slots) {
             valid(i) := false.B
             assert(!dirty(i))
@@ -678,31 +705,34 @@ class L1DCacheBank(p: Parameters) extends Module {
 
   // ---------------------------------------------------------------------------
   // Memory controls.
-  val axiwrite  = memwaddrEn
-  val axiread = io.axi.read.data.valid && io.axi.read.data.ready
+  val axiwrite = memwaddrEn
+  val axiread  = io.axi.read.data.valid && io.axi.read.data.ready
   val buswrite = io.dbus.valid && io.dbus.ready && io.dbus.write
   val busread  = io.dbus.valid && !io.dbus.write && !ractive
 
   val wdbits = p.axi1DataBits
   val wmbits = p.axi1DataBits / 8
-  val id = io.axi.read.data.bits.id
-  val rsel = axirdataready
+  val id     = io.axi.read.data.bits.id
+  val rsel   = axirdataready
 
-  mem.io.clock    := clock
-  mem.io.valid    := busread || buswrite || axiread || axiwrite
-  mem.io.write    := rsel && !axiwrite || io.dbus.valid && io.dbus.write && !ractive
-  mem.io.addr     := Mux(rsel || axiwrite, replaceIdReg, foundId)
-  mem.io.wmask    := Mux(rsel, ~0.U(wmbits.W), io.dbus.wmask)
-  mem.io.wdata    :=
-    Mux(rsel,
+  mem.io.clock := clock
+  mem.io.valid := busread || buswrite || axiread || axiwrite
+  mem.io.write := rsel && !axiwrite || io.dbus.valid && io.dbus.write && !ractive
+  mem.io.addr  := Mux(rsel || axiwrite, replaceIdReg, foundId)
+  mem.io.wmask := Mux(rsel, ~0.U(wmbits.W), io.dbus.wmask)
+  mem.io.wdata :=
+    Mux(
+      rsel,
       Mem8to9(
         Cat(0.U((256 - io.axi.read.data.bits.data.getWidth).W), io.axi.read.data.bits.data),
-        Cat(0.U((32 - wmbits).W), 0.U(wmbits.W))),
+        Cat(0.U((32 - wmbits).W), 0.U(wmbits.W))
+      ),
       Mem8to9(
         Cat(0.U((256 - io.dbus.wdata.getWidth).W), io.dbus.wdata),
-        Cat(0.U((32 - wmbits).W), ~0.U(wmbits.W))))
+        Cat(0.U((32 - wmbits).W), ~0.U(wmbits.W))
+      )
+    )
   mem.io.volt_sel := io.volt_sel
-
 
   assert(PopCount(busread +& buswrite +& axiread) <= 1.U)
 }
@@ -712,7 +742,9 @@ object EmitL1DCache extends App {
   val p = new Parameters
   (new ChiselStage).execute(
     Array("--target", "systemverilog") ++ args,
-    Seq(ChiselGeneratorAnnotation(() => new L1DCache(p))) ++ Seq(FirtoolOption("-enable-layers=Verification"))
+    Seq(ChiselGeneratorAnnotation(() => new L1DCache(p))) ++ Seq(
+      FirtoolOption("-enable-layers=Verification")
+    )
   )
 }
 
@@ -721,6 +753,8 @@ object EmitL1DCacheBank extends App {
   val p = new Parameters
   (new ChiselStage).execute(
     Array("--target", "systemverilog") ++ args,
-    Seq(ChiselGeneratorAnnotation(() => new L1DCacheBank(p))) ++ Seq(FirtoolOption("-enable-layers=Verification"))
+    Seq(ChiselGeneratorAnnotation(() => new L1DCacheBank(p))) ++ Seq(
+      FirtoolOption("-enable-layers=Verification")
+    )
   )
 }

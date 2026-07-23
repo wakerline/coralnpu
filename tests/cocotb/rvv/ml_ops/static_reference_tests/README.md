@@ -3,11 +3,14 @@
 This directory contains a suite of fully frozen, self-contained test targets used as stable benchmarks for **power analysis** and **gate-level netlist simulation**.
 
 ## Motivation
+
 Standard regression tests are designed to be runtime-configurable to cover various matrix dimensions. However, this flexibility poses risks for performance and power analysis:
+
 - A change to test shapes or parameters will alter simulation cycles and power profiles, silently invalidating baseline measurements.
 - Modifications to generic runner logic or compiler optimization flags will impact instruction scheduling and execution metrics.
 
 To prevent this, tests inside this folder are locked down:
+
 - Runner binaries hardcode shape dimensions as constants and statically allocate memory.
 - Inputs are generated using deterministic, pseudo-random seeds.
 - File names explicitly include the test dimensions (e.g., `float_matmul_16x48x16`).

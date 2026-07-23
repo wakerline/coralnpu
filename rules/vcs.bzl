@@ -14,17 +14,19 @@
 
 """Bazel functions for VCS."""
 
-load("@rules_hdl//verilog:providers.bzl", "VerilogInfo")
 load("@coralnpu_hw//rules:verilog.bzl", "collect_verilog_files")
+load("@rules_hdl//verilog:providers.bzl", "VerilogInfo")
 
 def _vcs_testbench_test_impl(ctx):
     all_files = collect_verilog_files(ctx.attr.deps).to_list() + ctx.files.srcs
 
     vcs_binary_output = ctx.actions.declare_file(ctx.attr.module)
     vcs_daidir_output = ctx.actions.declare_directory(
-        ctx.attr.module + ".daidir")
+        ctx.attr.module + ".daidir",
+    )
     vcs_vdb_output = ctx.actions.declare_directory(
-        ctx.attr.module + ".vdb")
+        ctx.attr.module + ".vdb",
+    )
 
     verilog_files = []
     for file in all_files:
@@ -52,14 +54,16 @@ def _vcs_testbench_test_impl(ctx):
     command.append(vcs_binary_output.path)
 
     ctx.actions.run_shell(
-        outputs=[vcs_binary_output, vcs_daidir_output, vcs_vdb_output],
-        inputs=verilog_files,
+        outputs = [vcs_binary_output, vcs_daidir_output, vcs_vdb_output],
+        inputs = verilog_files,
         command = " ".join(command),
         use_default_shell_env = True,
     )
 
-    return [DefaultInfo(runfiles=ctx.runfiles(files=[vcs_daidir_output, vcs_vdb_output]),
-                        executable=vcs_binary_output)]
+    return [DefaultInfo(
+        runfiles = ctx.runfiles(files = [vcs_daidir_output, vcs_vdb_output]),
+        executable = vcs_binary_output,
+    )]
 
 _vcs_testbench_test = rule(
     _vcs_testbench_test_impl,
@@ -78,10 +82,8 @@ _vcs_testbench_test = rule(
     test = True,
 )
 
-def vcs_testbench_test(name, tags=[], **kwargs):
+def vcs_testbench_test(name, tags = [], **kwargs):
     _vcs_testbench_test(name = name, tags = ["vcs"] + tags, **kwargs)
-
-
 
 def _vcs_binary_impl(ctx):
     verilog_files = collect_verilog_files(ctx.attr.verilog_deps, ctx.files.verilog_srcs).to_list()
@@ -154,8 +156,10 @@ def _vcs_binary_impl(ctx):
         "-debug_access+all",
         "+notimingcheck",
         "-timescale=1ns/1ps",
-        "-cflags", "-I..",
-        "-o", vcs_simv_output.path,
+        "-cflags",
+        "-I..",
+        "-o",
+        vcs_simv_output.path,
     ] + cflags + ctx.attr.build_args
 
     package_files = []
@@ -196,12 +200,12 @@ def _vcs_binary_impl(ctx):
         '    SIMV_ARGS+=("+cycles=$val")',
         '  elif [[ "$arg" == --trace ]]; then',
         '    SIMV_ARGS+=("+trace")',
-        '  else',
+        "  else",
         '    SIMV_ARGS+=("$arg")',
-        '  fi',
-        'done',
+        "  fi",
+        "done",
         'RUNNER_DIR=$(dirname "$0")',
-        '# Filter out Synopsys noise!',
+        "# Filter out Synopsys noise!",
         '"$RUNNER_DIR/%s_simv" "${SIMV_ARGS[@]}" 2>&1 | grep -v -E \\' % ctx.attr.name,
         '  -e "^Chronologic VCS simulator" \\',
         '  -e "^Contains Synopsys proprietary" \\',
@@ -227,9 +231,9 @@ def _vcs_binary_impl(ctx):
     )
 
     return [DefaultInfo(
-        files=depset([vcs_binary_output]),
-        runfiles=ctx.runfiles(files=[vcs_simv_output, vcs_daidir_output]),
-        executable=vcs_binary_output,
+        files = depset([vcs_binary_output]),
+        runfiles = ctx.runfiles(files = [vcs_simv_output, vcs_daidir_output]),
+        executable = vcs_binary_output,
     )]
 
 _vcs_binary = rule(
@@ -257,5 +261,5 @@ _vcs_binary = rule(
     executable = True,
 )
 
-def vcs_binary(name, tags=[], **kwargs):
+def vcs_binary(name, tags = [], **kwargs):
     _vcs_binary(name = name, tags = ["vcs"] + tags, **kwargs)

@@ -15,36 +15,33 @@
 package bus
 
 import chisel3._
-import coralnpu.Parameters
 
-/**
-  * A testbench DUT that instantiates a single SecdedEncoder so it can be
-  * tested with cocotb.
+/** A testbench DUT that instantiates a single SecdedEncoder so it can be tested with cocotb.
   */
 class SecdedEncoderTestbench(val w: Int, val moduleName: String) extends Module {
   override def desiredName = moduleName
 
   val io = IO(new Bundle {
     val data_i = Input(UInt(w.W))
-    val ecc_o = Output(UInt(7.W))
+    val ecc_o  = Output(UInt(7.W))
   })
 
   val encoder = Module(new SecdedEncoder(w))
   encoder.io.data_i := io.data_i
-  io.ecc_o := encoder.io.ecc_o
+  io.ecc_o          := encoder.io.ecc_o
 }
 
-import _root_.circt.stage.{ChiselStage,FirtoolOption}
+import _root_.circt.stage.{ChiselStage, FirtoolOption}
 import chisel3.stage.ChiselGeneratorAnnotation
 import scala.annotation.nowarn
 
 @nowarn
 object EmitSecdedEncoderTestbench extends App {
-  val p = new Parameters
-  p.lsuDataBits = 128
   (new ChiselStage).execute(
     Array("--target", "systemverilog") ++ args,
-    Seq(ChiselGeneratorAnnotation(() => new SecdedEncoderTestbench(p.lsuDataBits, "SecdedEncoderTestbench128"))) ++ Seq(FirtoolOption("-enable-layers=Verification"))
+    Seq(
+      ChiselGeneratorAnnotation(() => new SecdedEncoderTestbench(128, "SecdedEncoderTestbench128"))
+    ) ++ Seq(FirtoolOption("-enable-layers=Verification"))
   )
 }
 
@@ -52,7 +49,9 @@ object EmitSecdedEncoderTestbench extends App {
 object EmitSecdedEncoderTestbench32 extends App {
   (new ChiselStage).execute(
     Array("--target", "systemverilog") ++ args,
-    Seq(ChiselGeneratorAnnotation(() => new SecdedEncoderTestbench(32, "SecdedEncoderTestbench32"))) ++ Seq(FirtoolOption("-enable-layers=Verification"))
+    Seq(
+      ChiselGeneratorAnnotation(() => new SecdedEncoderTestbench(32, "SecdedEncoderTestbench32"))
+    ) ++ Seq(FirtoolOption("-enable-layers=Verification"))
   )
 }
 
@@ -60,6 +59,8 @@ object EmitSecdedEncoderTestbench32 extends App {
 object EmitSecdedEncoderTestbench57 extends App {
   (new ChiselStage).execute(
     Array("--target", "systemverilog") ++ args,
-    Seq(ChiselGeneratorAnnotation(() => new SecdedEncoderTestbench(57, "SecdedEncoderTestbench57"))) ++ Seq(FirtoolOption("-enable-layers=Verification"))
+    Seq(
+      ChiselGeneratorAnnotation(() => new SecdedEncoderTestbench(57, "SecdedEncoderTestbench57"))
+    ) ++ Seq(FirtoolOption("-enable-layers=Verification"))
   )
 }

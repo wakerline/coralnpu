@@ -18,42 +18,42 @@
 //--------------------------------------------------------------------------------
 class coralnpu_rv32f_transaction extends coralnpu_rvvi_decode_transaction;
 
-  logic[4:0] fd_addr;
+  logic [4:0] fd_addr;
   bit signed [(`FLEN-1):0] fd_val;
-  logic[4:0] fs1_addr;
+  logic [4:0] fs1_addr;
   bit signed [(`FLEN-1):0] fs1_val;
-  logic[4:0] fs2_addr;
+  logic [4:0] fs2_addr;
   bit signed [(`FLEN-1):0] fs2_val;
-  logic[4:0] fs3_addr;
+  logic [4:0] fs3_addr;
   bit signed [(`FLEN-1):0] fs3_val;
-  logic[4:0] rs3_addr;
+  logic [4:0] rs3_addr;
   bit signed [(`XLEN-1):0] rs3_val;
-  logic[2:0] rm;//insn[14:12]
+  logic [2:0] rm;  //insn[14:12]
   floating_e inst_name;
   //floating_point csr
-  logic[(`FLEN-1):0] fflags;
-  logic[(`FLEN-1):0] frm;
-  logic[(`FLEN-1):0] fcsr;
+  logic [(`FLEN-1):0] fflags;
+  logic [(`FLEN-1):0] frm;
+  logic [(`FLEN-1):0] fcsr;
 
   `uvm_object_utils_begin(coralnpu_rv32f_transaction)
-    `uvm_field_int (fd_addr, UVM_DEFAULT)
-    `uvm_field_int (fd_val, UVM_DEFAULT)
-    `uvm_field_int (fs1_addr, UVM_DEFAULT)
-    `uvm_field_int (fs1_val, UVM_DEFAULT)
-    `uvm_field_int (fs2_addr, UVM_DEFAULT)
-    `uvm_field_int (fs2_val, UVM_DEFAULT)
-    `uvm_field_int (fs3_addr, UVM_DEFAULT)
-    `uvm_field_int (fs3_val, UVM_DEFAULT)
-    `uvm_field_int (rs3_addr, UVM_DEFAULT)
-    `uvm_field_int (rs3_val, UVM_DEFAULT)
-    `uvm_field_int (rm, UVM_DEFAULT)
-    `uvm_field_int (fflags, UVM_DEFAULT)
-    `uvm_field_int (frm, UVM_DEFAULT)
-    `uvm_field_int (fcsr, UVM_DEFAULT)
-    `uvm_field_enum (floating_e,inst_name, UVM_DEFAULT)
+    `uvm_field_int(fd_addr, UVM_DEFAULT)
+    `uvm_field_int(fd_val, UVM_DEFAULT)
+    `uvm_field_int(fs1_addr, UVM_DEFAULT)
+    `uvm_field_int(fs1_val, UVM_DEFAULT)
+    `uvm_field_int(fs2_addr, UVM_DEFAULT)
+    `uvm_field_int(fs2_val, UVM_DEFAULT)
+    `uvm_field_int(fs3_addr, UVM_DEFAULT)
+    `uvm_field_int(fs3_val, UVM_DEFAULT)
+    `uvm_field_int(rs3_addr, UVM_DEFAULT)
+    `uvm_field_int(rs3_val, UVM_DEFAULT)
+    `uvm_field_int(rm, UVM_DEFAULT)
+    `uvm_field_int(fflags, UVM_DEFAULT)
+    `uvm_field_int(frm, UVM_DEFAULT)
+    `uvm_field_int(fcsr, UVM_DEFAULT)
+    `uvm_field_enum(floating_e, inst_name, UVM_DEFAULT)
   `uvm_object_utils_end
 
-  function new (string name = "coralnpu_rv32f_transaction");
+  function new(string name = "coralnpu_rv32f_transaction");
     super.new(name);
   endfunction : new
 

@@ -19,18 +19,18 @@
 class coralnpu_rv32zicsr_transaction extends coralnpu_rvvi_decode_transaction;
   bit is_imm;
   logic [4:0] zimm;
-  logic[11:0] csr_addr;
+  logic [11:0] csr_addr;
   logic [(`XLEN-1):0] csr_val;
   zicsr_e inst_name;
   `uvm_object_utils_begin(coralnpu_rv32zicsr_transaction)
-    `uvm_field_int (is_imm, UVM_DEFAULT)
-    `uvm_field_int (zimm, UVM_DEFAULT)
-    `uvm_field_int (csr_addr, UVM_DEFAULT)
-    `uvm_field_int (csr_val, UVM_DEFAULT)
-    `uvm_field_enum (zicsr_e,inst_name, UVM_DEFAULT)
+    `uvm_field_int(is_imm, UVM_DEFAULT)
+    `uvm_field_int(zimm, UVM_DEFAULT)
+    `uvm_field_int(csr_addr, UVM_DEFAULT)
+    `uvm_field_int(csr_val, UVM_DEFAULT)
+    `uvm_field_enum(zicsr_e, inst_name, UVM_DEFAULT)
   `uvm_object_utils_end
 
-  function new (string name = "coralnpu_rv32zicsr_transaction");
+  function new(string name = "coralnpu_rv32zicsr_transaction");
     super.new(name);
   endfunction : new
 

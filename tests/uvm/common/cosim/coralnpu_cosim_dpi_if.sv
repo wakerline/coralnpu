@@ -20,10 +20,10 @@
 package coralnpu_cosim_dpi_if;
 
   typedef struct packed {
-    int unsigned itcm_start_address;    // Start address of the ITCM range.
-    int unsigned itcm_length;           // Length of the ITCM range.
-    int unsigned initial_misa_value;    // Initial value of the misa register.
-    int unsigned architecture;          // 0 - M2, 1 - M3
+    int unsigned itcm_start_address;  // Start address of the ITCM range.
+    int unsigned itcm_length;         // Length of the ITCM range.
+    int unsigned initial_misa_value;  // Initial value of the misa register.
+    int unsigned architecture;        // 0 - M2, 1 - M3
   } sim_config_t;
 
   // Function to initialize the MPACT simulator.
@@ -40,9 +40,7 @@ package coralnpu_cosim_dpi_if;
 
   // Function to execute one instruction in the MPACT simulator.
   // Returns 0 on success.
-  import "DPI-C" context function int mpact_step(
-    input logic [31:0] instruction
-  );
+  import "DPI-C" context function int mpact_step(input logic [31:0] instruction);
 
   // Function to check if the MPACT simulator has halted.
   // Returns '1' (true) if halted.

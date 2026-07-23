@@ -64,18 +64,18 @@ struct CoreMiniAxi_tb : Sysc_tb {
 
   struct DebugIO {
     sc_signal<sc_bv<4>> en;
-    sc_signal<sc_bv<32>> cycles;
-    sc_signal<sc_bv<32>> addr_0;
-    sc_signal<sc_bv<32>> addr_1;
-    sc_signal<sc_bv<32>> addr_2;
-    sc_signal<sc_bv<32>> addr_3;
+    sc_signal<sc_bv<KP_xlen>> cycles;
+    sc_signal<sc_bv<KP_programCounterBits>> addr_0;
+    sc_signal<sc_bv<KP_programCounterBits>> addr_1;
+    sc_signal<sc_bv<KP_programCounterBits>> addr_2;
+    sc_signal<sc_bv<KP_programCounterBits>> addr_3;
     sc_signal<sc_bv<32>> inst_0;
     sc_signal<sc_bv<32>> inst_1;
     sc_signal<sc_bv<32>> inst_2;
     sc_signal<sc_bv<32>> inst_3;
     // DBus signals
     sc_signal<bool> dbus_valid;
-    sc_signal<sc_bv<32>> dbus_bits_addr;
+    sc_signal<sc_bv<KP_lsuAddrBits>> dbus_bits_addr;
     sc_signal<sc_bv<KP_lsuDataBits>> dbus_bits_wdata;
     sc_signal<bool> dbus_bits_write;
     // Dispatch signals
@@ -83,10 +83,10 @@ struct CoreMiniAxi_tb : Sysc_tb {
     sc_signal<bool> dispatch_1_instFire;
     sc_signal<bool> dispatch_2_instFire;
     sc_signal<bool> dispatch_3_instFire;
-    sc_signal<sc_bv<32>> dispatch_0_instAddr;
-    sc_signal<sc_bv<32>> dispatch_1_instAddr;
-    sc_signal<sc_bv<32>> dispatch_2_instAddr;
-    sc_signal<sc_bv<32>> dispatch_3_instAddr;
+    sc_signal<sc_bv<KP_programCounterBits>> dispatch_0_instAddr;
+    sc_signal<sc_bv<KP_programCounterBits>> dispatch_1_instAddr;
+    sc_signal<sc_bv<KP_programCounterBits>> dispatch_2_instAddr;
+    sc_signal<sc_bv<KP_programCounterBits>> dispatch_3_instAddr;
     sc_signal<sc_bv<32>> dispatch_0_instInst;
     sc_signal<sc_bv<32>> dispatch_1_instInst;
     sc_signal<sc_bv<32>> dispatch_2_instInst;
@@ -96,55 +96,55 @@ struct CoreMiniAxi_tb : Sysc_tb {
     sc_signal<bool> regfile_writeAddr_1_valid;
     sc_signal<bool> regfile_writeAddr_2_valid;
     sc_signal<bool> regfile_writeAddr_3_valid;
-    sc_signal<sc_bv<5>> regfile_writeAddr_0_bits;
-    sc_signal<sc_bv<5>> regfile_writeAddr_1_bits;
-    sc_signal<sc_bv<5>> regfile_writeAddr_2_bits;
-    sc_signal<sc_bv<5>> regfile_writeAddr_3_bits;
+    sc_signal<sc_bv<KP_scalarRegCountWidth>> regfile_writeAddr_0_bits;
+    sc_signal<sc_bv<KP_scalarRegCountWidth>> regfile_writeAddr_1_bits;
+    sc_signal<sc_bv<KP_scalarRegCountWidth>> regfile_writeAddr_2_bits;
+    sc_signal<sc_bv<KP_scalarRegCountWidth>> regfile_writeAddr_3_bits;
     sc_signal<bool> regfile_writeData_0_valid;
     sc_signal<bool> regfile_writeData_1_valid;
     sc_signal<bool> regfile_writeData_2_valid;
     sc_signal<bool> regfile_writeData_3_valid;
     sc_signal<bool> regfile_writeData_4_valid;
     sc_signal<bool> regfile_writeData_5_valid;
-    sc_signal<sc_bv<5>> regfile_writeData_0_bits_addr;
-    sc_signal<sc_bv<5>> regfile_writeData_1_bits_addr;
-    sc_signal<sc_bv<5>> regfile_writeData_2_bits_addr;
-    sc_signal<sc_bv<5>> regfile_writeData_3_bits_addr;
-    sc_signal<sc_bv<5>> regfile_writeData_4_bits_addr;
-    sc_signal<sc_bv<5>> regfile_writeData_5_bits_addr;
-    sc_signal<sc_bv<32>> regfile_writeData_0_bits_data;
-    sc_signal<sc_bv<32>> regfile_writeData_1_bits_data;
-    sc_signal<sc_bv<32>> regfile_writeData_2_bits_data;
-    sc_signal<sc_bv<32>> regfile_writeData_3_bits_data;
-    sc_signal<sc_bv<32>> regfile_writeData_4_bits_data;
-    sc_signal<sc_bv<32>> regfile_writeData_5_bits_data;
+    sc_signal<sc_bv<KP_scalarRegCountWidth>> regfile_writeData_0_bits_addr;
+    sc_signal<sc_bv<KP_scalarRegCountWidth>> regfile_writeData_1_bits_addr;
+    sc_signal<sc_bv<KP_scalarRegCountWidth>> regfile_writeData_2_bits_addr;
+    sc_signal<sc_bv<KP_scalarRegCountWidth>> regfile_writeData_3_bits_addr;
+    sc_signal<sc_bv<KP_scalarRegCountWidth>> regfile_writeData_4_bits_addr;
+    sc_signal<sc_bv<KP_scalarRegCountWidth>> regfile_writeData_5_bits_addr;
+    sc_signal<sc_bv<KP_xlen>> regfile_writeData_0_bits_data;
+    sc_signal<sc_bv<KP_xlen>> regfile_writeData_1_bits_data;
+    sc_signal<sc_bv<KP_xlen>> regfile_writeData_2_bits_data;
+    sc_signal<sc_bv<KP_xlen>> regfile_writeData_3_bits_data;
+    sc_signal<sc_bv<KP_xlen>> regfile_writeData_4_bits_data;
+    sc_signal<sc_bv<KP_xlen>> regfile_writeData_5_bits_data;
 #if (KP_enableFloat == true)
     // Float signals
     sc_signal<bool> float_writeAddr_valid;
-    sc_signal<sc_bv<5>> float_writeAddr_bits;
+    sc_signal<sc_bv<KP_floatRegCountWidth>> float_writeAddr_bits;
     sc_signal<bool> float_writeData_0_valid;
     sc_signal<bool> float_writeData_1_valid;
-    sc_signal<sc_bv<32>> float_writeData_0_bits_addr;
-    sc_signal<sc_bv<32>> float_writeData_1_bits_addr;
-    sc_signal<sc_bv<32>> float_writeData_0_bits_data;
-    sc_signal<sc_bv<32>> float_writeData_1_bits_data;
+    sc_signal<sc_bv<KP_floatRegCountWidth>> float_writeData_0_bits_addr;
+    sc_signal<sc_bv<KP_floatRegCountWidth>> float_writeData_1_bits_addr;
+    sc_signal<sc_bv<KP_xlen>> float_writeData_0_bits_data;
+    sc_signal<sc_bv<KP_xlen>> float_writeData_1_bits_data;
 #endif
 #if (KP_enableRvv == true)
 #define RB_DEBUG_IO_DATA_WIDTH KP_rvvVlen
 #define RB_DEBUG_IO_VEC(x, y) \
   sc_signal<bool> rb_inst_##x##_bits_vecWrites_##y##_valid; \
   sc_signal<sc_bv<KP_rvvVlen>> rb_inst_##x##_bits_vecWrites_##y##_bits_data; \
-  sc_signal<sc_bv<5>> rb_inst_##x##_bits_vecWrites_##y##_bits_idx;
+  sc_signal<sc_bv<KP_rvvRegCountWidth>> rb_inst_##x##_bits_vecWrites_##y##_bits_idx;
 #define RB_DEBUG_IO_VECS_8(x) \
   RB_DEBUG_IO_VEC(x, 0) RB_DEBUG_IO_VEC(x, 1) RB_DEBUG_IO_VEC(x, 2) RB_DEBUG_IO_VEC(x, 3) \
   RB_DEBUG_IO_VEC(x, 4) RB_DEBUG_IO_VEC(x, 5) RB_DEBUG_IO_VEC(x, 6) RB_DEBUG_IO_VEC(x, 7)
 #else
-#define RB_DEBUG_IO_DATA_WIDTH 32
+#define RB_DEBUG_IO_DATA_WIDTH KP_xlen
 #define RB_DEBUG_IO_VECS_8(x)
 #endif
 #define RB_DEBUG_IO(x) \
   sc_signal<bool> rb_inst_##x##_valid; \
-  sc_signal<sc_bv<32>> rb_inst_##x##_bits_pc; \
+  sc_signal<sc_bv<KP_programCounterBits>> rb_inst_##x##_bits_pc; \
   sc_signal<sc_bv<32>> rb_inst_##x##_bits_inst; \
   sc_signal<sc_bv<KP_retirementBufferIdxWidth>> rb_inst_##x##_bits_idx; \
   sc_signal<sc_bv<RB_DEBUG_IO_DATA_WIDTH>> rb_inst_##x##_bits_data; \
@@ -192,7 +192,7 @@ struct CoreMiniAxi_tb : Sysc_tb {
   sc_signal<bool> io_timer_irq;
   sc_signal<bool> io_software_irq;
   sc_signal<bool> io_te;
-  sc_signal<sc_bv<32>> io_boot_addr;
+  sc_signal<sc_bv<KP_programCounterBits>> io_boot_addr;
   bool tohost_halt = false;
   uint32_t tohost_val = 0;
 

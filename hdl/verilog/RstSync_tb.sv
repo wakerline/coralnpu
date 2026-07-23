@@ -21,9 +21,7 @@ module RstSync_tb;
   localparam CLK_RUNNING_INTERVAL = CLK_PERIOD * 10;
 
   // Sample the ticker to ensure that the output clock is ticking.
-  task automatic how_many_ticks
-      (ref int ticks,
-       input bit debug = 1'b1);
+  task automatic how_many_ticks(ref int ticks, input bit debug = 1'b1);
     logic [63 : 0] ticker_start, ticker_end;
 
     ticker_start = ticker;
@@ -33,42 +31,37 @@ module RstSync_tb;
     ticks = (ticker_end - ticker_start);
 
     if (debug) begin
-      $display("DEBUG: Ticker End = %0t, Start = %0t, Ticks = %0d",
-               ticker_end, ticker_start, ticks);
+      $display("DEBUG: Ticker End = %0t, Start = %0t, Ticks = %0d", ticker_end, ticker_start,
+               ticks);
     end
   endtask  // is_clock_running
 
   // Check if clock is running or stopped.
-  task automatic check_clock
-      (input bit is_running,
-       ref int nfails);
+  task automatic check_clock(input bit is_running, ref int nfails);
     int ticks;
 
     how_many_ticks(ticks);
     if (is_running) begin
       if (ticks == 0) begin
-        $display("ERROR: Clock stopped. Expected - running. Time = %0t",
-                 $realtime);
+        $display("ERROR: Clock stopped. Expected - running. Time = %0t", $realtime);
         nfails++;
       end
     end else begin
       if (ticks != 0) begin
-        $display("ERROR: Clock running. Expected - stopped, Time = %0t",
-                 $realtime);
+        $display("ERROR: Clock running. Expected - stopped, Time = %0t", $realtime);
         nfails++;
       end
     end
   endtask
 
   initial begin
-    clk_i = 1'b0;
+    clk_i  = 1'b0;
     rstn_i = 1'b1;
     clk_en = 1'b1;
 
     fork
       begin : clk_gen
-        forever
-          #(CLK_PERIOD / 2) clk_i = ~clk_i;
+        forever #(CLK_PERIOD / 2) clk_i = ~clk_i;
       end
 
       begin : test
@@ -103,19 +96,18 @@ module RstSync_tb;
   end  // initial begin
 
   final
-    if (nfails != 0)
-      $display(" *** TEST FAILED *** ");
-    else
-      $display(" === TEST PASSED === ");
+    if (nfails != 0) $display(" *** TEST FAILED *** ");
+    else $display(" === TEST PASSED === ");
 
-  RstSync dut(.clk_i,
-              .rstn_i,
-              .clk_en,
-              .te(1'b0),
+  RstSync dut (
+      .clk_i,
+      .rstn_i,
+      .clk_en,
+      .te(1'b0),
 
-              .clk_o,
-              .rstn_o);
+      .clk_o,
+      .rstn_o
+  );
 
-  always @(posedge clk_o)
-    ticker <= ticker + 1;
+  always @(posedge clk_o) ticker <= ticker + 1;
 endmodule

@@ -1,12 +1,6 @@
 `ifndef HDL_VERILOG_RVV_DESIGN_RVV_DEFINE_SVH
 `define HDL_VERILOG_RVV_DESIGN_RVV_DEFINE_SVH
 
-`ifndef RVV_CONFIG_SVH
-`ifndef RVV_CONFIG_SVH
-`include "rvv_backend_config.svh"
-`endif
-`endif 
-
 // number of scalar core issue lane
 `define ISSUE_LANE              4
 
@@ -29,9 +23,10 @@
   `define PMTRDT_RS_DEPTH       4
   `define MUL_RS_DEPTH          8
   `define DIV_RS_DEPTH          4
-  `define FMA_RS_DEPTH          8
+  `define FALU_RS_DEPTH         8
   `define FRDT_RS_DEPTH         4
   `define LSU_RS_DEPTH          4
+  `define LSUMAP_DEPTH          8
   `define ROB_DEPTH             8
 
 `else  // DISPATCH2
@@ -52,9 +47,10 @@
   `define PMTRDT_RS_DEPTH       8
   `define MUL_RS_DEPTH          4
   `define DIV_RS_DEPTH          4
-  `define FMA_RS_DEPTH          4
+  `define FALU_RS_DEPTH         4
   `define FRDT_RS_DEPTH         4
   `define LSU_RS_DEPTH          4
+  `define LSUMAP_DEPTH          8
   `define ROB_DEPTH             8
 `endif
 
@@ -68,26 +64,29 @@
 `define NUM_LSU                 2
 `define NUM_ALU                 2
 `define NUM_MUL                 2
-// TODO: split NUM_PMTRDT into NUM_PMT and NUM_RDT
 `define NUM_PMTRDT              1
 `define NUM_DIV                 1
 
 `ifdef ZVE32F_ON
-  `define NUM_FMA               2
+  `define NUM_FALU              2
   `define NUM_FRDT              1
   `define NUM_FDIV              1
   `define NUM_FSUB              4
-  `define NUM_ARI               (`NUM_ALU+`NUM_PMTRDT+`NUM_MUL+`NUM_DIV+`NUM_FMA)
-  `define NUM_PU                (`NUM_ARI+`NUM_LSU)
 `else
-  // Define FP variables even if not used
-  // TODO(derekjchow): Remove FP modules from chisel build once float is
-  // configurable.
-  `define NUM_FMA               0
-
-  `define NUM_ARI               (`NUM_ALU+`NUM_PMTRDT+`NUM_MUL+`NUM_DIV)
-  `define NUM_PU                (`NUM_ARI+`NUM_LSU)
+  `define NUM_FALU              0
+  `define NUM_FRDT              0
+  `define NUM_FDIV              0
+  `define NUM_FSUB              0
 `endif
+
+`ifdef ZVT_ON
+  `define NUM_VME               1
+`else
+  `define NUM_VME               0
+`endif
+
+`define NUM_ARI               (`NUM_ALU+`NUM_PMTRDT+`NUM_MUL+`NUM_DIV+`NUM_FALU+`NUM_VME)
+`define NUM_PU                (`NUM_ARI+`NUM_LSU)
 
 `ifdef ARBITER_ON
 `define NUM_SMPORT              4
@@ -174,5 +173,39 @@
 // V0 mask regsiter index
 `define V0_INDEX                5'b00000
 
+// ZVT
+`ifdef ZVT_ON
+  `define ZVT_RS_DEPTH        (`ZVT_LMUL*2)
+  
+  `define NUM_ACC             16
+  // 16 byte each subtile
+  `define SUBTILE_SIZE        16
+  `define NUM_BLK             4
+  
+  `define TE                  (`VLEN/8)
+
+  `ifdef ZVT_MAXCOMPUTING
+  `define COMPRATIO           1/4
+  `else       
+  `define COMPRATIO           4/`TE
+  `endif 
+
+  `ifdef ZVT_MAXCOMPUTING
+  `define PROCESS_DELAY       4
+  `define NUM_PE              (`TE*`TE/4)
+  `else
+  `define PROCESS_DELAY       (`TE/4)
+  `define NUM_PE              (4*`TE)
+  `endif
+  `define ZVT_LMUL            (`WORD_WIDTH*`TE/`VLEN)
+  // The quantity of subtile for each acc
+  `define NUM_SUBTILE         (`TE*`TE/`SUBTILE_SIZE)
+  // The quantity of subtile ports for each block
+  `ifdef ZVT_MAXCOMPUTING
+  `define NUM_BLKPORT         (((`TE + 15) / 16) * `TE/4)
+  `else
+  `define NUM_BLKPORT         (`TE/4)
+  `endif
+`endif // ZVT_ON
 
 `endif // HDL_VERILOG_RVV_DESIGN_RVV_DEFINE_SVH

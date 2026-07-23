@@ -18,9 +18,9 @@ load("//rules:utils.bzl", "template_rule")
 coralnpu_v2_binary(
     name = "htif_semihosting_test",
     srcs = ["coralnpu/htif_semihosting_test.cc"],
-    semihosting = True,
-    itcm_size_kbytes = 1024,
     dtcm_size_kbytes = 1024,
+    itcm_size_kbytes = 1024,
+    semihosting = True,
     visibility = ["//visibility:public"],
 )
 
@@ -60,9 +60,9 @@ cc_library(
 cc_library(
     name = "coralnpu_if",
     hdrs = [
+        "coralnpu/coralnpu_cfg.h",
         "coralnpu/core_if.h",
         "coralnpu/debug_if.h",
-        "coralnpu/coralnpu_cfg.h",
         "coralnpu/memory_if.h",
     ],
     defines = ["CORALNPU_SIMD=256"],

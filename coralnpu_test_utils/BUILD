@@ -17,30 +17,40 @@ load("@coralnpu_hw//third_party/python:requirements.bzl", "requirement")
 py_library(
     name = "TileLinkULInterface",
     srcs = ["TileLinkULInterface.py"],
+    visibility = ["//visibility:public"],
     deps = [
         requirement("cocotb"),
         "//coralnpu_test_utils:secded_golden",
     ],
+)
+
+py_library(
+    name = "TlulVerificationEnv",
+    srcs = ["TlulVerificationEnv.py"],
     visibility = ["//visibility:public"],
+    deps = [
+        requirement("cocotb"),
+        ":TileLinkULInterface",
+    ],
 )
 
 py_library(
     name = "rvv_type_util",
     srcs = ["rvv_type_util.py"],
+    visibility = ["//visibility:public"],
     deps = [
         requirement("numpy"),
     ],
-    visibility = ["//visibility:public"],
 )
 
 py_library(
     name = "spi_master",
     srcs = ["spi_master.py"],
+    visibility = ["//visibility:public"],
     deps = [
         requirement("cocotb"),
         ":spi_constants",
     ],
-    visibility = ["//visibility:public"],
 )
 
 py_library(
@@ -66,13 +76,13 @@ py_library(
     srcs = [
         "core_mini_axi_interface.py",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         requirement("cocotb"),
         requirement("numpy"),
         requirement("pyelftools"),
         ":backdoor",
     ],
-    visibility = [ "//visibility:public" ],
 )
 
 py_library(
@@ -80,12 +90,12 @@ py_library(
     srcs = [
         "sim_test_fixture.py",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         requirement("cocotb"),
         requirement("numpy"),
         ":core_mini_axi_sim_interface",
     ],
-    visibility = [ "//visibility:public" ],
 )
 
 py_library(
@@ -93,28 +103,28 @@ py_library(
     srcs = [
         "core_mini_axi_pyocd_gdbserver.py",
     ],
+    data = [
+        "//toolchain:gdb",
+    ],
+    visibility = ["//visibility:public"],
     deps = [
         requirement("cocotb"),
         requirement("pyocd"),
         "@bazel_tools//tools/python/runfiles",
     ],
-    data = [
-        "//toolchain:gdb",
-    ],
-    visibility = ["//visibility:public"],
 )
 
 py_library(
     name = "ftdi_spi_master_lib",
     srcs = ["ftdi_spi_master.py"],
+    data = [
+        "//sw/utils/nexus_loader",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "@bazel_tools//tools/python/runfiles",
         requirement("pyelftools"),
         ":spi_constants",
-    ],
-    data = [
-        "//sw/utils/nexus_loader:nexus_loader",
     ],
 )
 
@@ -150,10 +160,10 @@ py_binary(
 py_library(
     name = "axi_slave",
     srcs = ["axi_slave.py"],
+    visibility = ["//visibility:public"],
     deps = [
         requirement("cocotb"),
     ],
-    visibility = ["//visibility:public"],
 )
 
 py_binary(

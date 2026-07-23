@@ -25,7 +25,6 @@ load(
 )
 
 VCS_COMMON_DATA = [
-    "//tests/cocotb:coverage_exclude.cfg",
     "//hdl/verilog:dpi_files",
 ]
 
@@ -210,11 +209,11 @@ cocotb_test_suite(
         "test_conv2d_16x1",
         "test_conv2d_18x1",
         "test_conv2d_37x1_h2w2",
-        "test_conv2d_48x48_h2w2",
+        ("test_conv2d_48x48_h2w2", "large"),
         "test_conv2d_16x3_s2",
         ("test_conv2d_21x48_h8w8", "large"),
-        ("test_conv2d_16x16", "large"),
-        ("test_conv2d_16x16_h2w8", "large"),
+        ("test_conv2d_16x16", "enormous"),
+        ("test_conv2d_16x16_h2w8", "enormous"),
     ],
     tests_kwargs = {
         "waves": False,

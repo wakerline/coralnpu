@@ -15,8 +15,14 @@
 
 PROG=$(basename "$0")
 DRIVER_DIR=$(dirname "$0")
-TOOLCHAIN="toolchain_coralnpu_v2"
-PREFIX="riscv32-unknown-elf"
+
+# Find the bzlmod canonical repo directory name.
+_resolve_toolchain() {
+    local root="$1"
+    local match
+    match=$(ls -d "${root}/external/"*toolchain_coralnpu_v2 2>/dev/null | head -1)
+    [[ -n "${match}" ]] && basename "${match}"
+}
 
 ARGS=()
 POSTARGS=()
@@ -25,14 +31,38 @@ case "${PROG}" in
         ;;
 esac
 
-if [[ ! -z "${EXT_BUILD_ROOT}" ]]; then
-exec "${EXT_BUILD_ROOT}/external/${TOOLCHAIN}/bin/${PREFIX}-${PROG}" \
-    "${ARGS[@]}" \
-    "$@"\
-    "${POSTARGS[@]}"
+# Strip -lpthread / -pthread injected by abseil and a handful of tflite_micro
+# helpers when they're transitively pulled into a coralnpu_v2 (RISC-V bare-
+# metal, newlib) link. The cross newlib has no pthread; the threading code
+# from those libraries is dead under our use because nothing in litert-micro
+# / tfmicro actually starts a thread on this target.
+FILTERED=()
+for arg in "$@"; do
+    case "$arg" in
+        -lpthread|-pthread) ;;
+        *) FILTERED+=("$arg") ;;
+    esac
+done
+set -- "${FILTERED[@]}"
+
+if [[ -n "${EXT_BUILD_ROOT}" ]]; then
+    ROOT="${EXT_BUILD_ROOT}"
 else
-exec "external/${TOOLCHAIN}/bin/${PREFIX}-${PROG}" \
-    "${ARGS[@]}" \
-    "$@"\
-    "${POSTARGS[@]}"
+    ROOT="."
 fi
+TOOLCHAIN=$(_resolve_toolchain "${ROOT}")
+if [[ -z "${TOOLCHAIN}" ]]; then
+    echo "$0: cannot find toolchain_coralnpu_v2 under ${ROOT}/external" 1>&2
+    exit 1
+fi
+
+if [[ -f "${ROOT}/external/${TOOLCHAIN}/bin/riscv64-unknown-elf-gcc" ]]; then
+    PREFIX="riscv64-unknown-elf"
+else
+    PREFIX="riscv32-unknown-elf"
+fi
+
+exec "${ROOT}/external/${TOOLCHAIN}/bin/${PREFIX}-${PROG}" \
+    "${ARGS[@]}" \
+    "$@" \
+    "${POSTARGS[@]}"

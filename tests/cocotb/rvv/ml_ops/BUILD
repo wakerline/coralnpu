@@ -21,47 +21,74 @@ template_rule(
     coralnpu_v2_binary,
     {
         "rvv_matmul_assembly": {
-            "srcs": ["matmul_runner.cc", "rvv_matmul_assembly.cc"],
+            "srcs": [
+                "matmul_runner.cc",
+                "rvv_matmul_assembly.cc",
+            ],
             "hdrs": ["//sw/utils:utils.h"],
         },
         "rvv_matmul": {
-            "srcs": ["matmul_runner.cc", "rvv_matmul.cc"],
+            "srcs": [
+                "matmul_runner.cc",
+                "rvv_matmul.cc",
+            ],
             "hdrs": ["//sw/utils:utils.h"],
         },
         "rvv_matmul_assembly_highmem": {
-            "srcs": ["matmul_runner.cc", "rvv_matmul_assembly.cc"],
+            "srcs": [
+                "matmul_runner.cc",
+                "rvv_matmul_assembly.cc",
+            ],
             "hdrs": ["//sw/utils:utils.h"],
             "itcm_size_kbytes": 1024,
             "dtcm_size_kbytes": 1024,
         },
         "rvv_matmul_highmem": {
-            "srcs": ["matmul_runner.cc", "rvv_matmul.cc"],
+            "srcs": [
+                "matmul_runner.cc",
+                "rvv_matmul.cc",
+            ],
             "hdrs": ["//sw/utils:utils.h"],
             "itcm_size_kbytes": 1024,
             "dtcm_size_kbytes": 1024,
         },
         "rvv_matmul_assembly_itcm512kb_dtcm512kb": {
-            "srcs": ["matmul_runner.cc", "rvv_matmul_assembly.cc"],
+            "srcs": [
+                "matmul_runner.cc",
+                "rvv_matmul_assembly.cc",
+            ],
             "hdrs": ["//sw/utils:utils.h"],
             "itcm_size_kbytes": 512,
             "dtcm_size_kbytes": 512,
         },
         "rvv_matmul_itcm512kb_dtcm512kb": {
-            "srcs": ["matmul_runner.cc", "rvv_matmul.cc"],
+            "srcs": [
+                "matmul_runner.cc",
+                "rvv_matmul.cc",
+            ],
             "hdrs": ["//sw/utils:utils.h"],
             "itcm_size_kbytes": 512,
             "dtcm_size_kbytes": 512,
         },
         "rvv_float_matmul": {
-            "srcs": ["float_matmul_runner.cc", "rvv_float_matmul.cc"],
+            "srcs": [
+                "float_matmul_runner.cc",
+                "rvv_float_matmul.cc",
+            ],
             "hdrs": ["//sw/utils:utils.h"],
         },
         "rvv_float_matmul_optimized": {
-            "srcs": ["float_matmul_runner.cc", "rvv_float_matmul_optimized.cc"],
+            "srcs": [
+                "float_matmul_runner.cc",
+                "rvv_float_matmul_optimized.cc",
+            ],
             "hdrs": ["//sw/utils:utils.h"],
         },
         "rvv_float_matmul_assembly": {
-            "srcs": ["float_matmul_runner.cc", "rvv_float_matmul_assembly.cc"],
+            "srcs": [
+                "float_matmul_runner.cc",
+                "rvv_float_matmul_assembly.cc",
+            ],
             "hdrs": ["//sw/utils:utils.h"],
         },
     },
@@ -70,10 +97,10 @@ template_rule(
 filegroup(
     name = "rvv_mlop_tests",
     srcs = [
-        ":rvv_matmul_assembly.elf",
-        ":rvv_matmul.elf",
-        ":rvv_float_matmul_assembly.elf",
         ":rvv_float_matmul.elf",
+        ":rvv_float_matmul_assembly.elf",
         ":rvv_float_matmul_optimized.elf",
+        ":rvv_matmul.elf",
+        ":rvv_matmul_assembly.elf",
     ],
 )

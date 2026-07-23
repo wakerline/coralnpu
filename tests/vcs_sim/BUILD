@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//rules:utils.bzl", "template_rule")
 load("@coralnpu_hw//rules:vcs.bzl", "vcs_binary")
+load("//rules:utils.bzl", "template_rule")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -87,12 +87,11 @@ sh_test(
     name = "simulators_smoke_test",
     srcs = ["simulators_smoke_test.sh"],
     data = [
-        "//tests/vcs_sim:rvv_core_mini_verification_axi_sim",
         "//tests/cocotb:nop_test.elf",
+        "//tests/vcs_sim:rvv_core_mini_verification_axi_sim",
     ],
     tags = ["vcs"],
     deps = [
         "@bazel_tools//tools/bash/runfiles",
     ],
 )
-

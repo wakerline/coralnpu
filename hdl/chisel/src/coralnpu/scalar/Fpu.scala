@@ -21,40 +21,44 @@ import common.Fma
 import common.FmaCmd
 
 object FpuOptype extends ChiselEnum {
-  val FpuAdd = Value
-  val FpuSub = Value
-  val FpuMul = Value
-  val FpuFma = Value
-  val FpuFms = Value
+  val FpuAdd  = Value
+  val FpuSub  = Value
+  val FpuMul  = Value
+  val FpuFma  = Value
+  val FpuFms  = Value
   val FpuFnma = Value
   val FpuFnms = Value
 }
 
 class FpuCmd extends Bundle {
   val optype = FpuOptype()
-  val ina = new Fp32
-  val inb = new Fp32
-  val inc = new Fp32
-  val waddr = UInt(5.W)
+  val ina    = new Fp32
+  val inb    = new Fp32
+  val inc    = new Fp32
+  val waddr  = UInt(5.W)
 }
 
 object FpuCmd {
   def ToFmaCmd(fpuCmd: FpuCmd): WithAddr[FmaCmd] = {
     val invert_ab = (fpuCmd.optype === FpuOptype.FpuFnma) ||
-                    (fpuCmd.optype === FpuOptype.FpuFnms)
+      (fpuCmd.optype === FpuOptype.FpuFnms)
     val invert_c = (fpuCmd.optype === FpuOptype.FpuSub) ||
-                   (fpuCmd.optype === FpuOptype.FpuFms) ||
-                   (fpuCmd.optype === FpuOptype.FpuFnms)
+      (fpuCmd.optype === FpuOptype.FpuFms) ||
+      (fpuCmd.optype === FpuOptype.FpuFnms)
 
     val fmaCmd = Wire(WithAddr(5, new FmaCmd))
     fmaCmd.bits.ina := Mux(invert_ab, fpuCmd.ina.negate(), fpuCmd.ina)
-    fmaCmd.bits.inb := Mux((fpuCmd.optype === FpuOptype.FpuAdd) ||
-                           (fpuCmd.optype === FpuOptype.FpuSub),
-                           Fp32(false.B, 127.U(8.W), 0.U(23.W)),
-                           fpuCmd.inb)
-    fmaCmd.bits.inc := Mux((fpuCmd.optype === FpuOptype.FpuMul),
-                           Fp32.fromWord(0.U(32.W)),
-                           Mux(invert_c, fpuCmd.inc.negate(), fpuCmd.inc))
+    fmaCmd.bits.inb := Mux(
+      (fpuCmd.optype === FpuOptype.FpuAdd) ||
+        (fpuCmd.optype === FpuOptype.FpuSub),
+      Fp32(false.B, 127.U(8.W), 0.U(23.W)),
+      fpuCmd.inb
+    )
+    fmaCmd.bits.inc := Mux(
+      (fpuCmd.optype === FpuOptype.FpuMul),
+      Fp32.fromWord(0.U(32.W)),
+      Mux(invert_c, fpuCmd.inc.negate(), fpuCmd.inc)
+    )
     fmaCmd.addr := fpuCmd.waddr
     fmaCmd
   }
@@ -62,7 +66,7 @@ object FpuCmd {
 
 class Fpu extends Module {
   val io = IO(new Bundle {
-    val cmd = Flipped(Decoupled(new FpuCmd))
+    val cmd    = Flipped(Decoupled(new FpuCmd))
     val output = Decoupled(WithAddr(5, new Fp32))
   })
 

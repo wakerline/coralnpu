@@ -23,13 +23,13 @@ trait TLULTestUtils extends ChiselSim { this: TestSuite =>
 
   /** Helper to perform a TileLink Put transaction. */
   def tlWrite(
-      tl: OpenTitanTileLink.Host2Device,
-      clock: Clock,
-      addr: UInt,
-      data: UInt,
-      mask: UInt = 0xf.U,
-      size: UInt = 2.U,
-      source: UInt = 0.U
+    tl: OpenTitanTileLink.Host2Device,
+    clock: Clock,
+    addr: UInt,
+    data: UInt,
+    mask: UInt = 0xf.U,
+    size: UInt = 2.U,
+    source: UInt = 0.U
   ): Unit = {
     tl.a.valid.poke(true.B)
     tl.a.bits.opcode.poke(TLULOpcodesA.PutFullData.asUInt)
@@ -49,11 +49,11 @@ trait TLULTestUtils extends ChiselSim { this: TestSuite =>
 
   /** Helper to perform a TileLink Get transaction. Returns (data, error). */
   def tlRead(
-      tl: OpenTitanTileLink.Host2Device,
-      clock: Clock,
-      addr: UInt,
-      size: UInt = 2.U,
-      source: UInt = 0.U
+    tl: OpenTitanTileLink.Host2Device,
+    clock: Clock,
+    addr: UInt,
+    size: UInt = 2.U,
+    source: UInt = 0.U
   ): (BigInt, Boolean) = {
     tl.a.valid.poke(true.B)
     tl.a.bits.opcode.poke(TLULOpcodesA.Get.asUInt)
@@ -74,11 +74,11 @@ trait TLULTestUtils extends ChiselSim { this: TestSuite =>
 
   /** Wrapper for tlRead to maintain compatibility with existing tests that only expect data. */
   def tlReadData(
-      tl: OpenTitanTileLink.Host2Device,
-      clock: Clock,
-      addr: UInt,
-      size: UInt = 2.U,
-      source: UInt = 0.U
+    tl: OpenTitanTileLink.Host2Device,
+    clock: Clock,
+    addr: UInt,
+    size: UInt = 2.U,
+    source: UInt = 0.U
   ): BigInt = {
     tlRead(tl, clock, addr, size, source)._1
   }

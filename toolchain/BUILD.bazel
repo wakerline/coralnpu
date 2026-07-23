@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-package(default_visibility = ["//visibility:public"])
-
-load(":cc_toolchain_config.bzl", "coralnpu_v2_cc_toolchain_config")
 load("//rules:linker.bzl", "generate_linker_script")
+load(":cc_toolchain_config.bzl", "coralnpu_v2_cc_toolchain_config")
+
+package(default_visibility = ["//visibility:public"])
 
 exports_files(["coralnpu_tcm.ld.tpl"])
 

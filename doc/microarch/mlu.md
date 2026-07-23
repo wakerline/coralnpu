@@ -48,11 +48,11 @@ lane).
 The MLU is a three stage pipeline, with the following stages:
 
 1. **Dispatch:** The dispatch unit determines if MLU operations can be executed.
-Amongst the four lanes, the MLU accepts the first valid MLU instruction. This
-request will be processed next cycle.
+   Amongst the four lanes, the MLU accepts the first valid MLU instruction. This
+   request will be processed next cycle.
 2. **Compute:** The second stage performs computation of the multiplication,
-using the register read data from rs1 and rs2.
-2. **Writeback:** The multiplication result is stored back to the register file.
+   using the register read data from rs1 and rs2.
+3. **Writeback:** The multiplication result is stored back to the register file.
 
 A waveform showing a typical interaction with the waveform can be found in
 Figure 2:

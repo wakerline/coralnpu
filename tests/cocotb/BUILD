@@ -13,8 +13,9 @@
 # limitations under the License.
 
 load("@coralnpu_hw//third_party/python:requirements.bzl", "requirement")
+load("@gemma_deps//:requirements.bzl", gemma_requirement = "requirement")
 load("@rules_pkg//:pkg.bzl", "pkg_zip")
-load("//rules:coco_tb.bzl", "cocotb_test_suite", "verilator_cocotb_model")
+load("//rules:coco_tb.bzl", "cocotb_test_suite", "vcs_test_macro_smoke_test", "verilator_cocotb_model")
 load("//rules:coralnpu_v2.bzl", "coralnpu_v2_binary")
 load("//rules:utils.bzl", "template_rule")
 load(
@@ -30,11 +31,14 @@ package(default_visibility = ["//visibility:public"])
 
 COCOTB_TEST_BINARY_TARGETS = glob(["**/*.elf"]) + glob(["**/*.o"]) + [
     ":align_test.elf",
+    ":fcsr_frm_hazard_test.elf",
+    ":rvv_frm_hazard_test.elf",
     ":frm_test.elf",
     ":float_csr_interlock_test.elf",
     ":float_hazard_tests.elf",
     ":finish_txn_before_halt.elf",
     ":math.elf",
+    ":minstret_test.elf",
     ":stress_test.elf",
     ":unreachable_prefetch_fault.elf",
     ":vector_store_fault.elf",
@@ -43,15 +47,15 @@ COCOTB_TEST_BINARY_TARGETS = glob(["**/*.elf"]) + glob(["**/*.o"]) + [
     ":wfi_slot_2.elf",
     ":wfi_slot_3.elf",
     ":zfbfmin_test.elf",
+    ":zvfbf_test.elf",
     "//tests/cocotb/coralnpu_isa:coralnpu_isa_tests",
     "//tests/cocotb/exceptions:elf_files",
     "//third_party/riscv-tests:all_files",
 ]
 
 VCS_COMMON_DATA = [
-    ":coverage_exclude.cfg",
     ":xprop.cfg",
-    "//hdl/verilog:dpi_files",
+    "@coralnpu_hw//hdl/verilog:dpi_files",
 ]
 
 verilator_cocotb_model(
@@ -98,12 +102,25 @@ verilator_cocotb_model(
     ],
 )
 
+# VME (Zvt) variant. Adds -DZVT_ON so the SystemVerilog `RVVConfigState`
+# struct gets the matrix-extension fields it needs.
+verilator_cocotb_model(
+    name = "vme_core_mini_axi_model",
+    cflags = VERILATOR_BUILD_ARGS + ["-DZVT_ON"],
+    hdl_toplevel = "VmeCoreMiniAxi",
+    trace = False,
+    verilog_source = "//hdl/chisel/src/coralnpu:VmeCoreMiniAxi.sv",
+    deps = [
+        "//hdl/verilog:sram_backdoor",
+    ],
+)
+
 # BEGIN_TESTCASES_FOR_core_mini_axi_sim_cocotb
 CORE_MINI_AXI_SIM_TESTCASES = [
     ("core_mini_axi_basic_write_read_memory", "large"),
     "core_mini_axi_run_wfi_in_all_slots",
     "core_mini_axi_slow_bready",
-    "core_mini_axi_write_read_memory_stress_test",
+    ("core_mini_axi_write_read_memory_stress_test", "large"),
     "core_mini_axi_master_write_alignment",
     "core_mini_axi_finish_txn_before_halt_test",
     "core_mini_axi_riscv_tests",
@@ -117,7 +134,9 @@ CORE_MINI_AXI_SIM_TESTCASES = [
     "core_mini_axi_float_hazard_test",
     "unreachable_prefetch_fault",
     "core_mini_axi_frm_test",
+    "core_mini_axi_fcsr_frm_hazard_test",
     "core_mini_axi_backdoor_load_test",
+    "core_mini_axi_minstret_test",
 ]
 # END_TESTCASES_FOR_core_mini_axi_sim_cocotb
 
@@ -141,6 +160,8 @@ RVV_CORE_MINI_AXI_SIM_TESTCASES = [
     "core_mini_axi_float_hazard_test",
     "unreachable_prefetch_fault",
     "core_mini_axi_frm_test",
+    "core_mini_axi_fcsr_frm_hazard_test",
+    "rvv_frm_hazard_test",
     "core_mini_axi_backdoor_load_test",
 ]
 # END_TESTCASES_FOR_rvv_core_mini_axi_sim_cocotb
@@ -199,6 +220,7 @@ template_rule(
 
 # BEGIN_TESTCASES_FOR_core_mini_axi_debug_cocotb
 CORE_MINI_AXI_DEBUG_TESTCASES = [
+    "core_mini_axi_debug_trigger_match",
     "core_mini_axi_debug_gdbserver",
     "core_mini_axi_debug_dmactive",
     "core_mini_axi_debug_probe_impl",
@@ -234,6 +256,7 @@ RVV_ASSEMBLY_TESTCASES = [
     "vslidedown_test",
     "vslide1up_test",
     "vslide1down_test",
+    "vgather_test",
 ]
 # END_TESTCASES_FOR_rvv_assembly_cocotb_test
 
@@ -251,13 +274,15 @@ RVV_LOAD_STORE_TESTCASES = [
     "load8_index32",
     ("load8_index32_seg", "large"),
     "load8_seg_unit",
+    "load8_stride0_m1",
+    "load8_stride0strict_m1",
     "load8_stride2_m1",
     "load8_stride2_m1_partial",
     "load8_stride2_mf4",
     "load16_index8",
     "load16_index8_seg",
-    "load16_index16_seg",
-    "load16_index32_seg",
+    ("load16_index16_seg", "large"),
+    ("load16_index32_seg", "large"),
     "load16_seg_unit",
     "load16_stride4_m1",
     "load16_stride4_m1_partial",
@@ -290,6 +315,7 @@ RVV_LOAD_STORE_TESTCASES = [
     "store8_seg_unit",
     "store16_seg_unit",
     "store32_seg_unit",
+    "load_store8_fault",
     "load_store8_test",
 ]
 # END_TESTCASES_FOR_rvv_load_store_test
@@ -331,6 +357,7 @@ HIGHMEM_TESTCASES = [
 # END_TESTCASES_FOR_highmem_test
 
 COCOTB_DEBUG_TEST_BINARY_TARGETS = [
+    ":debug_trigger_test.elf",
     ":fptr.elf",
     ":loop.elf",
     ":math.elf",
@@ -545,6 +572,13 @@ coralnpu_v2_binary(
 )
 
 coralnpu_v2_binary(
+    name = "debug_trigger_test",
+    srcs = [
+        "debug_trigger_test.S",
+    ],
+)
+
+coralnpu_v2_binary(
     name = "float_csr_interlock_test",
     srcs = [
         "float_csr_interlock_test.S",
@@ -556,6 +590,18 @@ coralnpu_v2_binary(
     srcs = [
         "float_hazard_tests.S",
     ],
+)
+
+coralnpu_v2_binary(
+    name = "fcsr_frm_hazard_test",
+    srcs = ["fcsr_frm_hazard_test.cc"],
+    copts = ["-std=c++20"],
+)
+
+coralnpu_v2_binary(
+    name = "rvv_frm_hazard_test",
+    srcs = ["rvv_frm_hazard_test.cc"],
+    copts = ["-std=c++20"],
 )
 
 coralnpu_v2_binary(
@@ -590,12 +636,18 @@ coralnpu_v2_binary(
 )
 
 coralnpu_v2_binary(
+    name = "minstret_test",
+    srcs = [
+        "minstret_test.cc",
+    ],
+)
+
+coralnpu_v2_binary(
     name = "mcycle_test",
     srcs = [
         "mcycle_test.cc",
     ],
 )
-
 
 # This test is used for baseline vector power analysis.
 coralnpu_v2_binary(
@@ -708,6 +760,32 @@ RVV_ML_OPS_TESTCASES = [
 ]
 # END_TESTCASES_FOR_rvv_ml_ops_cocotb_test
 
+py_binary(
+    name = "dump_gemma_tensors",
+    srcs = ["dump_gemma_tensors.py"],
+    tags = ["manual"],
+    deps = [
+        gemma_requirement("torch"),
+        gemma_requirement("transformers"),
+        gemma_requirement("accelerate"),
+        gemma_requirement("numpy"),
+    ],
+)
+
+genrule(
+    name = "generate_gemma_tensors",
+    outs = [
+        "gemma_q.npy",
+        "gemma_k.npy",
+        "gemma_v.npy",
+        "gemma_o.npy",
+    ],
+    cmd = "$(location :dump_gemma_tensors) --out_dir $(RULEDIR)",
+    local = True,
+    tags = ["manual"],
+    tools = [":dump_gemma_tensors"],
+)
+
 cocotb_test_suite(
     name = "rvv_ml_ops_cocotb_test",
     simulators = [
@@ -760,6 +838,45 @@ cocotb_test_suite(
         ],
         "size": "medium",
     },
+    verilator_model = ":rvv_core_mini_axi_model",
+)
+
+coralnpu_v2_binary(
+    name = "zvfbf_test",
+    srcs = [
+        "zvfbf_test.cc",
+    ],
+)
+
+cocotb_test_suite(
+    name = "zvfbf_cocotb_test",
+    simulators = [
+        "verilator",
+        "vcs",
+    ],
+    testcases = [
+        "zvfbf_test",
+    ],
+    testcases_vname = "ZVFBF_TESTCASES",
+    tests_kwargs = {
+        "hdl_toplevel": "RvvCoreMiniAxi",
+        "waves": False,
+        "seed": "42",
+        "test_module": ["zvfbf_test.py"],
+        "deps": [
+            "//coralnpu_test_utils:sim_test_fixture",
+            "@bazel_tools//tools/python/runfiles",
+        ],
+        "data": [
+            ":zvfbf_test.elf",
+        ],
+        "size": "medium",
+    },
+    vcs_build_args = VCS_BUILD_ARGS,
+    vcs_data = [":zvfbf_test.elf"] + VCS_COMMON_DATA,
+    vcs_defines = VCS_DEFINES,
+    vcs_test_args = VCS_TEST_ARGS,
+    vcs_verilog_sources = ["//hdl/chisel/src/coralnpu:rvv_core_mini_axi_cc_library_verilog"],
     verilator_model = ":rvv_core_mini_axi_model",
 )
 
@@ -891,4 +1008,27 @@ exports_files([
     "coverage_exclude.cfg",
     "xprop.cfg",
     "rvv_ml_ops_cocotb_test.py",
+    "rvv_flashattention_cocotb_test.py",
 ])
+
+# Smoke test to prevent signature divergence between regular and split VCS flows.
+vcs_test_macro_smoke_test(
+    name = "vcs_flow_smoke_test",
+    size = "small",
+    timeout = "short",
+    data = ["//tests/cocotb/rvv:rvv_assem_tests"],
+    extra_env = ["TEST_VAR=smoke_value"],
+    flaky = True,
+    hdl_toplevel = "RvvCoreMiniAxi",
+    local = True,
+    seed = "12345",
+    shard_count = 2,
+    test_args = ["+CLOCK_NS=2.0"],
+    test_module = ["rvv_assembly_cocotb_test.py"],
+    testcase = ["test_addi"],
+    verilog_sources = ["//hdl/chisel/src/coralnpu:rvv_core_mini_axi_cc_library_verilog"],
+    waves = False,
+    deps = [
+        "//coralnpu_test_utils:core_mini_axi_sim_interface",
+    ],
+)

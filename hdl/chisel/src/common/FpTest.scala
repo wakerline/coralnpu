@@ -20,7 +20,7 @@ import org.scalatest.freespec.AnyFreeSpec
 
 class Fp32Tester extends Module {
   val io = IO(new Bundle {
-    val in     = Input(UInt(32.W))
+    val in      = Input(UInt(32.W))
     val is_zero = Output(Bool())
     val is_inf  = Output(Bool())
     val is_nan  = Output(Bool())
@@ -28,36 +28,36 @@ class Fp32Tester extends Module {
 
   val fp = Fp32.fromWord(io.in)
   io.is_zero := fp.isZero()
-  io.is_inf := fp.isInf()
-  io.is_nan := fp.isNan()
+  io.is_inf  := fp.isInf()
+  io.is_nan  := fp.isNan()
 }
 
 class Fp32CvtuTester extends Module {
   val io = IO(new Bundle {
-    val int  = Input(UInt(32.W))
-    val fp_sign = Output(Bool())
+    val int         = Input(UInt(32.W))
+    val fp_sign     = Output(Bool())
     val fp_mantissa = Output(UInt(23.W))
     val fp_exponent = Output(UInt(8.W))
   })
 
   val fp = Wire(new Fp32)
-  fp := Fp32.fromInteger(io.int, false.B)
-  io.fp_sign := fp.sign
+  fp             := Fp32.fromInteger(io.int, false.B)
+  io.fp_sign     := fp.sign
   io.fp_mantissa := fp.mantissa
   io.fp_exponent := fp.exponent
 }
 
 class Fp32CvtTester extends Module {
   val io = IO(new Bundle {
-    val int  = Input(SInt(32.W))
-    val fp_sign = Output(Bool())
+    val int         = Input(SInt(32.W))
+    val fp_sign     = Output(Bool())
     val fp_mantissa = Output(UInt(23.W))
     val fp_exponent = Output(UInt(8.W))
   })
 
   val fp = Wire(new Fp32)
-  fp := Fp32.fromInteger(io.int.asUInt, true.B)
-  io.fp_sign := fp.sign
+  fp             := Fp32.fromInteger(io.int.asUInt, true.B)
+  io.fp_sign     := fp.sign
   io.fp_mantissa := fp.mantissa
   io.fp_exponent := fp.exponent
 }
@@ -74,14 +74,12 @@ class FpSpec extends AnyFreeSpec with ChiselSim {
 
   "Inf" in {
     simulate(new Fp32Tester()) { dut =>
-      dut.io.in.poke(BigInt(
-          "0" + "11111111" + "00000000000000000000000", 2))
+      dut.io.in.poke(BigInt("0" + "11111111" + "00000000000000000000000", 2))
       dut.io.is_zero.expect(0)
       dut.io.is_inf.expect(1)
       dut.io.is_nan.expect(0)
 
-      dut.io.in.poke(BigInt(
-          "1" + "11111111" + "00000000000000000000000", 2))
+      dut.io.in.poke(BigInt("1" + "11111111" + "00000000000000000000000", 2))
       dut.io.is_zero.expect(0)
       dut.io.is_inf.expect(1)
       dut.io.is_nan.expect(0)
@@ -90,14 +88,12 @@ class FpSpec extends AnyFreeSpec with ChiselSim {
 
   "Nan" in {
     simulate(new Fp32Tester()) { dut =>
-      dut.io.in.poke(BigInt(
-          "0" + "11111111" + "00011000011000111000100", 2))
+      dut.io.in.poke(BigInt("0" + "11111111" + "00011000011000111000100", 2))
       dut.io.is_zero.expect(0)
       dut.io.is_inf.expect(0)
       dut.io.is_nan.expect(1)
 
-      dut.io.in.poke(BigInt(
-          "1" + "11111111" + "00011000011000111000100", 2))
+      dut.io.in.poke(BigInt("1" + "11111111" + "00011000011000111000100", 2))
       dut.io.is_zero.expect(0)
       dut.io.is_inf.expect(0)
       dut.io.is_nan.expect(1)
@@ -113,8 +109,9 @@ class FpSpec extends AnyFreeSpec with ChiselSim {
           PeekFloat(
             dut.io.fp_sign.peek().litValue.toInt,
             dut.io.fp_exponent.peek().litValue.toInt,
-            dut.io.fp_mantissa.peek().litValue.toInt)
-          }
+            dut.io.fp_mantissa.peek().litValue.toInt
+          )
+        }
       }
     }
   }
@@ -128,8 +125,9 @@ class FpSpec extends AnyFreeSpec with ChiselSim {
           PeekFloat(
             dut.io.fp_sign.peek().litValue.toInt,
             dut.io.fp_exponent.peek().litValue.toInt,
-            dut.io.fp_mantissa.peek().litValue.toInt)
-          }
+            dut.io.fp_mantissa.peek().litValue.toInt
+          )
+        }
       }
     }
   }

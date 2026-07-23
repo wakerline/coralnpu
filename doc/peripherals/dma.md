@@ -53,7 +53,7 @@ Base address: `0x40050000` (4 KB region, after I2C at `0x40040000`)
 
 ### Programming Sequence
 
-```
+```text
 1. Build descriptor chain in memory (SRAM or DDR)
 2. Write DESC_ADDR with address of first descriptor
 3. Write CTRL with enable=1, start=1
@@ -66,7 +66,7 @@ Base address: `0x40050000` (4 KB region, after I2C at `0x40040000`)
 Descriptors are 32 bytes (two 128-bit TL-UL beats) and must be 32-byte aligned
 in memory. The DMA fetches them via its host port.
 
-```
+```text
 Offset  Field         Bits     Description
 0x00    src_addr      [31:0]   Source address
 0x04    dst_addr      [31:0]   Destination address
@@ -93,7 +93,7 @@ triplet. When configured (`poll_en` set and `poll_addr != 0`), the DMA reads
 
 ### Example: DMA → SPI TX
 
-```
+```text
 Descriptor:
   src_addr   = 0x20000000  (SRAM buffer)
   dst_addr   = 0x40020008  (SPI TXDATA register)
@@ -109,7 +109,7 @@ SPI clock rate.
 
 ### Example: I2C RX → DMA
 
-```
+```text
 Descriptor:
   src_addr   = 0x40040008  (I2C RXDATA register)
   dst_addr   = 0x20001000  (SRAM buffer)
@@ -121,7 +121,7 @@ Descriptor:
 
 ## State Machine
 
-```
+```text
 IDLE ──[start]──► FETCH_DESC_0 ──[d.fire]──► FETCH_DESC_1 ──[d.fire]──► POLL_CHECK
   ▲                                                                          │
   │                                                          [no poll or match]
@@ -213,14 +213,14 @@ The DMA occupies `0x40050000–0x40050FFF` (4 KB), after I2C at `0x40040000`.
 The DMA host port connects to all memory and peripheral devices it may need to
 access:
 
-```
+```scala
 "dma" -> Seq("sram", "coralnpu_device", "rom", "ddr_ctrl", "ddr_mem",
              "spi_master", "gpio", "i2c_master", "uart0", "uart1")
 ```
 
 The CPU must also be able to program the DMA:
 
-```
+```scala
 "coralnpu_core" -> Seq(...existing..., "dma")
 ```
 
@@ -229,6 +229,7 @@ The CPU must also be able to program the DMA:
 Single new file: `hdl/chisel/src/bus/DmaEngine.scala`
 
 Configuration changes in:
+
 - `hdl/chisel/src/soc/CrossbarConfig.scala` — host, device, address range,
   connections
 - `hdl/chisel/src/soc/SoCChiselConfig.scala` — `DmaParameters`, module config

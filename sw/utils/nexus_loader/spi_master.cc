@@ -8,7 +8,10 @@
 #include <cstring>
 
 void SpiMaster::send_cmd(const std::vector<uint8_t>& cmd) {
-  ftdi_->write_data(cmd.data(), cmd.size());
+  int n = ftdi_->write_data(cmd.data(), cmd.size());
+  if (n != static_cast<int>(cmd.size())) {
+    fprintf(stderr, "[ERROR] FTDI write failed: wrote %d/%zu bytes\n", n, cmd.size());
+  }
 }
 
 std::vector<uint8_t> SpiMaster::read_data(size_t len) {
@@ -112,7 +115,6 @@ bool SpiMaster::v2_read_lines(uint32_t addr, uint16_t num_beats, uint8_t* out) {
     cmd.push_back(MPSSE_DO_READ_NVE_MSB);
     cmd.push_back((uint8_t)((chunk - 1) & 0xFF));
     cmd.push_back((uint8_t)((chunk - 1) >> 8));
-    cmd.insert(cmd.end(), chunk, 0);
     off += chunk;
   }
 
@@ -252,6 +254,26 @@ void SpiMaster::v2_write_data(uint32_t addr, const uint8_t* data, size_t len) {
 
 void SpiMaster::write_word(uint32_t addr, uint32_t val) {
   v2_write_data(addr, reinterpret_cast<const uint8_t*>(&val), 4);
+}
+
+void SpiMaster::soft_reset() {
+  std::vector<uint8_t> cmd;
+  // CSB Low
+  cmd.insert(cmd.end(), {MPSSE_SET_DATA_BITS_LOW, kCsLow, kDirMask});
+
+  // Write 2 bytes: Opcode 0x03 (RESET) and dummy 0x00 to provide clocks
+  cmd.push_back(MPSSE_DO_WRITE_NVE_MSB);
+  cmd.push_back(1); // length - 1 = 1
+  cmd.push_back(0);
+  cmd.push_back(0x03);
+  cmd.push_back(0x00);
+
+  // CSB High & Flush
+  cmd.insert(cmd.end(), {MPSSE_SET_DATA_BITS_LOW, kCsHigh, kDirMask,
+                         MPSSE_SEND_IMMEDIATE});
+
+  send_cmd(cmd);
+  usleep(10000); // 10ms settle time
 }
 
 void SpiMaster::device_reset() {

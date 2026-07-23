@@ -7,28 +7,34 @@ import coralnpu.MemorySize
 import coralnpu.CoreTlul
 import common.MuBi4
 
-
-
-/**
- * This is the IO bundle for the unified Chisel subsystem.
- */
-class CoralNPUChiselSubsystemIO(val hostParams: Seq[bus.TLULParameters], val deviceParams: Seq[bus.TLULParameters], val enableTestHarness: Boolean, val itcmSize: MemorySize, val dtcmSize: MemorySize) extends Bundle {
+/** This is the IO bundle for the unified Chisel subsystem.
+  */
+class CoralNPUChiselSubsystemIO(
+  val hostParams: Seq[bus.TLULParameters],
+  val deviceParams: Seq[bus.TLULParameters],
+  val enableTestHarness: Boolean,
+  val itcmSize: MemorySize,
+  val dtcmSize: MemorySize
+) extends Bundle {
   val cfg = SoCChiselConfig(itcmSize, dtcmSize).crossbar
 
   // --- Clocks and Resets ---
-  val clk_i = Input(Clock())
+  val clk_i  = Input(Clock())
   val rst_ni = Input(AsyncReset())
 
   // --- Dynamic Asynchronous Clock/Reset Ports ---
-  val asyncHostDomains = cfg.hosts(enableTestHarness).map(_.clockDomain).distinct.filter(_ != "main")
+  val asyncHostDomains =
+    cfg.hosts(enableTestHarness).map(_.clockDomain).distinct.filter(_ != "main")
   val async_ports_hosts = new DataRecord(asyncHostDomains.map(d => d -> new ClockResetBundle))
 
-  val asyncDeviceDomains = cfg.devices.map(_.clockDomain).distinct.filter(_ != "main")
+  val asyncDeviceDomains  = cfg.devices.map(_.clockDomain).distinct.filter(_ != "main")
   val async_ports_devices = new DataRecord(asyncDeviceDomains.map(d => d -> new ClockResetBundle))
 
   // --- Identify Internal vs. External Connections ---
-  val internalHosts = SoCChiselConfig(itcmSize, dtcmSize).modules.flatMap(_.hostConnections.values).toSet
-  val internalDevices = SoCChiselConfig(itcmSize, dtcmSize).modules.flatMap(_.deviceConnections.values).toSet
+  val internalHosts =
+    SoCChiselConfig(itcmSize, dtcmSize).modules.flatMap(_.hostConnections.values).toSet
+  val internalDevices =
+    SoCChiselConfig(itcmSize, dtcmSize).modules.flatMap(_.deviceConnections.values).toSet
 
   // These devices are handled specially within the subsystem (e.g., converted to AXI)
   // and should not have external TileLink ports created for them.
@@ -36,7 +42,9 @@ class CoralNPUChiselSubsystemIO(val hostParams: Seq[bus.TLULParameters], val dev
   // Note: SpeciallyHandledHosts modified to matches the XBAR port names to accomodate multiple hosts in one IP
   val speciallyHandledHosts = Set("ispyocto_m1", "ispyocto_m2")
 
-  val externalHostPorts = cfg.hosts(enableTestHarness).filterNot(h => internalHosts.contains(h.name) || speciallyHandledHosts.contains(h.name))
+  val externalHostPorts = cfg
+    .hosts(enableTestHarness)
+    .filterNot(h => internalHosts.contains(h.name) || speciallyHandledHosts.contains(h.name))
   val externalDevicePorts = cfg.devices.filterNot(d =>
     internalDevices.contains(d.name) || speciallyHandledDevices.contains(d.name)
   )
@@ -52,19 +60,19 @@ class CoralNPUChiselSubsystemIO(val hostParams: Seq[bus.TLULParameters], val dev
 
   // --- Manually define peripheral ports for now ---
   val allExternalPortsConfig = SoCChiselConfig(itcmSize, dtcmSize).modules.flatMap(_.externalPorts)
-  val external_ports = new DataRecord(allExternalPortsConfig.map { p =>
+  val external_ports         = new DataRecord(allExternalPortsConfig.map { p =>
     val port = p.portType match {
-      case coralnpu.soc.Clk  => Clock()
-      case coralnpu.soc.Bool => Bool()
+      case coralnpu.soc.Clk          => Clock()
+      case coralnpu.soc.Bool         => Bool()
       case coralnpu.soc.Logic(width) => UInt(width.W)
       case coralnpu.soc.Custom(gen)  => gen()
     }
     p.name -> (if (p.direction == coralnpu.soc.In) Input(port) else Output(port))
   })
 
-  val p = new Parameters
+  val p            = new Parameters
   val ddrCtrlWidth = cfg.devices.find(_.name == "ddr_ctrl").get.width
-  val ddrMemWidth = cfg.devices.find(_.name == "ddr_mem").get.width
+  val ddrMemWidth  = cfg.devices.find(_.name == "ddr_mem").get.width
   val ddr_ctrl_axi = new AxiMasterIO(32, ddrCtrlWidth, p.axi2IdBits)
   // We specify the 256-bit AXI width and 1-bit ID for DDR here.
   // The output from the Xbar is 128-bits / 6-bits, and we instantiate
@@ -74,7 +82,9 @@ class CoralNPUChiselSubsystemIO(val hostParams: Seq[bus.TLULParameters], val dev
   // ISP Ports (Manual exposure for FPGA integration)
   // Control Interface (Slave): CPU -> Xbar -> ISP
   // Using generic Host2Device bundle
-  val ispyocto_ctrl = new OpenTitanTileLink.Host2Device(deviceParams(cfg.devices.indexWhere(_.name == "ispyocto_ctrl")))
+  val ispyocto_ctrl = new OpenTitanTileLink.Host2Device(
+    deviceParams(cfg.devices.indexWhere(_.name == "ispyocto_ctrl"))
+  )
 
   // Master Interfaces (Master): ISP -> AXI2TLUL -> Xbar -> Memory
   // Need Flipped AxiMasterIO because Subsystem acts as Slave to ISP
@@ -86,27 +96,37 @@ import chisel3.experimental.BaseModule
 import chisel3.reflect.DataMirror
 import scala.collection.mutable
 
-/**
- * A generator for the entire Chisel-based subsystem of the CoralNPU SoC.
- */
-class CoralNPUChiselSubsystem(val hostParams: Seq[bus.TLULParameters], val deviceParams: Seq[bus.TLULParameters], val enableTestHarness: Boolean, val itcmSize: MemorySize, val dtcmSize: MemorySize) extends RawModule {
-  val testHarnessSuffix = if (enableTestHarness) "TestHarness" else ""
+/** A generator for the entire Chisel-based subsystem of the CoralNPU SoC.
+  */
+class CoralNPUChiselSubsystem(
+  val hostParams: Seq[bus.TLULParameters],
+  val deviceParams: Seq[bus.TLULParameters],
+  val enableTestHarness: Boolean,
+  val itcmSize: MemorySize,
+  val dtcmSize: MemorySize
+) extends RawModule {
+  val testHarnessSuffix    = if (enableTestHarness) "TestHarness" else ""
   override val desiredName = {
-    if (itcmSize.kBytes == Parameters.itcmSizeKBytesDefault && dtcmSize.kBytes == Parameters.dtcmSizeKBytesDefault) {
+    if (
+      itcmSize.kBytes == Parameters.itcmSizeKBytesDefault && dtcmSize.kBytes == Parameters.dtcmSizeKBytesDefault
+    ) {
       "CoralNPUChiselSubsystem" + testHarnessSuffix
-    } else if (itcmSize.kBytes == Parameters.itcmSizeKBytesHighmem && dtcmSize.kBytes == Parameters.dtcmSizeKBytesHighmem) {
+    } else if (
+      itcmSize.kBytes == Parameters.itcmSizeKBytesHighmem && dtcmSize.kBytes == Parameters.dtcmSizeKBytesHighmem
+    ) {
       "CoralNPUChiselSubsystemHighmem" + testHarnessSuffix
     } else {
       s"CoralNPUChiselSubsystem_ITCM${itcmSize.kBytes}KB_DTCM${dtcmSize.kBytes}KB" + testHarnessSuffix
     }
   }
-  val io = IO(new CoralNPUChiselSubsystemIO(hostParams, deviceParams, enableTestHarness, itcmSize, dtcmSize))
+  val io = IO(
+    new CoralNPUChiselSubsystemIO(hostParams, deviceParams, enableTestHarness, itcmSize, dtcmSize)
+  )
   val cfg = SoCChiselConfig(itcmSize, dtcmSize).crossbar
 
-  /**
-   * A helper function to recursively traverse a Chisel Bundle and populate a
-   * map with the full hierarchical path to every port and sub-port.
-   */
+  /** A helper function to recursively traverse a Chisel Bundle and populate a map with the full
+    * hierarchical path to every port and sub-port.
+    */
   def populatePorts(prefix: String, data: Data, map: mutable.Map[String, Data]): Unit = {
     map(prefix) = data
     data match {
@@ -123,83 +143,111 @@ class CoralNPUChiselSubsystem(val hostParams: Seq[bus.TLULParameters], val devic
   }
 
   withClockAndReset(io.clk_i, (!io.rst_ni.asBool).asAsyncReset) {
-    // --- Instantiate Core Chisel Components ---
-    val xbar = Module(new CoralNPUXbar(hostParams, deviceParams, enableTestHarness, itcmSize, dtcmSize))
+    // --- 1. Instantiate spi2tlul first (with hardware reset) ---
+    val spi2tlul_config = SoCChiselConfig(itcmSize, dtcmSize).modules.find(_.name == "spi2tlul").get
+    val spi2tlul        = {
+      val p          = spi2tlul_config.params.asInstanceOf[Spi2TlulParameters]
+      val spi2tlul_p = new Parameters
+      spi2tlul_p.lsuDataBits = p.lsuDataBits
+      spi2tlul_p.axi2IdBits = 8
+      val m = Module(new Spi2TLUL(spi2tlul_p.toTLUL()))
+      m.suggestName("spi2tlul")
+      m
+    }
 
-    // --- Dynamic Module Instantiation ---
+    // --- 2. Define combined reset (active-low for modules expecting rst_ni) ---
+    val soft_reset     = spi2tlul.io.sys_rst_o
+    val raw_combined_n = io.rst_ni.asBool && !soft_reset
+    val combined_rst_n = withClockAndReset(io.clk_i, (!raw_combined_n).asAsyncReset) {
+      val r1 = RegInit(false.B)
+      val r2 = RegInit(false.B)
+      r1 := true.B
+      r2 := r1
+      r2
+    }
+
+    // --- 3. Instantiate xbar (with combined reset) ---
+    val xbar = withClockAndReset(io.clk_i, (!combined_rst_n).asAsyncReset) {
+      Module(new CoralNPUXbar(hostParams, deviceParams, enableTestHarness, itcmSize, dtcmSize))
+    }
+
+    // --- 4. Dynamic Module Instantiation helper (with combined reset) ---
     def instantiateModule(config: ChiselModuleConfig): BaseModule = {
-      config.params match {
-        case p: CoreTlulParameters =>
-          val core_p = new Parameters
-          core_p.m = p.memoryRegions
-          core_p.lsuDataBits = p.lsuDataBits
-          core_p.enableRvv = p.enableRvv
-          core_p.enableFetchL0 = p.enableFetchL0
-          core_p.fetchDataBits = p.fetchDataBits
-          core_p.enableFloat = p.enableFloat
-          core_p.itcmSizeKBytes = itcmSize.kBytes
-          core_p.dtcmSizeKBytes = dtcmSize.kBytes
-          Module(new CoreTlul(core_p, config.name))
+      withClockAndReset(io.clk_i, (!combined_rst_n).asAsyncReset) {
+        config.params match {
+          case p: CoreTlulParameters =>
+            val core_p = new Parameters
+            core_p.m = p.memoryRegions
+            core_p.lsuDataBits = p.lsuDataBits
+            core_p.enableRvv = p.enableRvv
+            core_p.enableFetchL0 = p.enableFetchL0
+            core_p.fetchDataBits = p.fetchDataBits
+            core_p.enableFloat = p.enableFloat
+            core_p.itcmSizeKBytes = itcmSize.kBytes
+            core_p.dtcmSizeKBytes = dtcmSize.kBytes
+            Module(new CoreTlul(core_p, config.name))
 
-        case p: Spi2TlulParameters =>
-          val spi2tlul_p = new Parameters
-          spi2tlul_p.lsuDataBits = p.lsuDataBits
-          spi2tlul_p.axi2IdBits = 8
-          Module(new Spi2TLUL(spi2tlul_p))
+          case p: Spi2TlulParameters => null
 
-        case p: SpiMasterParameters =>
-          val spi_p = new Parameters
-          spi_p.lsuDataBits = p.lsuDataBits
-          spi_p.axi2IdBits = 10
-          Module(new SpiMaster(spi_p))
+          case p: SpiMasterParameters =>
+            val spi_p = new Parameters
+            spi_p.lsuDataBits = p.lsuDataBits
+            spi_p.axi2IdBits = 10
+            Module(new SpiMaster(spi_p.toTLUL()))
 
-        case p: GPIOModuleParameters =>
-          val gpio_p = new Parameters
-          gpio_p.lsuDataBits = 32
-          gpio_p.axi2IdBits = 10
-          val gp = bus.GPIOParameters(width = p.width)
-          Module(new bus.GPIO(gpio_p, gp))
+          case p: GPIOModuleParameters =>
+            val gpio_p = new Parameters
+            gpio_p.lsuDataBits = 32
+            gpio_p.axi2IdBits = 10
+            val gp = bus.GPIOParameters(width = p.width)
+            Module(new bus.GPIO(gpio_p.toTLUL(), gp))
 
-        case p: DmaParameters =>
-          val host_p = new Parameters
-          host_p.lsuDataBits = p.hostDataBits
-          val device_p = new Parameters
-          device_p.lsuDataBits = p.deviceDataBits
-          device_p.axi2IdBits = 10
-          Module(new bus.DmaEngine(host_p, device_p))
+          case p: DmaParameters =>
+            val host_p = new Parameters
+            host_p.lsuDataBits = p.hostDataBits
+            val device_p = new Parameters
+            device_p.lsuDataBits = p.deviceDataBits
+            device_p.axi2IdBits = 10
+            Module(new bus.DmaEngine(host_p.toTLUL(), device_p.toTLUL()))
 
-        case ClintParameters =>
-          val clint_p = new Parameters
-          clint_p.lsuDataBits = 32
-          clint_p.axi2IdBits = 10
-          Module(new bus.Clint(clint_p))
+          case ClintParameters =>
+            val clint_p = new Parameters
+            clint_p.lsuDataBits = 32
+            clint_p.axi2IdBits = 10
+            Module(new bus.Clint(clint_p.toTLUL()))
 
-        case p: PlicParameters =>
-          val plic_p = new Parameters
-          plic_p.lsuDataBits = 32
-          plic_p.axi2IdBits = 10
-          Module(new bus.Plic(plic_p, p.numInterrupts, p.priorityWidth))
+          case p: PlicParameters =>
+            val plic_p = new Parameters
+            plic_p.lsuDataBits = 32
+            plic_p.axi2IdBits = 10
+            Module(new bus.Plic(plic_p.toTLUL(), p.numInterrupts, p.priorityWidth))
 
-        case p: TlulSramParameters =>
-          val sram_p = new Parameters
-          sram_p.lsuDataBits = 128
-          sram_p.axi2IdBits = 8
-          Module(new TlulSram(sram_p, p.sramSizeBytes, p.globalBaseAddr))
+          case p: TlulSramParameters =>
+            val sram_p = new Parameters
+            sram_p.lsuDataBits = 128
+            sram_p.axi2IdBits = 8
+            Module(new TlulSram(sram_p, p.sramSizeBytes, p.globalBaseAddr))
 
-        case p: IspParameters => null // Handled externally
+          case p: IspParameters => null // Handled externally
+        }
       }
     }
 
-    val instantiatedModules = SoCChiselConfig(itcmSize, dtcmSize).modules.flatMap {
-      config =>
-      val m = instantiateModule(config)
-      if (m != null) {
-        m.suggestName(config.name)
-        Some(config.name -> m)
-      } else {
-        None
+    // --- 5. Instantiate other modules ---
+    val otherModules = SoCChiselConfig(itcmSize, dtcmSize).modules
+      .filter(_.name != "spi2tlul")
+      .flatMap { config =>
+        val m = instantiateModule(config)
+        if (m != null) {
+          m.suggestName(config.name)
+          Some(config.name -> m)
+        } else {
+          None
+        }
       }
-    }.toMap
+      .toMap
+
+    val instantiatedModules = otherModules + ("spi2tlul" -> spi2tlul)
 
     // --- Dynamic Wiring ---
     // Note: SpeciallyHandledHosts modified to matches the XBAR port names to accomodate multiple hosts in one IP
@@ -218,34 +266,39 @@ class CoralNPUChiselSubsystem(val hostParams: Seq[bus.TLULParameters], val devic
       modulePorts.get(s"$name.io.clk").foreach(_ := io.clk_i)
       modulePorts.get(s"$name.io.clk_i").foreach(_ := io.clk_i)
       modulePorts.get(s"$name.io.clock").foreach(_ := io.clk_i)
-      modulePorts.get(s"$name.io.rst_ni").foreach(_ := io.rst_ni)
-      modulePorts.get(s"$name.io.reset").foreach(_ := (!io.rst_ni.asBool).asAsyncReset)
+
+      val m_rst_ni = if (name == "spi2tlul") io.rst_ni else combined_rst_n.asAsyncReset
+      val m_reset  =
+        if (name == "spi2tlul") (!io.rst_ni.asBool).asAsyncReset else (!combined_rst_n).asAsyncReset
+
+      modulePorts.get(s"$name.io.rst_ni").foreach(_ := m_rst_ni)
+      modulePorts.get(s"$name.io.reset").foreach(_ := m_reset)
     }
 
     // Connect all modules based on the configuration.
-    SoCChiselConfig(itcmSize, dtcmSize).modules.filter(c => instantiatedModules.contains(c.name)).foreach {
-      config =>
-      config.hostConnections.foreach { case (modulePort, xbarPort) =>
-        if (!speciallyHandledHosts.contains(xbarPort)) {
-          modulePorts(s"${config.name}.$modulePort") <> xbar.io.hosts(xbarPort)
+    SoCChiselConfig(itcmSize, dtcmSize).modules
+      .filter(c => instantiatedModules.contains(c.name))
+      .foreach { config =>
+        config.hostConnections.foreach { case (modulePort, xbarPort) =>
+          if (!speciallyHandledHosts.contains(xbarPort)) {
+            modulePorts(s"${config.name}.$modulePort") <> xbar.io.hosts(xbarPort)
+          }
+        }
+        config.deviceConnections.foreach { case (modulePort, xbarPort) =>
+          xbar.io.devices(xbarPort) <> modulePorts(s"${config.name}.$modulePort")
+        }
+        config.externalPorts.foreach { extPort =>
+          val moduleIo = modulePorts(s"${config.name}.${extPort.modulePort}")
+          val topIo    = io.external_ports(extPort.name)
+          if (extPort.direction == In) {
+            if (topIo.getClass == moduleIo.getClass) moduleIo := topIo
+            else moduleIo := topIo.asTypeOf(chiselTypeOf(moduleIo))
+          } else {
+            if (topIo.getClass == moduleIo.getClass) topIo := moduleIo
+            else topIo                                     := moduleIo.asTypeOf(chiselTypeOf(topIo))
+          }
         }
       }
-      config.deviceConnections.foreach { case (modulePort, xbarPort) =>
-        xbar.io.devices(xbarPort) <> modulePorts(s"${config.name}.$modulePort")
-      }
-      config.externalPorts.foreach {
-        extPort =>
-        val moduleIo = modulePorts(s"${config.name}.${extPort.modulePort}")
-        val topIo = io.external_ports(extPort.name)
-        if (extPort.direction == In) {
-          if (topIo.getClass == moduleIo.getClass) moduleIo := topIo
-          else moduleIo := topIo.asTypeOf(chiselTypeOf(moduleIo))
-        } else {
-          if (topIo.getClass == moduleIo.getClass) topIo := moduleIo
-          else topIo := moduleIo.asTypeOf(chiselTypeOf(topIo))
-        }
-      }
-    }
 
     // Connect external-facing TileLink ports
     io.externalHostPorts.map(_.name).foreach { name =>
@@ -258,25 +311,25 @@ class CoralNPUChiselSubsystem(val hostParams: Seq[bus.TLULParameters], val devic
     // Connect async clocks
     io.asyncHostDomains.foreach { domainName =>
       val xbarPort = xbar.io.async_ports_hosts(domainName).asInstanceOf[ClockResetBundle]
-      val ioPort = io.async_ports_hosts(domainName).asInstanceOf[ClockResetBundle]
+      val ioPort   = io.async_ports_hosts(domainName).asInstanceOf[ClockResetBundle]
       xbarPort.clock := ioPort.clock
       xbarPort.reset := ioPort.reset
     }
 
     io.asyncDeviceDomains.foreach { domainName =>
       val xbarPort = xbar.io.async_ports_devices(domainName).asInstanceOf[ClockResetBundle]
-      val ioPort = io.async_ports_devices(domainName).asInstanceOf[ClockResetBundle]
+      val ioPort   = io.async_ports_devices(domainName).asInstanceOf[ClockResetBundle]
       xbarPort.clock := ioPort.clock
       xbarPort.reset := ioPort.reset
     }
 
     // --- Wire CLINT mtip/msip to core timer_irq/software_irq ---
     // Override the external port connections: connect clint's mtip directly to core's timer_irq
-    val clintMtip = modulePorts("clint.io.mtip")
+    val clintMtip    = modulePorts("clint.io.mtip")
     val coreTimerIrq = modulePorts("rvv_core.io.timer_irq")
     coreTimerIrq := clintMtip
 
-    val clintMsip = modulePorts("clint.io.msip")
+    val clintMsip       = modulePorts("clint.io.msip")
     val coreSoftwareIrq = modulePorts("rvv_core.io.software_irq")
     coreSoftwareIrq := clintMsip
 
@@ -287,15 +340,22 @@ class CoralNPUChiselSubsystem(val hostParams: Seq[bus.TLULParameters], val devic
 
     // --- DDR AXI Interface ---
     val ddrAsyncPorts = io.async_ports_devices("ddr").asInstanceOf[ClockResetBundle]
-    val ddr_clk = ddrAsyncPorts.clock
-    val ddr_rst = ddrAsyncPorts.reset
+    val ddr_clk       = ddrAsyncPorts.clock
+    val ddr_rst       = ddrAsyncPorts.reset
 
     val ddr_ctrl_tlul_p = deviceParams(cfg.devices.indexWhere(_.name == "ddr_ctrl"))
-    val ddr_ctrl_tl_p = new Parameters
-    ddr_ctrl_tl_p.lsuDataBits = ddr_ctrl_tlul_p.w * 8
-    val ddr_ctrl_axi_p = new Parameters
+    val ddr_ctrl_axi_p  = new Parameters
     ddr_ctrl_axi_p.lsuDataBits = ddr_ctrl_tlul_p.w * 8
-    val ddr_ctrl_axi_conv = Module(new TLUL2Axi(ddr_ctrl_tl_p, ddr_ctrl_axi_p, () => new OpenTitanTileLink_A_User, () => new OpenTitanTileLink_D_User))
+    val ddr_ctrl_axi_conv = Module(
+      new TLUL2Axi(
+        ddr_ctrl_tlul_p,
+        ddr_ctrl_axi_p.axi2DataBits,
+        ddr_ctrl_axi_p.axi2AddrBits,
+        ddr_ctrl_axi_p.axi2IdBits,
+        () => new OpenTitanTileLink_A_User,
+        () => new OpenTitanTileLink_D_User
+      )
+    )
     ddr_ctrl_axi_conv.clock := ddr_clk
     ddr_ctrl_axi_conv.reset := ddr_rst
     ddr_ctrl_axi_conv.io.tl_a <> xbar.io.devices("ddr_ctrl").a
@@ -304,13 +364,11 @@ class CoralNPUChiselSubsystem(val hostParams: Seq[bus.TLULParameters], val devic
 
     // --- DDR Memory AXI Interface (128-bit TL -> 256-bit TL -> 256-bit AXI) ---
     // Define parameters for the 256-bit bus that exists AFTER the width bridge.
-    val ddr_mem_256_coralnpu_p = {
-      val p = new Parameters
-      p.lsuDataBits = 256
-      p.axi2IdBits = 10
-      p
-    }
-    val ddr_mem_256_tlul_p = new bus.TLULParameters(ddr_mem_256_coralnpu_p)
+    val ddr_mem_256_tlul_p = new bus.TLULParameters(
+      dataBits = 256,
+      addrBits = 32,
+      idBits = 10
+    )
 
     // Define parameters for the final 256-bit AXI port.
     val ddr_mem_axi_p = {
@@ -324,10 +382,19 @@ class CoralNPUChiselSubsystem(val hostParams: Seq[bus.TLULParameters], val devic
     val ddr_mem_bridge = Module(new TlulWidthBridge(xbar.commonParams, ddr_mem_256_tlul_p))
 
     // Instantiate the AXI converter: 256-bit TL to 256-bit AXI.
-    val ddr_mem_axi_conv = Module(new TLUL2Axi(ddr_mem_256_coralnpu_p, ddr_mem_axi_p, () => new OpenTitanTileLink_A_User, () => new OpenTitanTileLink_D_User))
+    val ddr_mem_axi_conv = Module(
+      new TLUL2Axi(
+        ddr_mem_256_tlul_p,
+        ddr_mem_axi_p.axi2DataBits,
+        ddr_mem_axi_p.axi2AddrBits,
+        ddr_mem_axi_p.axi2IdBits,
+        () => new OpenTitanTileLink_A_User,
+        () => new OpenTitanTileLink_D_User
+      )
+    )
 
-    ddr_mem_bridge.clock := ddr_clk
-    ddr_mem_bridge.reset := ddr_rst
+    ddr_mem_bridge.clock   := ddr_clk
+    ddr_mem_bridge.reset   := ddr_rst
     ddr_mem_axi_conv.clock := ddr_clk
     ddr_mem_axi_conv.reset := ddr_rst
 
@@ -347,17 +414,23 @@ class CoralNPUChiselSubsystem(val hostParams: Seq[bus.TLULParameters], val devic
     // 2. AXI Master 1 -> TLUL Host
     // Map IO [AXI] -> Bridge -> Xbar Port ["ispyocto_m1"]
     val ispAsyncPorts = io.async_ports_hosts("isp_axi_clk").asInstanceOf[ClockResetBundle]
-    val m1HostName = "ispyocto_m1"
-    val ispAxiParams = new Parameters
+    val m1HostName    = "ispyocto_m1"
+    val ispAxiParams  = new Parameters
     ispAxiParams.lsuDataBits = 64
 
     val axibm1 = withClockAndReset(ispAsyncPorts.clock, ispAsyncPorts.reset) {
-      Module(new Axi2TLUL(ispAxiParams, () => new OpenTitanTileLink_A_User, () => new OpenTitanTileLink_D_User))
+      Module(
+        new Axi2TLUL(
+          ispAxiParams.toTLUL(),
+          () => new OpenTitanTileLink_A_User,
+          () => new OpenTitanTileLink_D_User
+        )
+      )
     }
     axibm1.io.axi <> io.ispyocto_m1_axi
-    xbar.io.hosts(m1HostName).a.valid := axibm1.io.tl_a.valid
-    axibm1.io.tl_a.ready := xbar.io.hosts(m1HostName).a.ready
-    xbar.io.hosts(m1HostName).a.bits := axibm1.io.tl_a.bits
+    xbar.io.hosts(m1HostName).a.valid                := axibm1.io.tl_a.valid
+    axibm1.io.tl_a.ready                             := xbar.io.hosts(m1HostName).a.ready
+    xbar.io.hosts(m1HostName).a.bits                 := axibm1.io.tl_a.bits
     xbar.io.hosts(m1HostName).a.bits.user.instr_type := MuBi4.False.asUInt
     axibm1.io.tl_d <> xbar.io.hosts(m1HostName).d
 
@@ -366,12 +439,18 @@ class CoralNPUChiselSubsystem(val hostParams: Seq[bus.TLULParameters], val devic
     val m2HostName = "ispyocto_m2"
 
     val axibm2 = withClockAndReset(ispAsyncPorts.clock, ispAsyncPorts.reset) {
-      Module(new Axi2TLUL(ispAxiParams, () => new OpenTitanTileLink_A_User, () => new OpenTitanTileLink_D_User))
+      Module(
+        new Axi2TLUL(
+          ispAxiParams.toTLUL(),
+          () => new OpenTitanTileLink_A_User,
+          () => new OpenTitanTileLink_D_User
+        )
+      )
     }
     axibm2.io.axi <> io.ispyocto_m2_axi
-    xbar.io.hosts(m2HostName).a.valid := axibm2.io.tl_a.valid
-    axibm2.io.tl_a.ready := xbar.io.hosts(m2HostName).a.ready
-    xbar.io.hosts(m2HostName).a.bits := axibm2.io.tl_a.bits
+    xbar.io.hosts(m2HostName).a.valid                := axibm2.io.tl_a.valid
+    axibm2.io.tl_a.ready                             := xbar.io.hosts(m2HostName).a.ready
+    xbar.io.hosts(m2HostName).a.bits                 := axibm2.io.tl_a.bits
     xbar.io.hosts(m2HostName).a.bits.user.instr_type := MuBi4.False.asUInt
     axibm2.io.tl_d <> xbar.io.hosts(m2HostName).d
   }
@@ -391,64 +470,63 @@ object CoralNPUChiselSubsystemEmitter extends App {
   args.sliding(2, 1).foreach {
     case Array("--itcmSizeKBytes", size) => itcmSizeKBytes = size.toInt
     case Array("--dtcmSizeKBytes", size) => dtcmSizeKBytes = size.toInt
-    case _ =>
+    case _                               =>
   }
 
   val itcmSize = MemorySize.fromKBytes(itcmSizeKBytes)
   val dtcmSize = MemorySize.fromKBytes(dtcmSizeKBytes)
 
   val chiselArgs = args.filterNot(a =>
-      a.startsWith("--enableTestHarness") ||
-      a.startsWith("--itcmSizeKBytes") || a.toIntOption.isDefined && args(args.indexOf(a) - 1) == "--itcmSizeKBytes" ||
-      a.startsWith("--dtcmSizeKBytes") || a.toIntOption.isDefined && args(args.indexOf(a) - 1) == "--dtcmSizeKBytes" ||
-      a.startsWith("--target-dir="))
+    a.startsWith("--enableTestHarness") ||
+      a.startsWith("--itcmSizeKBytes") || a.toIntOption.isDefined && args(
+        args.indexOf(a) - 1
+      ) == "--itcmSizeKBytes" ||
+      a.startsWith("--dtcmSizeKBytes") || a.toIntOption.isDefined && args(
+        args.indexOf(a) - 1
+      ) == "--dtcmSizeKBytes" ||
+      a.startsWith("--target-dir=")
+  )
 
-  val hostParams = SoCChiselConfig(itcmSize, dtcmSize).crossbar.hosts(enableTestHarness).map {
-    host =>
-    val p = new Parameters
-    p.lsuDataBits = host.width
-    new bus.TLULParameters(p)
-  }
-  val deviceParams = SoCChiselConfig(itcmSize, dtcmSize).crossbar.devices.map {
-    device =>
-    val p = new Parameters
-    p.lsuDataBits = device.width
-    p.axi2IdBits = 10
-    new bus.TLULParameters(p)
+  val hostParams =
+    SoCChiselConfig(itcmSize, dtcmSize).crossbar.hosts(enableTestHarness).map { host =>
+      new bus.TLULParameters(dataBits = host.width, addrBits = 32, idBits = 6)
+    }
+  val deviceParams = SoCChiselConfig(itcmSize, dtcmSize).crossbar.devices.map { device =>
+    new bus.TLULParameters(dataBits = device.width, addrBits = 32, idBits = 10)
   }
 
   // Manually parse arguments to find the target directory.
   var targetDir: Option[String] = None
   args.foreach {
     case s if s.startsWith("--target-dir=") => targetDir = Some(s.stripPrefix("--target-dir="))
-    case "--enableTestHarness" => // Already handled by filterNot
-    case _ => // Ignore other arguments
+    case "--enableTestHarness"              => // Already handled by filterNot
+    case _                                  => // Ignore other arguments
   }
 
   // The subsystem module must be created in the ChiselStage context.
-  lazy val subsystem = new CoralNPUChiselSubsystem(hostParams, deviceParams, enableTestHarness, itcmSize, dtcmSize)
+  lazy val subsystem =
+    new CoralNPUChiselSubsystem(hostParams, deviceParams, enableTestHarness, itcmSize, dtcmSize)
 
   val firtoolOpts = Array(
-      // Disable `automatic logic =`, Suppress location comments
-      "--lowering-options=disallowLocalVariables,locationInfoStyle=none",
-      "-enable-layers=Verification",
+    // Disable `automatic logic =`, Suppress location comments
+    "--lowering-options=disallowLocalVariables,locationInfoStyle=none",
+    "-enable-layers=Verification"
   )
-  val systemVerilogSource = ChiselStage.emitSystemVerilog(
-    subsystem, chiselArgs.toArray, firtoolOpts)
+  val systemVerilogSource =
+    ChiselStage.emitSystemVerilog(subsystem, chiselArgs.toArray, firtoolOpts)
 
   // CIRCT adds extra data to the end of the file. Remove it.
   val resourcesSeparator =
-      "// ----- 8< ----- FILE \"firrtl_black_box_resource_files.f\" ----- 8< -----"
+    "// ----- 8< ----- FILE \"firrtl_black_box_resource_files.f\" ----- 8< -----"
   val strippedVerilogSource = systemVerilogSource.split(resourcesSeparator)(0)
 
   // Write the stripped Verilog to the target directory.
-  targetDir.foreach {
-    dir =>
-      Files.write(
-        Paths.get(dir, subsystem.name + ".sv"),
-        strippedVerilogSource.getBytes(StandardCharsets.UTF_8),
-        StandardOpenOption.CREATE,
-        StandardOpenOption.TRUNCATE_EXISTING)
+  targetDir.foreach { dir =>
+    Files.write(
+      Paths.get(dir, subsystem.name + ".sv"),
+      strippedVerilogSource.getBytes(StandardCharsets.UTF_8),
+      StandardOpenOption.CREATE,
+      StandardOpenOption.TRUNCATE_EXISTING
+    )
   }
 }
-

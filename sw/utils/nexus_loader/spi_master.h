@@ -19,7 +19,7 @@ constexpr uint8_t MPSSE_DISABLE_3PHASE_CLK = 0x8c;
 constexpr uint8_t MPSSE_ENABLE_3PHASE_CLK = 0x8d;
 
 constexpr uint8_t MPSSE_DO_WRITE_NVE_MSB = 0x11;
-constexpr uint8_t MPSSE_DO_READ_NVE_MSB = 0x35;
+constexpr uint8_t MPSSE_DO_READ_NVE_MSB = 0x24;
 
 constexpr uint8_t kDirMask = 0x0b;
 constexpr uint8_t kCsHigh = 0x08;
@@ -50,6 +50,7 @@ class SpiMaster {
   void v2_write_data(uint32_t addr, const uint8_t* data, size_t len);
   bool v2_read_data(uint32_t addr, size_t len, uint8_t* out);
   void write_word(uint32_t addr, uint32_t val);
+  void soft_reset();
   void device_reset();
 };
 

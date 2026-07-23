@@ -21,6 +21,20 @@ load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
 def coralnpu_repos():
     http_archive(
+        name = "uvm",
+        urls = ["https://github.com/chipsalliance/uvm-verilator/archive/5a37baacfed0722b523b05decc9b94fe3e9efbe4.tar.gz"],
+        sha256 = "2c5b24ac5d6527824ca62f30c0c6695e4779481ad835d84a9ad1da85300a1b27",
+        strip_prefix = "uvm-verilator-5a37baacfed0722b523b05decc9b94fe3e9efbe4",
+        build_file_content = """
+filegroup(
+    name = "uvm_src",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+""",
+    )
+
+    http_archive(
         name = "bazel_skylib",
         sha256 = "3b5b49006181f5f8ff626ef8ddceaa95e9bb8ad294f7b5d7b11ea9f7ddaf8c59",
         urls = [
@@ -48,9 +62,9 @@ def coralnpu_repos():
     http_archive(
         name = "rules_java",
         urls = [
-            "https://github.com/bazelbuild/rules_java/releases/download/7.12.5/rules_java-7.12.5.tar.gz",
+            "https://github.com/bazelbuild/rules_java/releases/download/8.14.0/rules_java-8.14.0.tar.gz",
         ],
-        sha256 = "17b18cb4f92ab7b94aa343ce78531b73960b1bed2ba166e5b02c9fdf0b0ac270",
+        sha256 = "bbe7d94360cc9ed4607ec5fd94995fd1ec41e84257020b6f09e64055281ecb12",
     )
 
     http_archive(
@@ -63,7 +77,6 @@ def coralnpu_repos():
     http_archive(
         name = "rules_pkg",
         urls = [
-            "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/1.2.0/rules_pkg-1.2.0.tar.gz",
             "https://github.com/bazelbuild/rules_pkg/releases/download/1.2.0/rules_pkg-1.2.0.tar.gz",
         ],
         sha256 = "b5c9184a23bb0bcff241981fd9d9e2a97638a1374c9953bb1808836ce711f990",
@@ -71,9 +84,9 @@ def coralnpu_repos():
 
     http_archive(
         name = "rules_proto",
-        urls = ["https://github.com/bazelbuild/rules_proto/archive/f7a30f6f80006b591fa7c437fe5a951eb10bcbcf.zip"],
-        sha256 = "a4382f78723af788f0bc19fd4c8411f44ffe0a72723670a34692ffad56ada3ac",
-        strip_prefix = "rules_proto-f7a30f6f80006b591fa7c437fe5a951eb10bcbcf",
+        urls = ["https://github.com/bazelbuild/rules_proto/releases/download/7.1.0/rules_proto-7.1.0.tar.gz"],
+        sha256 = "14a225870ab4e91869652cfd69ef2028277fc1dc4910d65d353b62d6e0ae21f4",
+        strip_prefix = "rules_proto-7.1.0",
     )
 
     http_archive(
@@ -87,9 +100,9 @@ def coralnpu_repos():
 
     http_archive(
         name = "pybind11_bazel",
-        urls = ["https://github.com/pybind/pybind11_bazel/releases/download/v2.11.1/pybind11_bazel-2.11.1.tar.gz"],
-        strip_prefix = "pybind11_bazel-2.11.1",
-        sha256 = "e8355ee56c2ff772334b4bfa22be17c709e5573f6d1d561c7176312156c27bd4",
+        urls = ["https://github.com/pybind/pybind11_bazel/releases/download/v2.13.6/pybind11_bazel-2.13.6.tar.gz"],
+        strip_prefix = "pybind11_bazel-2.13.6",
+        sha256 = "cae680670bfa6e82703c03f2a3c995408cdcbf43616d7bdd198ef45d3c327731",
     )
 
     http_archive(
@@ -105,7 +118,7 @@ def coralnpu_repos2():
 
     http_archive(
         name = "pybind11",
-        build_file = "@pybind11_bazel//:pybind11.BUILD",
+        build_file = "@pybind11_bazel//:pybind11-BUILD.bazel",
         strip_prefix = "pybind11-3.0.1",
         urls = ["https://github.com/pybind/pybind11/archive/v3.0.1.zip"],
         sha256 = "20fb420fe163d0657a262a8decb619b7c3101ea91db35f1a7227e67c426d4c7e",
@@ -137,6 +150,10 @@ def coralnpu_repos2():
             "@coralnpu_hw//third_party/rules_hdl:0011-Support-location-expansion-in-build-args.patch",
             "@coralnpu_hw//third_party/rules_hdl:0012-Fix-runfiles-collection-for-direct-files.patch",
             "@coralnpu_hw//third_party/rules_hdl:0013-Support-pre-compiled-VCS-models.patch",
+            "@coralnpu_hw//third_party/rules_hdl:0014-Remove-deprecated-path-attr-from-bison-filegroup.patch",
+            "@coralnpu_hw//third_party/rules_hdl:0015-Use-short_path-for-python-runfiles-resolution.patch",
+            "@coralnpu_hw//third_party/rules_hdl:0016-Add-V3AstNodeStmt-and-V3Dfg-gen-clone-cases-to-verilator.patch",
+            "@coralnpu_hw//third_party/rules_hdl:0017-Clean-up-WAVES-env-var-to-avoid-spurious-traces.patch",
         ],
         patch_args = ["-p1"],
     )
@@ -237,6 +254,7 @@ def cvfpu_repos():
             "@coralnpu_hw//third_party/cvfpu:0003-Fill-in-unreachable-state-in-fpnew_divsqrt_th_32-fsm.patch",
             "@coralnpu_hw//third_party/cvfpu:0004-Remove-ternary-operator-from-pkg-causing-dc-crash.patch",
             "@coralnpu_hw//third_party/cvfpu:0005-Fix-fsm-complete.patch",
+            "@coralnpu_hw//third_party/cvfpu:0006-Fix-syn-tool-compatibility-issues.patch",
         ],
         patch_args = ["-p1"],
     )
@@ -317,9 +335,9 @@ def tflite_repos():
 def mpact_repos():
     http_archive(
         name = "com_google_mpact-riscv",
-        sha256 = "b88d38251c716cd8cb6e9dbdd73161074924a3d40de18873d714eef98ad5529f",
-        strip_prefix = "mpact-riscv-cd69512240fb2957be2771aeb71fd994bac7b247",
-        url = "https://github.com/google/mpact-riscv/archive/cd69512240fb2957be2771aeb71fd994bac7b247.tar.gz",
+        sha256 = "38faef26745f34a82de0daf3b65a207c8d2ecf825f37484a4a27132512583574",
+        strip_prefix = "mpact-riscv-cb68bd4a2cb80dea24d9760dc6397b5854ea41bd",
+        url = "https://github.com/google/mpact-riscv/archive/cb68bd4a2cb80dea24d9760dc6397b5854ea41bd.tar.gz",
         patches = [
             "@coralnpu_hw//third_party:mpact-riscv-openat.patch",
         ],
@@ -328,9 +346,8 @@ def mpact_repos():
 
     http_archive(
         name = "coralnpu_mpact",
-        urls = ["https://github.com/google-coral/coralnpu-mpact/archive/a1d219efd49a36b8744af29df23ab06dd6c021c6.zip"],
-        sha256 = "23cf70ac2ca31f9c56fc140959298524d5db2f003fe4fdfe3552081048cbf934",
-        strip_prefix = "coralnpu-mpact-a1d219efd49a36b8744af29df23ab06dd6c021c6",
+        urls = ["https://github.com/google-coral/coralnpu-mpact/archive/e2a26e6d983f13d4c10875e4e5878a6171c04a06.zip"],
+        sha256 = "426328af9681929b262147538e61c7b6545bebf70e4db2d483c94d9613ac5909",
+        strip_prefix = "coralnpu-mpact-e2a26e6d983f13d4c10875e4e5878a6171c04a06",
         workspace_file = "@coralnpu_hw//third_party/coralnpu_mpact:WORKSPACE",
     )
-

@@ -35,11 +35,11 @@ package coralnpu_env_pkg;
     `uvm_component_utils(coralnpu_env)
 
     // Agent and Checker Handles
-    coralnpu_axi_master_agent m_master_agent; // Drives DUT Slave Port
+    coralnpu_axi_master_agent m_master_agent;  // Drives DUT Slave Port
     coralnpu_axi_slave_agent  m_slave_agent;  // Responds to DUT Master Port
-    coralnpu_irq_agent        m_irq_agent;    // Drives IRQ/Control Signals
-    coralnpu_rvvi_agent       m_rvvi_agent;   // Passive agent for RVVI
-    coralnpu_cosim_checker    m_cosim_checker; // Manages co-simulation against MPACT simulator
+    coralnpu_irq_agent        m_irq_agent;  // Drives IRQ/Control Signals
+    coralnpu_rvvi_agent       m_rvvi_agent;  // Passive agent for RVVI
+    coralnpu_cosim_checker    m_cosim_checker;  // Manages co-simulation against MPACT simulator
 
     // Constructor
     function new(string name = "coralnpu_env", uvm_component parent = null);

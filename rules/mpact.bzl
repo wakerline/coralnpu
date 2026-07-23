@@ -1,6 +1,7 @@
 """
 Transition rule to add CC=clang and -I. to the compile actions.
 """
+
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 
 def _clang_transition_impl(_settings, _attr):

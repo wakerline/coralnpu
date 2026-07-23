@@ -67,25 +67,25 @@ An external debugger communicates with the debug module by reading and writing a
 
 To write to an internal debug module register (e.g., writing `0x1` to `dmcontrol` at address `0x10`):
 
-1.  **Poll for readiness:** Read the `status` CSR at `0x31014` and wait for bit 0 to be `1`.
-2.  **Set address:** Write the target internal register address (`0x10`) to the `req_addr` CSR at `0x31000`.
-3.  **Set data:** Write the data (`0x1`) to the `req_data` CSR at `0x31004`.
-4.  **Initiate write:** Write the `WRITE` operation code (`2`) to the `req_op` CSR at `0x31008`.
-5.  **Poll for response:** Read the `status` CSR at `0x31014` and wait for bit 1 to be `1`.
-6.  **Check status:** Read the `rsp_op` CSR at `0x31010` to confirm the operation was successful.
-7.  **Acknowledge response:** Write to the `status` CSR at `0x31014` to clear the response.
+1. **Poll for readiness:** Read the `status` CSR at `0x31014` and wait for bit 0 to be `1`.
+2. **Set address:** Write the target internal register address (`0x10`) to the `req_addr` CSR at `0x31000`.
+3. **Set data:** Write the data (`0x1`) to the `req_data` CSR at `0x31004`.
+4. **Initiate write:** Write the `WRITE` operation code (`2`) to the `req_op` CSR at `0x31008`.
+5. **Poll for response:** Read the `status` CSR at `0x31014` and wait for bit 1 to be `1`.
+6. **Check status:** Read the `rsp_op` CSR at `0x31010` to confirm the operation was successful.
+7. **Acknowledge response:** Write to the `status` CSR at `0x31014` to clear the response.
 
 ### Read Operation
 
 To read from an internal debug module register (e.g., reading from `dmstatus` at address `0x11`):
 
-1.  **Poll for readiness:** Read the `status` CSR at `0x31014` and wait for bit 0 to be `1`.
-2.  **Set address:** Write the target internal register address (`0x11`) to the `req_addr` CSR at `0x31000`.
-3.  **Initiate read:** Write the `READ` operation code (`1`) to the `req_op` CSR at `0x31008`.
-4.  **Poll for response:** Read the `status` CSR at `0x31014` and wait for bit 1 to be `1`.
-5.  **Check status:** Read the `rsp_op` CSR at `0x31010` to confirm the operation was successful.
-6.  **Read data:** Read the result from the `rsp_data` CSR at `0x3100c`.
-7.  **Acknowledge response:** Write to the `status` CSR at `0x31014` to clear the response.
+1. **Poll for readiness:** Read the `status` CSR at `0x31014` and wait for bit 0 to be `1`.
+2. **Set address:** Write the target internal register address (`0x11`) to the `req_addr` CSR at `0x31000`.
+3. **Initiate read:** Write the `READ` operation code (`1`) to the `req_op` CSR at `0x31008`.
+4. **Poll for response:** Read the `status` CSR at `0x31014` and wait for bit 1 to be `1`.
+5. **Check status:** Read the `rsp_op` CSR at `0x31010` to confirm the operation was successful.
+6. **Read data:** Read the result from the `rsp_data` CSR at `0x3100c`.
+7. **Acknowledge response:** Write to the `status` CSR at `0x31014` to clear the response.
 
 ## AXI CSR Interface
 
@@ -177,28 +177,28 @@ The `control` field for the Access Register command is formatted as follows:
 
 The register numbers are defined as follows:
 
-*   `0x0000-0x0FFF`: CSRs
-*   `0x1000-0x101F`: Scalar GPRs
-*   `0x1020-0x103F`: Floating-point GPRs
+* `0x0000-0x0FFF`: CSRs
+* `0x1000-0x101F`: Scalar GPRs
+* `0x1020-0x103F`: Floating-point GPRs
 
 ## Command Examples
 
 ### Reading a GPR (a0)
 
-1.  **Issue the read command:** Write to the `command` register (address `0x17`) with the following value:
-    *   `cmdtype` (bits 31:24): `0x0` (Access Register)
-    *   `write` (bit 16): `0` (read)
-    *   `regno` (bits 15:0): `0x100A` (for `a0`)
-2.  **Wait for completion:** Poll the `abstractcs` register (address `0x16`) until the `busy` bit (bit 12) is cleared.
-3.  **Check for errors:** Read the `abstractcs` register again and check that the `cmderr` field (bits 10:8) is `0`.
-4.  **Read the result:** If there are no errors, read the value of GPR `a0` from the `data0` register (address `0x04`).
+1. **Issue the read command:** Write to the `command` register (address `0x17`) with the following value:
+  * `cmdtype` (bits 31:24): `0x0` (Access Register)
+  * `write` (bit 16): `0` (read)
+  * `regno` (bits 15:0): `0x100A` (for `a0`)
+2. **Wait for completion:** Poll the `abstractcs` register (address `0x16`) until the `busy` bit (bit 12) is cleared.
+3. **Check for errors:** Read the `abstractcs` register again and check that the `cmderr` field (bits 10:8) is `0`.
+4. **Read the result:** If there are no errors, read the value of GPR `a0` from the `data0` register (address `0x04`).
 
 ### Writing a GPR (a0)
 
-1.  **Write the value:** Write the desired value for GPR `a0` to the `data0` register (address `0x04`).
-2.  **Issue the write command:** Write to the `command` register (address `0x17`) with the following value:
-    *   `cmdtype` (bits 31:24): `0x0` (Access Register)
-    *   `write` (bit 16): `1` (write)
-    *   `regno` (bits 15:0): `0x100A` (for `a0`)
-3.  **Wait for completion:** Poll the `abstractcs` register (address `0x16`) until the `busy` bit (bit 12) is cleared.
-4.  **Check for errors:** Read the `abstractcs` register again and check that the `cmderr` field (bits 10:8) is `0`.
+1. **Write the value:** Write the desired value for GPR `a0` to the `data0` register (address `0x04`).
+2. **Issue the write command:** Write to the `command` register (address `0x17`) with the following value:
+  * `cmdtype` (bits 31:24): `0x0` (Access Register)
+  * `write` (bit 16): `1` (write)
+  * `regno` (bits 15:0): `0x100A` (for `a0`)
+3. **Wait for completion:** Poll the `abstractcs` register (address `0x16`) until the `busy` bit (bit 12) is cleared.
+4. **Check for errors:** Read the `abstractcs` register again and check that the `cmderr` field (bits 10:8) is `0`.

@@ -2,108 +2,58 @@ package bus
 
 import chisel3._
 import chisel3.util._
-import common.CoralNPURRArbiter
-import coralnpu.Parameters
-
-
-class TlulFifoSync_(p: TLULParameters,
-                    reqDepth: Int,
-                    rspDepth: Int,
-                    reqPass: Boolean,
-                    rspPass: Boolean,
-                    socketName: String)
-  extends TlulFifoSync(p, reqDepth, rspDepth, reqPass, rspPass) {
-  override val desiredName = s"${socketName}_TlulFifoSync_d${reqDepth}r${rspDepth}"
-}
-
-
 
 class TlulSocketM1(
-    p: TLULParameters,
-    M: Int = 4,
-    HReqPass: Seq[Boolean] = Nil,
-    HRspPass: Seq[Boolean] = Nil,
-    HReqDepth: Seq[Int] = Nil,
-    HRspDepth: Seq[Int] = Nil,
-    DReqPass: Boolean = true,
-    DRspPass: Boolean = true,
-    DReqDepth: Int = 1,
-    DRspDepth: Int = 1,
-    moduleName: String = "TlulSocketM1"
+  p: TLULParameters,
+  M: Int = 4,
+  HReqPass: Seq[Boolean] = Nil,
+  HRspPass: Seq[Boolean] = Nil,
+  HReqDepth: Seq[Int] = Nil,
+  HRspDepth: Seq[Int] = Nil,
+  DReqPass: Boolean = true,
+  DRspPass: Boolean = true,
+  DReqDepth: Int = 1,
+  DRspDepth: Int = 1,
+  moduleName: String = "TlulSocketM1"
 ) extends Module {
-  val HReqPass_ = if (HReqPass.isEmpty) Seq.fill(M)(true) else HReqPass
-  val HRspPass_ = if (HRspPass.isEmpty) Seq.fill(M)(true) else HRspPass
-  val HReqDepth_ = if (HReqDepth.isEmpty) Seq.fill(M)(1) else HReqDepth
-  val HRspDepth_ = if (HRspDepth.isEmpty) Seq.fill(M)(1) else HRspDepth
   override val desiredName = moduleName
-  val StIdW = log2Ceil(M)
+  val StIdW                = log2Ceil(M)
+
+  // 1. Define device-side parameters (augmented source ID width)
+  val p_d = p.augmentId(StIdW)
 
   val io = IO(new Bundle {
     val tl_h = Flipped(Vec(M, new OpenTitanTileLink.Host2Device(p)))
-    val tl_d = new OpenTitanTileLink.Host2Device(p)
+    val tl_d = new OpenTitanTileLink.Host2Device(p_d)
   })
 
-  // Host-side FIFOs
-  val hreq_fifo_o = Wire(Vec(M, Decoupled(new OpenTitanTileLink.A_Channel(p))))
-  val hrsp_fifo_i = Wire(Vec(M, Flipped(Decoupled(new OpenTitanTileLink.D_Channel(p)))))
-
-  for (i <- 0 until M) {
-    val hreq_fifo_i = Wire(new OpenTitanTileLink.A_Channel(p))
-    hreq_fifo_i := io.tl_h(i).a.bits
-    hreq_fifo_i.source := Cat(io.tl_h(i).a.bits.source, i.U(StIdW.W))
-
-    val fifo = Module(new TlulFifoSync_(
-      p,
-      reqDepth = HReqDepth_(i),
-      rspDepth = HRspDepth_(i),
-      reqPass = HReqPass_(i),
-      rspPass = HRspPass_(i),
-      socketName = moduleName
-    ))
-    fifo.io.host.a.valid := io.tl_h(i).a.valid
-    fifo.io.host.a.bits := hreq_fifo_i
-    io.tl_h(i).a.ready := fifo.io.host.a.ready
-
-    hreq_fifo_o(i) <> fifo.io.device.a
-
-    io.tl_h(i).d <> fifo.io.host.d
-    fifo.io.device.d <> hrsp_fifo_i(i)
-
-    fifo.io.spare_req_i := 0.U
-    fifo.io.spare_rsp_i := 0.U
+  // 2. Combinational Request Path (A-Channel)
+  val augmented_hosts = (0 until M).map { i =>
+    TlulAccessors.augment(io.tl_h(i), i.U(StIdW.W))
   }
 
-  // Arbiter
-  val arb = Module(new CoralNPURRArbiter(new OpenTitanTileLink.A_Channel(p), M, moduleName = Some(s"${moduleName}_CoralNPURRArbiter_${M}")))
+  // Arbiter selects one request combinationally
+  val arb = Module(new Arbiter(new OpenTitanTileLink.A_Channel(p_d), M))
   for (i <- 0 until M) {
-    arb.io.in(i) <> hreq_fifo_o(i)
+    arb.io.in(i) <> augmented_hosts(i).a
   }
 
-  // Device-side FIFO
-  val dfifo = Module(new TlulFifoSync_(
-    p,
-    reqDepth = DReqDepth,
-    rspDepth = DRspDepth,
-    reqPass = DReqPass,
-    rspPass = DRspPass,
-    socketName = moduleName
-  ))
+  // Drive device request directly (0 latency)
+  io.tl_d.a <> arb.io.out
 
-  dfifo.io.host.a <> arb.io.out
-  io.tl_d.a <> dfifo.io.device.a
-  dfifo.io.device.d <> io.tl_d.d
-  dfifo.io.spare_req_i := 0.U
-  dfifo.io.spare_rsp_i := 0.U
+  // 3. Combinational Response Path (D-Channel)
+  // Response steering based purely on the returning source ID
+  val rsp_valid  = io.tl_d.d.valid
+  val rsp_bits   = io.tl_d.d.bits
+  val host_index = rsp_bits.source(StIdW - 1, 0)
 
-  // Response steering
-  val rsp_arb_grant = Mux(io.tl_d.d.valid, UIntToOH(io.tl_d.d.bits.source(StIdW - 1, 0)), 0.U(M.W))
   for (i <- 0 until M) {
-    hrsp_fifo_i(i).valid := io.tl_d.d.valid && rsp_arb_grant(i)
-    hrsp_fifo_i(i).bits := io.tl_d.d.bits
-    hrsp_fifo_i(i).bits.source := io.tl_d.d.bits.source >> StIdW
+    augmented_hosts(i).d.valid := rsp_valid && (host_index === i.U)
+    augmented_hosts(i).d.bits  := rsp_bits
   }
-  io.tl_d.d.ready := (VecInit(hrsp_fifo_i.map(_.ready)).asUInt & rsp_arb_grant).orR
-  dfifo.io.host.d.ready := (VecInit(hrsp_fifo_i.map(_.ready)).asUInt & rsp_arb_grant).orR
+
+  // Combine ready signals back to device D-channel
+  io.tl_d.d.ready := VecInit(augmented_hosts.map(_.d.ready))(host_index)
 }
 
 import _root_.circt.stage.{ChiselStage, FirtoolOption}
@@ -112,14 +62,13 @@ import scala.annotation.nowarn
 
 @nowarn
 object TlulSocketM1_2_128Emitter extends App {
-  val p = new Parameters
-  p.lsuDataBits = 128
+  val tlul_p = new TLULParameters(dataBits = 128, addrBits = 32, idBits = 6)
   (new ChiselStage).execute(
     Array("--target", "systemverilog") ++ args,
     Seq(
       ChiselGeneratorAnnotation(() =>
         new TlulSocketM1(
-          p = new bus.TLULParameters(p),
+          p = tlul_p,
           M = 2,
           HReqDepth = Seq.fill(2)(0),
           HRspDepth = Seq.fill(2)(0),
@@ -134,14 +83,13 @@ object TlulSocketM1_2_128Emitter extends App {
 
 @nowarn
 object TlulSocketM1_3_128Emitter extends App {
-  val p = new Parameters
-  p.lsuDataBits = 128
+  val tlul_p = new TLULParameters(dataBits = 128, addrBits = 32, idBits = 6)
   (new ChiselStage).execute(
     Array("--target", "systemverilog") ++ args,
     Seq(
       ChiselGeneratorAnnotation(() =>
         new TlulSocketM1(
-          p = new bus.TLULParameters(p),
+          p = tlul_p,
           M = 3,
           HReqDepth = Seq.fill(3)(0),
           HRspDepth = Seq.fill(3)(0),

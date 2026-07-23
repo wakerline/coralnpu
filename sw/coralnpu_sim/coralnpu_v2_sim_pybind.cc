@@ -21,18 +21,19 @@
 
 #include "absl/log/log.h"
 #include "absl/status/status.h"
-#include "sim/coralnpu_v2_simulator.h"
+#include "sim/coralnpu_simulator.h"
 
-using coralnpu::sim::CoralNPUV2LsuAccessRange;
-using coralnpu::sim::CoralNPUV2Simulator;
-using coralnpu::sim::CoralNPUV2SimulatorOptions;
+using coralnpu::sim::CoralNPUV2MemoryRegion;
+using coralnpu::sim::CoralNPUSimulator;
+using coralnpu::sim::CoralNPUSimulatorOptions;
+using coralnpu::sim::MemoryPermission;
 
 namespace py = pybind11;
 
 class CoralNPUV2SimulatorPy {
  public:
   explicit CoralNPUV2SimulatorPy(
-      const coralnpu::sim::CoralNPUV2SimulatorOptions& options);
+      const coralnpu::sim::CoralNPUSimulatorOptions& options);
   ~CoralNPUV2SimulatorPy() = default;
 
   void LoadProgram(const std::string& elf_file_path,
@@ -53,7 +54,7 @@ class CoralNPUV2SimulatorPy {
   void WritePtr(uint64_t address, uint64_t ptr_address);
 
  private:
-  coralnpu::sim::CoralNPUV2Simulator sim_;
+  coralnpu::sim::CoralNPUSimulator sim_;
 };
 
 void CoralNPUV2SimulatorPy::LoadProgram(const std::string& elf_file_path,
@@ -197,33 +198,45 @@ py::array_t<uint8_t> CoralNPUV2SimulatorPy::ReadMemory(uint64_t address,
 }
 
 CoralNPUV2SimulatorPy::CoralNPUV2SimulatorPy(
-    const coralnpu::sim::CoralNPUV2SimulatorOptions& options)
+    const coralnpu::sim::CoralNPUSimulatorOptions& options)
     : sim_(options) {}
 
 PYBIND11_MODULE(coralnpu_v2_sim_pybind, module) {
   module.doc() =
-      "This module is created with pybind wrap on coralnpu-v2-simulator";
-  py::class_<CoralNPUV2LsuAccessRange>(module, "CoralNPUV2LsuAccessRange")
-      .def(py::init<>())
-      .def_readwrite("start_address", &CoralNPUV2LsuAccessRange::start_address)
-      .def_readwrite("length", &CoralNPUV2LsuAccessRange::length);
+      "This module is created with pybind wrap on coralnpu simulator";
 
-  py::class_<CoralNPUV2SimulatorOptions>(module, "CoralNPUV2SimulatorOptions")
+  py::enum_<MemoryPermission>(module, "MemoryPermission")
+      .value("kNone", MemoryPermission::kNone)
+      .value("kRead", MemoryPermission::kRead)
+      .value("kWrite", MemoryPermission::kWrite)
+      .value("kExecute", MemoryPermission::kExecute)
+      .value("kReadWrite", MemoryPermission::kReadWrite)
+      .value("kReadExecute", MemoryPermission::kReadExecute)
+      .value("kReadWriteExecute", MemoryPermission::kReadWriteExecute)
+      .export_values();
+
+  py::class_<CoralNPUV2MemoryRegion>(module, "CoralNPUV2MemoryRegion")
+      .def(py::init<>())
+      .def_readwrite("start_address", &CoralNPUV2MemoryRegion::start_address)
+      .def_readwrite("length", &CoralNPUV2MemoryRegion::length)
+      .def_readwrite("permissions", &CoralNPUV2MemoryRegion::permissions);
+
+  py::class_<CoralNPUSimulatorOptions>(module, "CoralNPUSimulatorOptions")
       .def(py::init<>())
       .def_readwrite("itcm_start_address",
-                     &CoralNPUV2SimulatorOptions::itcm_start_address)
-      .def_readwrite("itcm_length", &CoralNPUV2SimulatorOptions::itcm_length)
+                     &CoralNPUSimulatorOptions::itcm_start_address)
+      .def_readwrite("itcm_length", &CoralNPUSimulatorOptions::itcm_length)
       .def_readwrite("initial_misa_value",
-                     &CoralNPUV2SimulatorOptions::initial_misa_value)
-      .def_readwrite("lsu_access_ranges",
-                     &CoralNPUV2SimulatorOptions::lsu_access_ranges)
+                     &CoralNPUSimulatorOptions::initial_misa_value)
+      .def_readwrite("memory_regions",
+                     &CoralNPUSimulatorOptions::memory_regions)
       .def_readwrite("exit_on_ebreak",
-                     &CoralNPUV2SimulatorOptions::exit_on_ebreak)
+                     &CoralNPUSimulatorOptions::exit_on_ebreak)
       .def_readwrite("semihost_htif",
-                     &CoralNPUV2SimulatorOptions::semihost_htif);
+                     &CoralNPUSimulatorOptions::semihost_htif);
 
-  py::class_<CoralNPUV2SimulatorPy>(module, "CoralNPUV2SimulatorPy")
-      .def(py::init<const CoralNPUV2SimulatorOptions>())
+  py::class_<CoralNPUV2SimulatorPy>(module, "CoralNPUSimulatorPy")
+      .def(py::init<const CoralNPUSimulatorOptions>())
       .def("LoadProgram", &CoralNPUV2SimulatorPy::LoadProgram,
            py::arg("elf_file_path"), py::arg("entry_point"), "loads elf")
       .def("Run", &CoralNPUV2SimulatorPy::Run, "runs the program")

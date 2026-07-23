@@ -26,14 +26,14 @@ object IDiv {
   }
 
   val Stages = 4
-  val Rcnt = 32 / Stages
+  val Rcnt   = 32 / Stages
 }
 
 case class IDivOp() {
-  val DIV  = 0
-  val DIVU = 1
-  val REM  = 2
-  val REMU = 3
+  val DIV     = 0
+  val DIVU    = 1
+  val REM     = 2
+  val REMU    = 3
   val Entries = 4
 }
 
@@ -49,28 +49,28 @@ class IDiv(n: Int) extends Module {
 
   val active = RegInit(false.B)
   val result = RegInit(false.B)
-  val count = Reg(UInt(6.W))
+  val count  = Reg(UInt(6.W))
 
   val state = Reg(Vec(n, new IDivState()))
 
   val ivalid = io.ina.valid && io.ina.ready && io.inb.valid && io.inb.ready
   val ovalid = io.out.valid && io.out.ready
 
-  when (ivalid) {
+  when(ivalid) {
     active := true.B
-  } .elsewhen (active && count === IDiv.Rcnt.U) {
+  }.elsewhen(active && count === IDiv.Rcnt.U) {
     active := false.B
   }
 
-  when (ovalid) {
+  when(ovalid) {
     result := false.B
-  } .elsewhen (active && count === IDiv.Rcnt.U) {
+  }.elsewhen(active && count === IDiv.Rcnt.U) {
     result := true.B
   }
 
-  when (ivalid) {
+  when(ivalid) {
     count := 0.U
-  } .elsewhen (active) {
+  }.elsewhen(active) {
     count := count + 1.U
   }
 
@@ -78,11 +78,11 @@ class IDiv(n: Int) extends Module {
     val ina = io.ina.bits(i)
     val inb = io.inb.bits(i)
 
-    when (ivalid) {
+    when(ivalid) {
       val divide = io.req(dvu.DIV) || io.req(dvu.DIVU)
       val signed = io.req(dvu.DIV) || io.req(dvu.REM)
       state(i) := IDivComb1(ina, inb, signed, divide)
-    } .elsewhen (active) {
+    }.elsewhen(active) {
       state(i) := IDivComb2(state(i), count)
     }
   }
@@ -98,11 +98,11 @@ class IDiv(n: Int) extends Module {
 }
 
 class IDivState extends Bundle {
-  val denom = UInt(32.W)  // output is placed first
+  val denom  = UInt(32.W) // output is placed first
   val divide = UInt(32.W)
   val remain = UInt(32.W)
-  val opdiv = Bool()
-  val opneg = Bool()
+  val opdiv  = Bool()
+  val opneg  = Bool()
 }
 
 object IDivComb1 {
@@ -110,13 +110,13 @@ object IDivComb1 {
     val out = Wire(new IDivState())
 
     val divByZero = inb === 0.U
-    val divsign = signed && (ina(31) =/= inb(31)) && !divByZero
-    val remsign = signed && ina(31)
-    val inp = Mux(signed && ina(31), ~ina + 1.U, ina)
+    val divsign   = signed && (ina(31) =/= inb(31)) && !divByZero
+    val remsign   = signed && ina(31)
+    val inp       = Mux(signed && ina(31), ~ina + 1.U, ina)
 
-    out.opdiv := divide
-    out.opneg := Mux(divide, divsign, remsign)
-    out.denom := Mux(signed && inb(31), ~inb + 1.U, inb)
+    out.opdiv  := divide
+    out.opneg  := Mux(divide, divsign, remsign)
+    out.denom  := Mux(signed && inb(31), ~inb + 1.U, inb)
     out.divide := inp
     out.remain := 0.U
 
@@ -129,7 +129,7 @@ object IDivComb2 {
     val out = Wire(new IDivState())
     out := in
 
-    when (count < IDiv.Rcnt.U) {
+    when(count < IDiv.Rcnt.U) {
       val (div1, rem1) = Divide(in.divide, in.remain, in.denom)
       if (IDiv.Stages == 1) {
         out.divide := div1
@@ -147,7 +147,7 @@ object IDivComb2 {
       } else {
         assert(false)
       }
-    } .otherwise {
+    }.otherwise {
       val div = Mux(in.opneg, ~in.divide + 1.U, in.divide)
       val rem = Mux(in.opneg, ~in.remain + 1.U, in.remain)
       out.denom := Mux(in.opdiv, div, rem)
@@ -157,17 +157,17 @@ object IDivComb2 {
   }
 
   def Divide(prvDivide: UInt, prvRemain: UInt, denom: UInt): (UInt, UInt) = {
-    val shfRemain = Cat(prvRemain(30,0), prvDivide(31))
-    val subtract = shfRemain -& denom
+    val shfRemain = Cat(prvRemain(30, 0), prvDivide(31))
+    val subtract  = shfRemain -& denom
     assert(subtract.getWidth == 33)
     val divDivide = Wire(UInt(32.W))
     val divRemain = Wire(UInt(32.W))
 
-    when (!subtract(32)) {
-      divDivide := Cat(prvDivide(30,0), 1.U(1.W))
-      divRemain := subtract(31,0)
-    } .otherwise {
-      divDivide := Cat(prvDivide(30,0), 0.U(1.W))
+    when(!subtract(32)) {
+      divDivide := Cat(prvDivide(30, 0), 1.U(1.W))
+      divRemain := subtract(31, 0)
+    }.otherwise {
+      divDivide := Cat(prvDivide(30, 0), 0.U(1.W))
       divRemain := shfRemain
     }
 

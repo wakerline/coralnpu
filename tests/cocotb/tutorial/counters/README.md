@@ -12,8 +12,9 @@ processor has executed since reset.
 Instruction Retirement Counter (minstret/minstreth): Tracks the total number of
 instructions retired (successfully completed) by the processor.
 
-Cycles and instructions are read from registers via assembly interface for example
-```
+Cycles and instructions are read from registers via assembly interface for example:
+
+```c
 read cycles and store.
 
 asm volatile(
@@ -25,12 +26,12 @@ asm volatile(
       : "=r"(cycle_high), "=r"(cycle_low), "=r"(cycle_high_2)
       :);
 
-```c
+```
 
 Refer to sw/utils/utils.h cycle read and reset definition. Pseudo code to read
 cycles and instructions below.
 
-```
+```c
 cycle_counter_reset();
 cycle_start = mcycle_read();
 // define compute workload to be measured
@@ -39,10 +40,10 @@ uint64_t cycle_count = cycle_end - cycle_start;
 // store cycle_count to a buffer.
 // A similar steps above can used to read number of instructions using
 // instrut_counter_reset() minstret_read()
-```c
+```
 
 ## Run the example
 
+```bash
+bazel run -c opt tests/cocotb/tutorial/counters:cocotb_counter_test
 ```
-$ bazel run -c opt tests/cocotb/tutorial/counters:cocotb_counter_test
-```c

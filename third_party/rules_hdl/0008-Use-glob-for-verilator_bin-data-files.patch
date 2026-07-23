@@ -1,24 +1,18 @@
-From 0a186a8b4047de3aad53993f30754b19f8d14127 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Alex Van Damme <atv@google.com>
-Date: Mon, 2 Mar 2026 00:27:01 +0000
-Subject: [PATCH] Use glob for verilator_bin data files
+Date: Mon, 29 Jun 2026 18:54:23 +0000
+Subject: [PATCH 08/16] Apply patch 0008
 
-Replace the explicit file list in verilator_bin's data attribute with a
-glob to automatically include all verilator include files. This ensures
-newer verilator versions' files (like verilated_std_waiver.vlt) are
-available without needing to enumerate each one.
-
-Generated files (verilated.mk, verilated_config.h) are kept explicit since
-glob only matches source files.
 ---
  .../verilator/verilator.BUILD.bazel           | 39 ++++---------------
  1 file changed, 7 insertions(+), 32 deletions(-)
 
 diff --git a/dependency_support/verilator/verilator.BUILD.bazel b/dependency_support/verilator/verilator.BUILD.bazel
-index 707d8ed..a8604a8 100644
+index cdb96d7..40aa488 100644
 --- a/dependency_support/verilator/verilator.BUILD.bazel
 +++ b/dependency_support/verilator/verilator.BUILD.bazel
-@@ -1,36 +1,11 @@
+@@ -444,40 +444,15 @@ cc_binary(
+     deps = [":verilator_libV3"],
      data = [
          "bin/verilator_includer",
 -        "include/verilated.cpp",
@@ -62,6 +56,6 @@ index 707d8ed..a8604a8 100644
 +        "include/**/*.sv",
 +        "include/**/*.vlt",
 +    ]),
--- 
-2.39.5
-
+ )
+ 
+ sh_binary(

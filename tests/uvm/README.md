@@ -6,6 +6,7 @@ verifying the `RvvCoreMiniVerificationAxi` DUT.
 ## Overview
 
 This testbench provides a basic UVM environment to:
+
 * Instantiate the `RvvCoreMiniVerificationAxi` DUT.
 * Connect AXI Master, AXI Slave, and IRQ interfaces to the DUT.
 * Provide basic stimulus generation via UVM sequences.
@@ -34,25 +35,26 @@ This testbench provides a basic UVM environment to:
 
 The test program run by the DUT needs to be compiled to an elf format.
 
-1.  Navigate to the CoralNPU HW repository root:
-    ```bash
-    cd /path/to/your/coralnpu/hw/repo
-    ```
-2.  Run the Bazel build command to compile the test program:
-    ```bash
-    bazel build //tests/cocotb/tutorial:coralnpu_v2_program
-    ```
-3.  The `coralnpu_v2_program.elf` file is generated in the bazel output
-    directory.
-4.  Copy this `coralnpu_v2_program.elf` file to the `bin/` directory of this
-    UVM testbench structure (or update the `TEST_ELF` path in the `Makefile` or
-    run command).
+1. Navigate to the CoralNPU HW repository root:
+
+   ```bash
+   cd /path/to/your/coralnpu/hw/repo
+   ```
+
+2. Run the Bazel build command to compile the test program:
+
+   ```bash
+   bazel build //tests/cocotb/tutorial:coralnpu_v2_program
+   ```
+
+3. The `coralnpu_v2_program.elf` file is generated in the bazel output directory.
+4. Copy this `coralnpu_v2_program.elf` file to the `bin/` directory of this UVM testbench structure (or update the `TEST_ELF` path in the `Makefile` or run command).
 
 ## Directory Structure
 
 The testbench follows a standard UVM directory structure:
 
-```
+```text
 .
 ├── common/                  # Common components
 │   ├── coralnpu_axi_master/ # Files related to the TB acting as AXI Master
@@ -86,43 +88,47 @@ The provided `Makefile` simplifies the compilation and simulation process.
 
 * **Command:** `make compile`
 * **Action:**
-    * Creates necessary directories (`sim_work`, `logs`, `waves`).
-    * Generates the DUT Verilog from Chisel sources.
-    * Builds the MPACT co-simulation C++ library.
-    * Compiles the DUT and testbench SystemVerilog files using VCS based on `coralnpu_dv.f`.
-    * Creates the `sim_work/simv` executable.
-*   Users should run `make compile` whenever modifying SystemVerilog (`.sv`),
-    Chisel (`.scala`), or C++ (`.cpp`) source files that are part of the
-    DUT or testbench.
+  * Creates necessary directories (`sim_work`, `logs`, `waves`).
+  * Generates the DUT Verilog from Chisel sources.
+  * Builds the MPACT co-simulation C++ library.
+  * Compiles the DUT and testbench SystemVerilog files using VCS based on `coralnpu_dv.f`.
+  * Creates the `sim_work/simv` executable.
+* Users should run `make compile` whenever modifying SystemVerilog (`.sv`),
+  Chisel (`.scala`), or C++ (`.cpp`) source files that are part of the
+  DUT or testbench.
 * **Expected Output:**
-    ```
-    --- Checking MPACT-Sim Co-sim Library dependencies ---
-    --- Checking RTL source dependencies ---
-    --- Compiling with VCS ---
-    Chronologic VCS simulator copyright 1991-202X
-    Contains Synopsys proprietary information.
-    Compiler version ...
-    ... (VCS compilation messages) ...
-    Top Level Modules:
-            coralnpu_tb_top
-    TimeScale is 1ns / 1ps
-    --- Compilation Finished ---
-    ```
-    Check `sim_work/logs/compile.log` for detailed messages and errors.
+
+  ```text
+  --- Checking MPACT-Sim Co-sim Library dependencies ---
+  --- Checking RTL source dependencies ---
+  --- Compiling with VCS ---
+  Chronologic VCS simulator copyright 1991-202X
+  Contains Synopsys proprietary information.
+  Compiler version ...
+  ... (VCS compilation messages) ...
+  Top Level Modules:
+          coralnpu_tb_top
+  TimeScale is 1ns / 1ps
+  --- Compilation Finished ---
+  ```
+
+  Check `sim_work/logs/compile.log` for detailed messages and errors.
 
 **2. Running the Simulation:**
 
 * **Command (Default Test):** `make run`
-    * Runs the default test (`coralnpu_base_test`) defined in the Makefile.
-    * Uses the default program (`bin/program.elf`).
-    * Uses `UVM_MEDIUM` verbosity.
+  * Runs the default test (`coralnpu_base_test`) defined in the Makefile.
+  * Uses the default program (`bin/program.elf`).
+  * Uses `UVM_MEDIUM` verbosity.
 * **Command (Specific Test & Binary):**
-    ```bash
-    make run UVM_TESTNAME=<your_specific_test> \
-             TEST_ELF=/path/to/another.elf \
-             UVM_VERBOSITY=UVM_HIGH
-    ```
-    * Overrides the default test name, binary path, and verbosity level.
+
+  ```bash
+  make run UVM_TESTNAME=<your_specific_test> \
+            TEST_ELF=/path/to/another.elf \
+            UVM_VERBOSITY=UVM_HIGH
+  ```
+
+  * Overrides the default test name, binary path, and verbosity level.
 * **Action:**
   * Generates memory initialization files (`.mem`) and runtime options
     (`elf_run_opts.f`) from the specified `TEST_ELF` (this always runs).
@@ -131,6 +137,7 @@ The provided `Makefile` simplifies the compilation and simulation process.
     finished, or when only the `TEST_ELF` file changes and recompilation
     is not needed.
 * **Expected Output:**
+
     ```
     --- Running Simulation ---
     Test:      coralnpu_base_test
@@ -156,10 +163,11 @@ The provided `Makefile` simplifies the compilation and simulation process.
         [coralnpu_base_test] ** UVM TEST PASSED **
     --- Simulation Finished ---
     ```
-    * Look for the `** UVM TEST PASSED **` or `** UVM TEST FAILED **` message
-      at the end of the simulation log (`sim_work/logs/<testname>.log`).
-    * If enabled, a waveform file (`sim_work/waves/<testname>.fsdb`) will be
-      generated.
+
+  * Look for the `** UVM TEST PASSED **` or `** UVM TEST FAILED **` message
+    at the end of the simulation log (`sim_work/logs/<testname>.log`).
+  * If enabled, a waveform file (`sim_work/waves/<testname>.fsdb`) will be
+    generated.
 
 **3. Combined Compile and Run:**
 
@@ -175,6 +183,7 @@ The provided `Makefile` simplifies the compilation and simulation process.
   files (`simv`, `csrc`, logs, waveforms, etc.). It also cleans Bazel
   caches for the MPACT library and generated RTL.
 * **Expected Output:**
+
     ```
     --- Cleaning Simulation Files ---
     rm -rf sim_work simv* csrc* *.log* *.key *.vpd *.fsdb ucli.key DVEfiles/ \

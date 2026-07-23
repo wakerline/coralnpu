@@ -80,13 +80,13 @@ class CircularBufferMultiSpec extends AnyFreeSpec with ChiselSim {
       // Fill buffer completely
       for (writeCount <- 0 until 4) {
         for (nIndex <- 0 until 4) {
-          val indata = writeCount*4 + nIndex
+          val indata = writeCount * 4 + nIndex
           dut.io.enqData(nIndex).poke(indata)
         }
         dut.io.enqValid.poke(4)
         dut.clock.step()
         // Confirm nEnqueued increments the amount corresponding to #enqValid each cycle
-        dut.io.nEnqueued.expect((writeCount+1)*4)
+        dut.io.nEnqueued.expect((writeCount + 1) * 4)
       }
     }
   }
@@ -99,7 +99,7 @@ class CircularBufferMultiSpec extends AnyFreeSpec with ChiselSim {
       // Fill buffer completely
       for (writeCount <- 0 until 4) {
         for (nIndex <- 0 until 4) {
-          val indata = writeCount*4 + nIndex
+          val indata = writeCount * 4 + nIndex
           dut.io.enqData(nIndex).poke(indata)
         }
         dut.io.enqValid.poke(4)
@@ -111,7 +111,7 @@ class CircularBufferMultiSpec extends AnyFreeSpec with ChiselSim {
       // Empty buffer completely
       for (writeCount <- 0 until 4) {
         for (nIndex <- 0 until 4) {
-          val outdata = writeCount*4 + nIndex
+          val outdata = writeCount * 4 + nIndex
           dut.io.dataOut(nIndex).expect(outdata)
         }
         dut.io.deqReady.poke(4)
@@ -130,7 +130,7 @@ class CircularBufferMultiSpec extends AnyFreeSpec with ChiselSim {
       // Use 4x transactions of n=4 items to fill up to size 16, incrementing each transaction
       for (writeCount <- 0 until 4) {
         for (nIndex <- 0 until 4) {
-          val indata = writeCount*4 + nIndex
+          val indata = writeCount * 4 + nIndex
           dut.io.enqData(nIndex).poke(indata)
         }
         dut.io.enqValid.poke(4)
@@ -142,7 +142,7 @@ class CircularBufferMultiSpec extends AnyFreeSpec with ChiselSim {
       // Remove 4x items
       for (writeCount <- 0 until 1) {
         for (nIndex <- 0 until 4) {
-          val outdata = writeCount*4 + nIndex
+          val outdata = writeCount * 4 + nIndex
           dut.io.dataOut(nIndex).expect(outdata)
         }
         dut.io.deqReady.poke(4)
@@ -154,7 +154,7 @@ class CircularBufferMultiSpec extends AnyFreeSpec with ChiselSim {
       // Add back n=4 items
       for (writeCount <- 4 until 5) {
         for (nIndex <- 0 until 4) {
-          val indata = writeCount*4 + nIndex
+          val indata = writeCount * 4 + nIndex
           dut.io.enqData(nIndex).poke(indata)
         }
         dut.io.enqValid.poke(4)
@@ -165,7 +165,7 @@ class CircularBufferMultiSpec extends AnyFreeSpec with ChiselSim {
       // Remove 4x items
       for (writeCount <- 1 until 2) {
         for (nIndex <- 0 until 4) {
-          val outdata = writeCount*4 + nIndex
+          val outdata = writeCount * 4 + nIndex
           dut.io.dataOut(nIndex).expect(outdata)
         }
         dut.io.deqReady.poke(4)
@@ -183,7 +183,7 @@ class CircularBufferMultiSpec extends AnyFreeSpec with ChiselSim {
       // Fill buffer completely and flush
       for (writeCount <- 0 until 4) {
         for (nIndex <- 0 until 4) {
-          val indata = writeCount*4 + nIndex
+          val indata = writeCount * 4 + nIndex
           dut.io.enqData(nIndex).poke(indata)
         }
         dut.io.enqValid.poke(4)
@@ -202,7 +202,7 @@ class CircularBufferMultiSpec extends AnyFreeSpec with ChiselSim {
       // Add 4x items and flush
       for (writeCount <- 0 until 1) {
         for (nIndex <- 0 until 4) {
-          val indata = writeCount*4 + nIndex
+          val indata = writeCount * 4 + nIndex
           dut.io.enqData(nIndex).poke(indata)
         }
         dut.io.enqValid.poke(4)
@@ -217,8 +217,8 @@ class CircularBufferMultiSpec extends AnyFreeSpec with ChiselSim {
       dut.clock.step()
       dut.io.nEnqueued.expect(0)
       dut.io.flush.poke(false)
-      }
     }
+  }
 
   "Read and Write Buffer on Same Cycle" in {
     simulate(new CircularBufferMulti(UInt(32.W), 4, 16)) { dut =>
@@ -228,7 +228,7 @@ class CircularBufferMultiSpec extends AnyFreeSpec with ChiselSim {
       // Use 2x transactions of n=4 items to fill up to size 8, incrementing each transaction
       for (writeCount <- 0 until 2) {
         for (nIndex <- 0 until 4) {
-          val indata = writeCount*4 + nIndex
+          val indata = writeCount * 4 + nIndex
           dut.io.enqData(nIndex).poke(indata)
         }
         dut.io.enqValid.poke(4)
@@ -261,7 +261,7 @@ class CircularBufferMultiSpec extends AnyFreeSpec with ChiselSim {
       // Fill buffer up to 12 items
       for (writeCount <- 0 until 3) {
         for (nIndex <- 0 until 4) {
-          val indata = writeCount*4 + nIndex
+          val indata = writeCount * 4 + nIndex
           dut.io.enqData(nIndex).poke(indata)
         }
         dut.io.enqValid.poke(4)
@@ -285,4 +285,3 @@ class CircularBufferMultiSpec extends AnyFreeSpec with ChiselSim {
   }
 
 }
-

@@ -14,8 +14,8 @@
 
 """VCStatic lint rules."""
 
-load("@rules_hdl//verilog:providers.bzl", "VerilogInfo")
 load("@coralnpu_hw//rules:verilog.bzl", "collect_verilog_files")
+load("@rules_hdl//verilog:providers.bzl", "VerilogInfo")
 
 def _vcstatic_lint_impl(ctx):
     # Create f file
@@ -23,19 +23,20 @@ def _vcstatic_lint_impl(ctx):
     verilog_files = collect_verilog_files(ctx.attr.package).to_list()
     f_file_content = ["+define+SIMULATION"]
     for f in verilog_files:
-      f_file_content = f_file_content + [f.path]
+        f_file_content = f_file_content + [f.path]
     f_file_content = "\n".join(f_file_content) + "\n"
     ctx.actions.write(f_file, f_file_content)
 
     # Generate the lint script from template
     vc_static_script = ctx.actions.declare_file(
-        ctx.attr.name + "_vc_shell.prj")
+        ctx.attr.name + "_vc_shell.prj",
+    )
     report_violations = ctx.actions.declare_file(ctx.attr.name + "_lint.rpt")
 
     ctx.actions.expand_template(
-        template=ctx.attr._lint_script.files.to_list()[0],
-        output=vc_static_script,
-        substitutions={
+        template = ctx.attr._lint_script.files.to_list()[0],
+        output = vc_static_script,
+        substitutions = {
             "{F_FILE}": f_file.path,
             "{MODULE_TO_LINT}": ctx.attr.module,
             "{REPORT_VIOLATIONS_FILE}": report_violations.path,
@@ -54,13 +55,13 @@ def _vcstatic_lint_impl(ctx):
         vc_static_script.path,
     ]
     ctx.actions.run_shell(
-        outputs=[report_violations],
-        inputs=[vc_static_script, f_file] + verilog_files,
+        outputs = [report_violations],
+        inputs = [vc_static_script, f_file] + verilog_files,
         command = " ".join(command),
         use_default_shell_env = True,
     )
 
-    return [DefaultInfo(files=depset([report_violations]))]
+    return [DefaultInfo(files = depset([report_violations]))]
 
 _vcstatic_lint = rule(
     _vcstatic_lint_impl,
@@ -102,5 +103,5 @@ _vcstatic_lint = rule(
     },
 )
 
-def vcstatic_lint(name, tags=[], **kwargs):
+def vcstatic_lint(name, tags = [], **kwargs):
     _vcstatic_lint(name = name, tags = ["vcs"] + tags, **kwargs)

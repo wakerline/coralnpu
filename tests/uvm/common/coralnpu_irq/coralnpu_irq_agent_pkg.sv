@@ -36,7 +36,7 @@ package coralnpu_irq_agent_pkg;
     virtual function void build_phase(uvm_phase phase);
       super.build_phase(phase);
       if (!uvm_config_db#(virtual coralnpu_irq_if.TB_IRQ_DRIVER)::get(this, "", "vif", vif)) begin
-         `uvm_fatal(get_type_name(), "Virtual interface 'vif' not found for TB_IRQ_DRIVER")
+        `uvm_fatal(get_type_name(), "Virtual interface 'vif' not found for TB_IRQ_DRIVER")
       end
     endfunction
 
@@ -72,7 +72,7 @@ package coralnpu_irq_agent_pkg;
     virtual function void build_phase(uvm_phase phase);
       super.build_phase(phase);
       if (!uvm_config_db#(virtual coralnpu_irq_if.TB_IRQ_DRIVER)::get(this, "", "vif", vif)) begin
-         `uvm_fatal(get_type_name(), "Virtual interface 'vif' not found for coralnpu_irq_sequencer")
+        `uvm_fatal(get_type_name(), "Virtual interface 'vif' not found for coralnpu_irq_sequencer")
       end
     endfunction
   endclass

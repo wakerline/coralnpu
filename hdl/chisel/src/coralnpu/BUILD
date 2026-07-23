@@ -21,8 +21,9 @@ load(
     "chisel_test",
 )
 load("@coralnpu_hw//rules:lint.bzl", "vcstatic_lint")
-load("@coralnpu_hw//rules:verilog.bzl", "verilog_zip_bundle")
 load("@coralnpu_hw//rules:utils.bzl", "template_rule")
+load("@coralnpu_hw//rules:verilog.bzl", "verilog_zip_bundle")
+load("//hdl/chisel/src/coralnpu:flags.bzl", "RVV_CORE_MINI_AXI_COMMON_GEN_FLAGS")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -118,17 +119,39 @@ chisel_library(
         "//hdl/verilog/rvv/common:arb_round_robin.sv",
         "//hdl/verilog/rvv/common:barrel_shifter.sv",
         "//hdl/verilog/rvv/common:handshake_ff.sv",
+        "//hdl/verilog/rvv/common:handshake_multistage_ctrl.sv",
         "//hdl/verilog/rvv/common:handshake_multi_fifo.sv",
         "//hdl/verilog/rvv/common:cdffr.sv",
-        "//hdl/verilog/rvv/common:compressor_3_2.sv",
-        "//hdl/verilog/rvv/common:compressor_4_2.sv",
+        "//hdl/verilog/rvv/common:compressor_3to2.sv",
+        "//hdl/verilog/rvv/common:compressor_4to2.sv",
         "//hdl/verilog/rvv/common:dff.sv",
         "//hdl/verilog/rvv/common:edff.sv",
         "//hdl/verilog/rvv/common:edff_2d.sv",
         "//hdl/verilog/rvv/common:multi_fifo.sv",
+        "//hdl/verilog/rvv/common:intdivider.sv",
         "//hdl/verilog/rvv/design:Aligner.sv",
         "//hdl/verilog/rvv/design:RvvCore.sv",
         "//hdl/verilog/rvv/design:RvvFrontEnd.sv",
+        "//hdl/verilog/rvv/design:Zvt/fp_absaddsub.sv",
+        "//hdl/verilog/rvv/design:Zvt/fp_addfront.sv",
+        "//hdl/verilog/rvv/design:Zvt/fp_align.sv",
+        "//hdl/verilog/rvv/design:Zvt/fp_classifier.sv",
+        "//hdl/verilog/rvv/design:Zvt/fp_mulfront.sv",
+        "//hdl/verilog/rvv/design:Zvt/fp_rounding.sv",
+        "//hdl/verilog/rvv/design:Zvt/zvt.sv",
+        "//hdl/verilog/rvv/design:Zvt/zvt_acc.sv",
+        "//hdl/verilog/rvv/design:Zvt/zvt_acc_reg.sv",
+        "//hdl/verilog/rvv/design:Zvt/zvt_ctrl.sv",
+        "//hdl/verilog/rvv/design:Zvt/zvt_pe_adder.sv",
+        "//hdl/verilog/rvv/design:Zvt/zvt_pe_adder_fp_lane.sv",
+        "//hdl/verilog/rvv/design:Zvt/zvt_pe_adder_int_lane.sv",
+        "//hdl/verilog/rvv/design:Zvt/zvt_pe_array.sv",
+        "//hdl/verilog/rvv/design:Zvt/zvt_pe_block.sv",
+        "//hdl/verilog/rvv/design:Zvt/zvt_pe_mulbulk.sv",
+        "//hdl/verilog/rvv/design:Zvt/zvt_pe_mulbulk_fp_lane.sv",
+        "//hdl/verilog/rvv/design:Zvt/zvt_pe_mulbulk_int_lane.sv",
+        "//hdl/verilog/rvv/design:rvv_backend_falu_unit.sv",
+        "//hdl/verilog/rvv/design:rvv_backend_falu.sv",
         "//hdl/verilog/rvv/design:rvv_backend.sv",
         "//hdl/verilog/rvv/design:rvv_backend_alu.sv",
         "//hdl/verilog/rvv/design:rvv_backend_alu_unit.sv",
@@ -157,16 +180,14 @@ chisel_library(
         "//hdl/verilog/rvv/design:rvv_backend_dispatch_raw_uop_uop.sv",
         "//hdl/verilog/rvv/design:rvv_backend_dispatch_structure_hazard.sv",
         "//hdl/verilog/rvv/design:rvv_backend_div.sv",
+        "//hdl/verilog/rvv/design:rvv_backend_fdiv_unit.sv",
         "//hdl/verilog/rvv/design:rvv_backend_div_unit.sv",
-        "//hdl/verilog/rvv/design:rvv_backend_div_unit_divider.sv",
         "//hdl/verilog/rvv/design:rvv_backend_fdiv_wrapper.sv",
         "//hdl/verilog/rvv/design:rvv_backend_lsu_remap.sv",
         "//hdl/verilog/rvv/design:rvv_backend_mac_unit.sv",
         "//hdl/verilog/rvv/design:rvv_backend_mul_unit.sv",
         "//hdl/verilog/rvv/design:rvv_backend_mul_unit_mul8.sv",
         "//hdl/verilog/rvv/design:rvv_backend_sqrt7_rec7.sv",
-        "//hdl/verilog/rvv/design:rvv_backend_fma_wrapper.sv",
-        "//hdl/verilog/rvv/design:rvv_backend_fma.sv",
         "//hdl/verilog/rvv/design:rvv_backend_mulmac.sv",
         "//hdl/verilog/rvv/design:rvv_backend_pmtrdt.sv",
         "//hdl/verilog/rvv/design:rvv_backend_pmtrdt_unit.sv",
@@ -181,11 +202,11 @@ chisel_library(
         "//hdl/verilog/rvv/design:rvv_backend_vrf_reg.sv",
         "//hdl/verilog/rvv/inc:rvv_backend.svh",
         "//hdl/verilog/rvv/inc:rvv_backend_alu.svh",
-        "//hdl/verilog/rvv/inc:rvv_backend_config.svh",
         "//hdl/verilog/rvv/inc:rvv_backend_define.svh",
         "//hdl/verilog/rvv/inc:rvv_backend_dispatch.svh",
         "//hdl/verilog/rvv/inc:rvv_backend_div.svh",
-        "//hdl/verilog/rvv/inc:rvv_backend_fma.svh",
+        "//hdl/verilog/rvv/inc:rvv_backend_falu.svh",
+        "//hdl/verilog/rvv/inc:rvv_backend_opcode.svh",
         "//hdl/verilog/rvv/inc:rvv_backend_pmtrdt.svh",
         "//hdl/verilog/rvv/inc:rvv_backend_sva.svh",
     ],
@@ -204,6 +225,7 @@ chisel_test(
         "-P",  # Allows parallel tests.
     ],
     deps = [
+        ":coralnpu_base",
         ":coralnpu_rvv",
         "//hdl/chisel/src/common:testing",
     ],
@@ -419,13 +441,13 @@ chisel_library(
         "Sram.scala",
         "SramNx128.scala",
     ],
-    deps = [
-        ":coralnpu_base",
-        "//hdl/chisel/src/bus",
-    ],
     resource_strip_prefix = "hdl/verilog",
     resources = [
         "//hdl/verilog:Sram.v",
+    ],
+    deps = [
+        ":coralnpu_base",
+        "//hdl/chisel/src/bus",
     ],
 )
 
@@ -462,6 +484,7 @@ chisel_library(
         "Parameters.scala",
     ],
     deps = [
+        "//hdl/chisel/src/bus",
     ],
 )
 
@@ -541,6 +564,7 @@ template_rule(
                 "--enableZfbfmin=True",
                 "--moduleName=CoreMini",
                 "--useAxi",
+                "--exposeDebugPorts=True",
             ],
             "module_name": "CoreMiniAxi",
             "verilog_file_path": "CoreMiniAxi.sv",
@@ -615,7 +639,6 @@ chisel_cc_library(
     vopts = CORE_MINI_AXI_VOPTS,
 )
 
-
 CORE_MINI_AXI_BLACKBOX_DESIGNS = [
     "CKLNQD10BWP6T20P96CPDLVT",
     "TS1N12FFCLLMBLVTD2048X128M4SWBSHO",
@@ -658,16 +681,6 @@ vcstatic_lint(
     waive_tags = ["UndrivenInTerm-ML"],
 )
 
-RVV_CORE_MINI_AXI_COMMON_GEN_FLAGS = [
-    "--enableFetchL0=False",
-    "--fetchDataBits=128",
-    "--lsuDataBits=128",
-    "--enableRvv=True",
-    "--enableFloat=True",
-    "--enableZfbfmin=True",
-    "--useAxi",
-]
-
 template_rule(
     chisel_cc_library,
     {
@@ -698,6 +711,7 @@ template_rule(
                 "--moduleName=RvvCoreMini",
                 "--itcmSizeKBytes=8",
                 "--dtcmSizeKBytes=32",
+                "--enableVerification=True",
             ] + RVV_CORE_MINI_AXI_COMMON_GEN_FLAGS,
             "module_name": "RvvCoreMiniAxi",
         },
@@ -760,7 +774,7 @@ template_rule(
         "-Wno-WIDTHEXPAND",
         "-Wno-WIDTHTRUNC",
         "-Wno-UNSIGNED",
-        "-Ihdl/verilog/rvv/inc",
+        "-Wno-WIDTHCONCAT",
         "-Ihdl/verilog/rvv/design/FPnew/common_cells/inc",
     ],
 )
@@ -768,6 +782,68 @@ template_rule(
 filegroup(
     name = "rvv_core_mini_tlul_verilog",
     srcs = [":rvv_core_mini_tlul_cc_library_verilog"],
+)
+
+# VME (Zvt) variant. Adds the non-tile mset* CSR plumbing on top of the RVV
+# core. Kept as a separate template_rule call so the RVV-only targets above
+# remain byte-identical (the ZVT_ON define widens the RVVConfigState struct).
+VME_CORE_MINI_AXI_COMMON_GEN_FLAGS = RVV_CORE_MINI_AXI_COMMON_GEN_FLAGS + [
+    "--enableVme=True",
+]
+
+template_rule(
+    chisel_cc_library,
+    {
+        "vme_core_mini_axi_cc_library": {
+            "verilog_file_path": "VmeCoreMiniAxi.sv",
+            "extra_outs": [
+                "VVmeCoreMiniAxi_parameters.h",
+                "VmeCoreMiniAxi.zip",
+            ],
+            "gen_flags": [
+                "--moduleName=VmeCoreMini",
+                "--itcmSizeKBytes=8",
+                "--dtcmSizeKBytes=32",
+            ] + VME_CORE_MINI_AXI_COMMON_GEN_FLAGS,
+            "module_name": "VmeCoreMiniAxi",
+        },
+    },
+    chisel_lib = ":coralnpu",
+    emit_class = "coralnpu.EmitCore",
+    vopts = [
+        "-DUSE_GENERIC",
+        # RVV
+        "-DTB_SUPPORT",
+        "-DVLEN_128",
+        "-DZVE32F_ON",
+        # VME (Zvt) non-tile state and mset* instructions.
+        "-DZVT_ON",
+        "-Wno-WIDTH",
+        "-Wno-CASEINCOMPLETE",
+        "-Wno-LATCH",
+        "-Wno-SIDEEFFECT",
+        "-Wno-MULTIDRIVEN",
+        "-Wno-UNOPTFLAT",
+        "-Wno-BLKANDNBLK",
+        "-Wno-CASEX",
+        # FPNEW
+        "-Wno-ASCRANGE",
+        "-Wno-WIDTHEXPAND",
+        "-Wno-WIDTHTRUNC",
+        "-Wno-UNSIGNED",
+        "-Wno-WIDTHCONCAT",
+        "-Ihdl/verilog/rvv/design/FPnew/common_cells/inc",
+    ],
+)
+
+vcstatic_lint(
+    name = "vme_core_mini_axi_cc_library_lint",
+    blackbox_designs = CORE_MINI_AXI_BLACKBOX_DESIGNS,
+    goal = "lint_rtl",
+    lint_tags = CORE_MINI_AXI_LINT_TAGS,
+    module = "VmeCoreMiniAxi",
+    package = "vme_core_mini_axi_cc_library_verilog",
+    waive_tags = ["UndrivenInTerm-ML"],
 )
 
 verilog_zip_bundle(

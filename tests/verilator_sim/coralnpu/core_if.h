@@ -45,19 +45,19 @@ static bool rand_bool_dbus() {
 struct Core_if : Memory_if {
   sc_in<bool>         io_ibus_valid;
   sc_out<bool>        io_ibus_ready;
-  sc_in<sc_bv<32> >   io_ibus_addr;
+  sc_in<sc_bv<KP_programCounterBits> >   io_ibus_addr;
   sc_out<sc_bv<KP_fetchDataBits> > io_ibus_rdata;
 
   sc_out<bool> io_ibus_fault_valid;
   sc_out<bool> io_ibus_fault_bits_write;
-  sc_out<sc_bv<32>> io_ibus_fault_bits_addr;
-  sc_out<sc_bv<32>> io_ibus_fault_bits_epc;
+  sc_out<sc_bv<KP_programCounterBits>> io_ibus_fault_bits_addr;
+  sc_out<sc_bv<KP_programCounterBits>> io_ibus_fault_bits_epc;
 
   sc_in<bool> io_dbus_valid;
   sc_out<bool> io_dbus_ready;
   sc_in<bool> io_dbus_write;
-  sc_in<sc_bv<32> > io_dbus_addr;
-  sc_in<sc_bv<32> > io_dbus_adrx;
+  sc_in<sc_bv<KP_lsuAddrBits> > io_dbus_addr;
+  sc_in<sc_bv<KP_lsuAddrBits> > io_dbus_adrx;
   sc_in<sc_bv<KP_dbusSize> > io_dbus_size;
   sc_in<sc_bv<KP_lsuDataBits> > io_dbus_wdata;
   sc_in<sc_bv<KP_lsuDataBits / 8> > io_dbus_wmask;

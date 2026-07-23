@@ -45,6 +45,7 @@ ABSL_FLAG(uint32_t, read_lines_addr, 0xFFFFFFFF,
           "Base address to read multiple lines");
 ABSL_FLAG(uint32_t, read_lines_count, 1, "Number of 128-bit lines to read");
 ABSL_FLAG(bool, reset, false, "Reset the target device");
+ABSL_FLAG(bool, soft_reset, false, "Soft reset the target device via SPI (non-destructive)");
 ABSL_FLAG(std::string, load_data, "", "Binary data file to load");
 ABSL_FLAG(uint32_t, load_data_addr, 0, "Address to load binary data");
 ABSL_FLAG(uint32_t, read_data_addr, 0xFFFFFFFF,
@@ -110,6 +111,11 @@ ssize_t ReadFully(int fd, void* buf, size_t count) {
   return total;
 }
 
+void SuggestResetOnError() {
+  fprintf(stderr, "\n[HINT] If the transaction timed out, the FPGA bus might be hung (possibly due to a failed Power-On Reset from FTDI backpowering).\n");
+  fprintf(stderr, "[HINT] Try running the command again with the '--reset' flag to reload the bitstream.\n\n");
+}
+
 bool load_elf(SpiMaster& spi, const char* filename, uint32_t csr_base,
               bool verify) {
   if (elf_version(EV_CURRENT) == EV_NONE) return false;
@@ -173,6 +179,7 @@ bool load_elf(SpiMaster& spi, const char* filename, uint32_t csr_base,
                               vbuf)) {
           fprintf(stderr, " TIMEOUT at 0x%08x\n",
                   paddr + static_cast<uint32_t>(off));
+          SuggestResetOnError();
           return false;
         }
         if (memcmp(vbuf, buf.data() + off, chunk) != 0) {
@@ -209,6 +216,11 @@ void HandleReset(struct ftdi_context* ftdi, SpiMaster& spi) {
   spi.device_reset();
   ftdi_set_bitmode(ftdi, 0, BITMODE_RESET);
   ftdi_set_bitmode(ftdi, kDirMask, BITMODE_MPSSE);
+}
+
+void HandleSoftReset(SpiMaster& spi) {
+  fprintf(stderr, "Soft resetting device via SPI...\n");
+  spi.soft_reset();
 }
 
 bool HandleLoadElf(SpiMaster& spi, uint32_t csr_base) {
@@ -360,11 +372,21 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  // Always reset FTDI bitmode to clear any hung state.
+  // Use kDirMask (0x0b) so ADBUS7 (PROG_B) remains an input and doesn't wipe the FPGA.
+  ftdi_set_bitmode(ftdi_ctx.get(), 0, BITMODE_RESET);
+  ftdi_set_bitmode(ftdi_ctx.get(), kDirMask, BITMODE_MPSSE);
+
   RealFtdi rftdi(ftdi_ctx.get());
   SpiMaster spi(&rftdi);
 
   if (absl::GetFlag(FLAGS_reset)) {
     HandleReset(ftdi_ctx.get(), spi);
+    usleep(3000000);  // 3s delay for FPGA configuration and DDR calibration
+  }
+
+  if (absl::GetFlag(FLAGS_soft_reset)) {
+    HandleSoftReset(spi);
   }
 
   std::vector<uint8_t> init_cmd = {MPSSE_DISABLE_CLK_DIV_5,
@@ -415,6 +437,7 @@ int main(int argc, char** argv) {
       printf("DATA_WORD: 0x%08x\n", val);
     } else {
       fprintf(stderr, "Failed to read word at 0x%08x\n", addr);
+      SuggestResetOnError();
       return 1;
     }
   }
@@ -430,6 +453,10 @@ int main(int argc, char** argv) {
       printf("0x%08x: 0x", addr);
       for (int i = 15; i >= 0; i--) printf("%02x", line[i]);
       printf("\n");
+    } else {
+      fprintf(stderr, "Failed to read line at 0x%08x\n", addr);
+      SuggestResetOnError();
+      return 1;
     }
   }
 
@@ -443,6 +470,10 @@ int main(int argc, char** argv) {
         for (int i = 15; i >= 0; i--) printf("%02x", lines[c * 16 + i]);
         printf("\n");
       }
+    } else {
+      fprintf(stderr, "Failed to read %u lines at 0x%08x\n", count, addr);
+      SuggestResetOnError();
+      return 1;
     }
   }
 

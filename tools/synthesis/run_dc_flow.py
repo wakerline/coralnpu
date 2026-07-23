@@ -77,6 +77,9 @@ def maybe_bazel_build(bazel_target: str, bazel_config: str, skip_build: bool) ->
     cmd = ["bazel", "build"]
     if bazel_config:
         cmd.append(f"--config={bazel_config}")
+    # This helper always builds one explicit RTL-generation target. Do not let
+    # a config-level tag filter silently exclude it and report "0 targets".
+    cmd.append("--build_tag_filters=")
     cmd.append(bazel_target)
     run(cmd, REPO_ROOT, stream=True)
 

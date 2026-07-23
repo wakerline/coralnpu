@@ -18,18 +18,39 @@
 
 #include "tests/verilator_sim/coralnpu/coralnpu_cfg.h"
 
+template <typename T>
+struct get_port_width;
+
+template <typename T>
+struct get_port_width<T&> : get_port_width<T> {};
+
+template <int W>
+struct get_port_width<sc_core::sc_in<sc_dt::sc_bv<W>>> {
+  static const int value = W;
+};
+
+template <int W>
+struct get_port_width<sc_core::sc_out<sc_dt::sc_bv<W>>> {
+  static const int value = W;
+};
+
 struct L1ICache_tb : Sysc_tb {
+  static const int PC_WIDTH = get_port_width<decltype(VL1ICache::io_flush_pcNext)>::value;
+  static const int ADDR_WIDTH = get_port_width<decltype(VL1ICache::io_ibus_addr)>::value;
+  static const int FAULT_ADDR_WIDTH = get_port_width<decltype(VL1ICache::io_ibus_fault_bits_addr)>::value;
+  static const int FAULT_EPC_WIDTH = get_port_width<decltype(VL1ICache::io_ibus_fault_bits_epc)>::value;
+
   sc_out<bool> io_flush_valid;
-  sc_out<sc_bv<32> > io_flush_pcNext;
+  sc_out<sc_bv<PC_WIDTH> > io_flush_pcNext;
   sc_in<bool> io_flush_ready;
   sc_out<bool> io_ibus_valid;
   sc_in<bool> io_ibus_ready;
-  sc_out<sc_bv<32> > io_ibus_addr;
+  sc_out<sc_bv<ADDR_WIDTH> > io_ibus_addr;
   sc_in<sc_bv<kL1IAxiBits> > io_ibus_rdata;
   sc_in<bool> io_ibus_fault_valid;
   sc_in<bool> io_ibus_fault_bits_write;
-  sc_in<sc_bv<32>> io_ibus_fault_bits_addr;
-  sc_in<sc_bv<32>> io_ibus_fault_bits_epc;
+  sc_in<sc_bv<FAULT_ADDR_WIDTH>> io_ibus_fault_bits_addr;
+  sc_in<sc_bv<FAULT_EPC_WIDTH>> io_ibus_fault_bits_epc;
   sc_in<bool> io_axi_read_addr_valid;
   sc_out<bool> io_axi_read_addr_ready;
   sc_in<sc_bv<kL1IAxiId> > io_axi_read_addr_bits_id;
@@ -150,16 +171,16 @@ struct L1ICache_tb : Sysc_tb {
 
 static void L1ICache_test(char* name, int loops, bool trace) {
   sc_signal<bool> io_flush_valid;
-  sc_signal<sc_bv<32> > io_flush_pcNext;
+  sc_signal<sc_bv<L1ICache_tb::PC_WIDTH> > io_flush_pcNext;
   sc_signal<bool> io_flush_ready;
   sc_signal<bool> io_ibus_valid;
   sc_signal<bool> io_ibus_ready;
-  sc_signal<sc_bv<32> > io_ibus_addr;
+  sc_signal<sc_bv<L1ICache_tb::ADDR_WIDTH> > io_ibus_addr;
   sc_signal<sc_bv<kL1IAxiBits> > io_ibus_rdata;
   sc_signal<bool> io_ibus_fault_valid;
   sc_signal<bool> io_ibus_fault_bits_write;
-  sc_signal<sc_bv<32>> io_ibus_fault_bits_addr;
-  sc_signal<sc_bv<32>> io_ibus_fault_bits_epc;
+  sc_signal<sc_bv<L1ICache_tb::FAULT_ADDR_WIDTH>> io_ibus_fault_bits_addr;
+  sc_signal<sc_bv<L1ICache_tb::FAULT_EPC_WIDTH>> io_ibus_fault_bits_epc;
   sc_signal<bool> io_axi_read_addr_valid;
   sc_signal<bool> io_axi_read_addr_ready;
   sc_signal<sc_bv<kL1IAxiId> > io_axi_read_addr_bits_id;

@@ -17,12 +17,30 @@
 #ifndef L1DCACHEBANK
 #include "VL1DCache.h"
 constexpr int kDBusBankAdj = 0;
+using DUT_Class = VL1DCache;
 #else
 #include "VL1DCacheBank.h"
 constexpr int kDBusBankAdj = 1;
+using DUT_Class = VL1DCacheBank;
 #endif
 
 #include "tests/verilator_sim/coralnpu/coralnpu_cfg.h"
+
+template <typename T>
+struct get_port_width;
+
+template <typename T>
+struct get_port_width<T&> : get_port_width<T> {};
+
+template <int W>
+struct get_port_width<sc_core::sc_in<sc_dt::sc_bv<W>>> {
+  static const int value = W;
+};
+
+template <int W>
+struct get_port_width<sc_core::sc_out<sc_dt::sc_bv<W>>> {
+  static const int value = W;
+};
 
 constexpr int kLineSize = kVector / 8;
 constexpr int kLineBase = ~(kLineSize - 1);
@@ -31,6 +49,8 @@ constexpr int kVLenB = kVector / 8;
 constexpr int kVLenW = kVLenB / sizeof(int32_t);
 
 struct L1DCache_tb : Sysc_tb {
+  static const int DBUS_ADDR_WIDTH = get_port_width<decltype(DUT_Class::io_dbus_addr)>::value;
+  static const int AXI_ADDR_WIDTH = get_port_width<decltype(DUT_Class::io_axi_read_addr_bits_addr)>::value;
   sc_out<bool> io_flush_valid;
   sc_in<bool> io_flush_ready;
   sc_out<bool> io_flush_all;
@@ -40,8 +60,8 @@ struct L1DCache_tb : Sysc_tb {
   sc_in<bool> io_dbus_ready;
   sc_out<bool> io_dbus_write;
   sc_out<sc_bv<kDbusBits> > io_dbus_size;
-  sc_out<sc_bv<32 - kDBusBankAdj> > io_dbus_addr;
-  sc_out<sc_bv<32 - kDBusBankAdj> > io_dbus_adrx;
+  sc_out<sc_bv<DBUS_ADDR_WIDTH> > io_dbus_addr;
+  sc_out<sc_bv<DBUS_ADDR_WIDTH> > io_dbus_adrx;
   sc_in<sc_bv<kVector> > io_dbus_rdata;
   sc_in<sc_bv<32> > io_dbus_pc;
   sc_out<sc_bv<kVector> > io_dbus_wdata;
@@ -50,7 +70,7 @@ struct L1DCache_tb : Sysc_tb {
   sc_in<bool> io_axi_read_addr_valid;
   sc_out<bool> io_axi_read_addr_ready;
   sc_in<sc_bv<kL1DAxiId - kDBusBankAdj> > io_axi_read_addr_bits_id;
-  sc_in<sc_bv<32 - kDBusBankAdj> > io_axi_read_addr_bits_addr;
+  sc_in<sc_bv<AXI_ADDR_WIDTH> > io_axi_read_addr_bits_addr;
   sc_in<sc_bv<4> > io_axi_read_addr_bits_region;
   sc_in<sc_bv<4> > io_axi_read_addr_bits_qos;
   sc_in<sc_bv<3> > io_axi_read_addr_bits_prot;
@@ -70,7 +90,7 @@ struct L1DCache_tb : Sysc_tb {
   sc_in<bool> io_axi_write_addr_valid;
   sc_out<bool> io_axi_write_addr_ready;
   sc_in<sc_bv<kL1DAxiId - kDBusBankAdj> > io_axi_write_addr_bits_id;
-  sc_in<sc_bv<32 - kDBusBankAdj> > io_axi_write_addr_bits_addr;
+  sc_in<sc_bv<AXI_ADDR_WIDTH> > io_axi_write_addr_bits_addr;
   sc_in<sc_bv<4> > io_axi_write_addr_bits_region;
   sc_in<sc_bv<4> > io_axi_write_addr_bits_qos;
   sc_in<sc_bv<3> > io_axi_write_addr_bits_prot;
@@ -449,8 +469,8 @@ static void L1DCache_test(char* name, int loops, bool trace) {
   sc_signal<bool> io_dbus_ready;
   sc_signal<bool> io_dbus_write;
   sc_signal<sc_bv<kDbusBits> > io_dbus_size;
-  sc_signal<sc_bv<32 - kDBusBankAdj> > io_dbus_addr;
-  sc_signal<sc_bv<32 - kDBusBankAdj> > io_dbus_adrx;
+  sc_signal<sc_bv<L1DCache_tb::DBUS_ADDR_WIDTH> > io_dbus_addr;
+  sc_signal<sc_bv<L1DCache_tb::DBUS_ADDR_WIDTH> > io_dbus_adrx;
   sc_signal<sc_bv<kVector> > io_dbus_rdata;
   sc_signal<sc_bv<32> > io_dbus_pc;
   sc_signal<sc_bv<kVector> > io_dbus_wdata;
@@ -459,7 +479,7 @@ static void L1DCache_test(char* name, int loops, bool trace) {
   sc_signal<bool> io_axi_read_addr_valid;
   sc_signal<bool> io_axi_read_addr_ready;
   sc_signal<sc_bv<kL1DAxiId - kDBusBankAdj> > io_axi_read_addr_bits_id;
-  sc_signal<sc_bv<32 - kDBusBankAdj> > io_axi_read_addr_bits_addr;
+  sc_signal<sc_bv<L1DCache_tb::AXI_ADDR_WIDTH> > io_axi_read_addr_bits_addr;
   sc_signal<sc_bv<4> > io_axi_read_addr_bits_region;
   sc_signal<sc_bv<4> > io_axi_read_addr_bits_qos;
   sc_signal<sc_bv<3> > io_axi_read_addr_bits_prot;
@@ -479,7 +499,7 @@ static void L1DCache_test(char* name, int loops, bool trace) {
   sc_signal<bool> io_axi_write_addr_valid;
   sc_signal<bool> io_axi_write_addr_ready;
   sc_signal<sc_bv<kL1DAxiId - kDBusBankAdj> > io_axi_write_addr_bits_id;
-  sc_signal<sc_bv<32 - kDBusBankAdj> > io_axi_write_addr_bits_addr;
+  sc_signal<sc_bv<L1DCache_tb::AXI_ADDR_WIDTH> > io_axi_write_addr_bits_addr;
   sc_signal<sc_bv<4> > io_axi_write_addr_bits_region;
   sc_signal<sc_bv<4> > io_axi_write_addr_bits_qos;
   sc_signal<sc_bv<3> > io_axi_write_addr_bits_prot;

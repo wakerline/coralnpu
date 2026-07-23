@@ -41,7 +41,7 @@ class FmaTester extends Module {
   val stage2 = Fma.FmaStage2(stage1)
   io.state1 := stage1
   io.state2 := stage2
-  io.out := Fma.FmaStage3(stage2)
+  io.out    := Fma.FmaStage3(stage2)
 }
 
 class FmaSpec extends AnyFreeSpec with ChiselSim {

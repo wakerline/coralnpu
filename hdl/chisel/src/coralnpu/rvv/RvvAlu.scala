@@ -23,41 +23,41 @@ object RvvAluOp extends ChiselEnum {
   val VRSUB = Value
 
   val VMINU = Value
-  val VMIN = Value
+  val VMIN  = Value
   val VMAXU = Value
-  val VMAX = Value
+  val VMAX  = Value
 
   val VAND = Value
-  val VOR = Value
+  val VOR  = Value
   val VXOR = Value
 
-  val VRGATHER = Value
+  val VRGATHER     = Value
   val VRGATHEREI16 = Value
 
-  val VSLIDEUP = Value
+  val VSLIDEUP   = Value
   val VSLIDEDOWN = Value
 
-  val VADC = Value
+  val VADC  = Value
   val VMADC = Value
-  val VSBC = Value
+  val VSBC  = Value
   val VMSBC = Value
 
   val VMERGE = Value
-  val VMV = Value
+  val VMV    = Value
 
-  val VMSEQ = Value
-  val VMSNE = Value
+  val VMSEQ  = Value
+  val VMSNE  = Value
   val VMSLTU = Value
-  val VMSLT = Value
+  val VMSLT  = Value
   val VMSLEU = Value
-  val VMSLE = Value
+  val VMSLE  = Value
   val VMSGTU = Value
-  val VMSGT = Value
+  val VMSGT  = Value
 
   val VSADDU = Value
-  val VSADD = Value
+  val VSADD  = Value
   val VSSUBU = Value
-  val VSSUB = Value
+  val VSSUB  = Value
 
   val VSMUL = Value
 
@@ -66,16 +66,20 @@ object RvvAluOp extends ChiselEnum {
   val VMV4R = Value
   val VMV8R = Value
 
-  val VSLL = Value
-  val VSRL = Value
-  val VSRA = Value
+  val VSLL  = Value
+  val VSRL  = Value
+  val VSRA  = Value
   val VSSRL = Value
   val VSSRA = Value
   val VNSRL = Value
   val VNSRA = Value
 
   val VNCLIPU = Value
-  val VNCLIP = Value
+  val VNCLIP  = Value
+
+  val VFNCVTBF16  = Value
+  val VFWCVTBF16  = Value
+  val VFWMACCBF16 = Value
 }
 
 // The validity of an RVV instruction can only be fully checked when the
@@ -83,5 +87,7 @@ object RvvAluOp extends ChiselEnum {
 // all context-free checks and needs to be cross-checked with vector config
 // before execution.
 class RvvS1DecodedInstruction extends Bundle {
-  val op = RvvAluOp()
+  val op          = RvvAluOp()
+  val is_float    = Bool()
+  val is_widening = Bool()
 }

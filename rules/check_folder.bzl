@@ -50,5 +50,5 @@ check_folder = repository_rule(
             mandatory = True,
             allow_single_file = True,
         ),
-    }
+    },
 )

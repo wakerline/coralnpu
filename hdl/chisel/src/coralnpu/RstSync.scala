@@ -18,14 +18,14 @@ import chisel3._
 import chisel3.util._
 
 class RstSync extends BlackBox with HasBlackBoxResource {
-    val io = IO(new Bundle {
-        val clk_i = Input(Clock())
-        val rstn_i = Input(AsyncReset())
-        val clk_en = Input(Bool())
-        val te     = Input(Bool())
+  val io = IO(new Bundle {
+    val clk_i  = Input(Clock())
+    val rstn_i = Input(AsyncReset())
+    val clk_en = Input(Bool())
+    val te     = Input(Bool())
 
-        val clk_o = Output(Clock())
-        val rstn_o = Output(AsyncReset())
-    })
-    addResource("RstSync.sv")
+    val clk_o  = Output(Clock())
+    val rstn_o = Output(AsyncReset())
+  })
+  addResource("RstSync.sv")
 }

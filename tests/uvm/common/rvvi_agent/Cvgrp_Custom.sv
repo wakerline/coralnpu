@@ -17,12 +17,11 @@
 //----------------------------------------------------------------------------
 covergroup cvgrp_Custom;
 
-   option.per_instance = 1;
+  option.per_instance = 1;
 
-   //base cover
-   mpause: coverpoint custom_trans.insn_name iff(rv32i_trans.trap==0) {
-      bins b0 = {MPAUSE};
-      option.weight = 1;
-    }
+  //base cover
+  mpause: coverpoint custom_trans.insn_name iff (rv32i_trans.trap == 0) {
+    bins b0 = {MPAUSE}; option.weight = 1;
+  }
 
 endgroup

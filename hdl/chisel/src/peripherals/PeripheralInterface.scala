@@ -21,22 +21,23 @@ import bus._
 import common._
 
 /** Get a 32-bit AxiMasterReadIO that returns values from a read map.
-  * @param idBits The bit-width of the id field in the AXI Interface.
-  * @param reads A map of read names to a (address, value) pair.
+  * @param idBits
+  *   The bit-width of the id field in the AXI Interface.
+  * @param reads
+  *   A map of read names to a (address, value) pair.
   */
 object ConnectAxiRead {
-  def apply(idBits: Integer,
-            reads: Map[String, (Int, UInt)]): AxiMasterReadIO = {
+  def apply(idBits: Integer, reads: Map[String, (Int, UInt)]): AxiMasterReadIO = {
     val axiRead = Wire(Flipped(new AxiMasterReadIO(32, 32, idBits)))
-    val readReq = Queue(axiRead.addr, 1, pipe=true)
+    val readReq = Queue(axiRead.addr, 1, pipe = true)
 
-    val readResp = readReq.map{req =>
-      val resp = Wire(new AxiReadData(32, idBits))
+    val readResp = readReq.map { req =>
+      val resp    = Wire(new AxiReadData(32, idBits))
       val regRead = MuxLookup(req.addr, MakeInvalid(UInt(32.W)))(
-        reads.values.map{case (a, b) => (a.U(32.W) -> MakeValid(b))}.toSeq
+        reads.values.map { case (a, b) => (a.U(32.W) -> MakeValid(b)) }.toSeq
       )
 
-      resp.id := req.id
+      resp.id   := req.id
       resp.data := regRead.bits
       resp.resp := Mux(regRead.valid, 0.U(2.W), "b10".asUInt(2.W))
       resp.last := true.B
@@ -50,27 +51,30 @@ object ConnectAxiRead {
 }
 
 /** Reads a 32-bit AxiMasterWriteIO and returns the value it tries to write.
-  * @param idBits The bit-width of the id field in the AXI Interface.
-  * @param reads A map of write names to target address.
-  * Returns a map of names->written as well as the data written.
+  * @param idBits
+  *   The bit-width of the id field in the AXI Interface.
+  * @param reads
+  *   A map of write names to target address. Returns a map of names->written as well as the data
+  *   written.
   */
 object ConnectAxiWrite {
-  def apply(idBits: Integer,
-            writeMap: Map[String, Int],
-            axiWrite: AxiMasterWriteIO): (Map[String, Bool], UInt) = {
-    val writeAddrReq = Queue(axiWrite.addr, 1, true /*pipe*/)
-    val writeDataReq = Queue(axiWrite.data, 1, true /*pipe*/)
+  def apply(
+    idBits: Integer,
+    writeMap: Map[String, Int],
+    axiWrite: AxiMasterWriteIO
+  ): (Map[String, Bool], UInt) = {
+    val writeAddrReq = Queue(axiWrite.addr, 1, true /*pipe*/ )
+    val writeDataReq = Queue(axiWrite.data, 1, true /*pipe*/ )
 
     // Wait for both queues to be full before removing elements from them
-    writeAddrReq.ready := writeDataReq.valid && axiWrite.resp.ready
-    writeDataReq.ready := writeAddrReq.valid && axiWrite.resp.ready
+    writeAddrReq.ready  := writeDataReq.valid && axiWrite.resp.ready
+    writeDataReq.ready  := writeAddrReq.valid && axiWrite.resp.ready
     axiWrite.resp.valid := writeDataReq.valid && writeAddrReq.valid
     val writeAddr = writeAddrReq.bits.addr
     val writeData = writeDataReq.bits.data
-    val writes = writeMap.view.mapValues(_.U(32.W) === writeAddr)
-    axiWrite.resp.bits.id := writeAddrReq.bits.id
-    axiWrite.resp.bits.resp := Mux(writes.values.toSeq.reduce(_||_),
-                                   0.U(2.W), "b10".asUInt(2.W))
+    val writes    = writeMap.view.mapValues(_.U(32.W) === writeAddr)
+    axiWrite.resp.bits.id   := writeAddrReq.bits.id
+    axiWrite.resp.bits.resp := Mux(writes.values.toSeq.reduce(_ || _), 0.U(2.W), "b10".asUInt(2.W))
 
     (writes.toMap, writeData)
   }

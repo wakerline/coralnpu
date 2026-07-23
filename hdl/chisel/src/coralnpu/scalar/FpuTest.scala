@@ -49,11 +49,11 @@ class FpuSpec extends AnyFreeSpec with ChiselSim {
   }
 
   def GetFloat(fpu: Fpu): Float = {
-    val sign = fpu.io.output.bits.bits.sign.peek().litValue
+    val sign     = fpu.io.output.bits.bits.sign.peek().litValue
     val exponent = fpu.io.output.bits.bits.exponent.peek().litValue
     val mantissa = fpu.io.output.bits.bits.mantissa.peek().litValue
-    val int_val = ((exponent << 23) + mantissa).toInt
-    val negate = if (sign == 1) -1.0f else 1.0f
+    val int_val  = ((exponent << 23) + mantissa).toInt
+    val negate   = if (sign == 1) -1.0f else 1.0f
 
     negate * java.lang.Float.intBitsToFloat(int_val)
   }
@@ -77,7 +77,6 @@ class FpuSpec extends AnyFreeSpec with ChiselSim {
       assertResult(2.0f) { GetFloat(dut) }
       dut.io.cmd.valid.poke(0)
       dut.clock.step()
-
 
       dut.io.output.valid.expect(1)
       dut.io.output.bits.addr.expect(3)

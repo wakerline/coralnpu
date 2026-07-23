@@ -209,25 +209,26 @@ module chip_verilator #(
   logic spim_flash_sclk, spim_flash_csb, spim_flash_mosi, spim_flash_miso, spim_flash_rst_n;
 
   s25fl512s_dpi i_s25fl512s_dpi (
-    .clk_i(clk_i),
-    .rst_ni(rst_ni),
-    .sck_i(spim_flash_sclk),
-    .csb_i(spim_flash_csb),
-    .mosi_i(spim_flash_mosi),
-    .flash_rst_ni(spim_flash_rst_n),
-    .miso_o(spim_flash_miso)
+      .clk_i(clk_i),
+      .rst_ni(rst_ni),
+      .sck_i(spim_flash_sclk),
+      .csb_i(spim_flash_csb),
+      .mosi_i(spim_flash_mosi),
+      .flash_rst_ni(spim_flash_rst_n),
+      .miso_o(spim_flash_miso)
   );
 
   logic io_halted_o;
   logic io_fault_o;
-  coralnpu_soc #(.MemInitFile(MemInitFile),
-                 .ClockFrequencyMhz(ClockFrequencyMhz),
-                 .IspClockFrequencyMhz(IspClockFrequencyMhz),
-                 .SpimClockFrequencyMhz(SpimClockFrequencyMhz),
-                 .EnableAutoboot(EnableAutoboot),
-                 .ItcmSizeKBytes(ItcmSizeKBytes),
-                 .DtcmSizeKBytes(DtcmSizeKBytes))
-  i_coralnpu_soc(
+  coralnpu_soc #(
+      .MemInitFile(MemInitFile),
+      .ClockFrequencyMhz(ClockFrequencyMhz),
+      .IspClockFrequencyMhz(IspClockFrequencyMhz),
+      .SpimClockFrequencyMhz(SpimClockFrequencyMhz),
+      .EnableAutoboot(EnableAutoboot),
+      .ItcmSizeKBytes(ItcmSizeKBytes),
+      .DtcmSizeKBytes(DtcmSizeKBytes)
+  ) i_coralnpu_soc (
       .clk_i(clk_i),
       .clk_isp_i(clk_isp),
       .rst_ni(rst_ni),
@@ -272,7 +273,7 @@ module chip_verilator #(
       .ISP_DVP_PCLK(cam_pclk),
       .ISP_DVP_HSYNC(cam_hsync),
       .ISP_DVP_VSYNC(cam_vsync),
-      .CAM_INT(1'b0),           // Unused
+      .CAM_INT(1'b0),  // Unused
       .CAM_TRIG(),              // Tied low in chip_nexus, route to GPIO or logic to use as alternative to I2C trigger
       .ddr_clk_i(1'b0),
       .ddr_rst(1'b0),

@@ -15,21 +15,25 @@ This directory contains the I2C Master IP block. It implements a standard I2C Ma
 | 0x018  | CLK_DIV     | Clock divider. Specifies half-period of I2C clk.  |
 
 ### STATUS Register (0x00C)
+
 * **Bit 0**: `busy` - I2C FSM is not idle.
 * **Bit 1**: `!fifo_empty` - TX FIFO is not empty.
 * **Bit 2**: `rx_fifo_valid` - RX FIFO has valid data.
 
 ### FDATA Register (0x010)
+
 Writes to this register push a command and data to the TX FIFO.
 Reads from this register pop data from the RX FIFO.
 
 **Write Format:**
+
 * **Bits 7:0**: Data to transmit.
 * **Bit 8**: `START` - Issue a START (or Repeated START) condition before sending the byte.
 * **Bit 9**: `STOP` - Issue a STOP condition after sending/receiving the byte.
 * **Bit 10**: `READ` - Perform an I2C Read instead of a Write.
 
 **Read Format:**
+
 * **Bits 7:0**: Received data.
 
 ## Programming Model
@@ -39,13 +43,17 @@ Reads from this register pop data from the RX FIFO.
 2. Set bit 0 of the `CTRL` register to enable the I2C Master.
 
 ### Example: I2C Write
+
 To write data `0xDE` to register `0x02` of a slave at address `0x55`:
+
 1. Write `FDATA` with `START`=1, `Data`=`(0x55 << 1) | 0`.
 2. Write `FDATA` with `START`=0, `Data`=`0x02`.
 3. Write `FDATA` with `STOP`=1, `Data`=`0xDE`.
 
 ### Example: I2C Read
+
 To read a register `0x02` from a slave at address `0x55`:
+
 1. Write `FDATA` with `START`=1, `Data`=`(0x55 << 1) | 0`.
 2. Write `FDATA` with `START`=0, `Data`=`0x02`.
 3. Write `FDATA` with `START`=1, `Data`=`(0x55 << 1) | 1` (Repeated Start, Read).

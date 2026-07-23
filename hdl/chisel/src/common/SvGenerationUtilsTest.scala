@@ -38,9 +38,9 @@ class ValidModule extends Module {
 }
 
 object TrafficLight extends ChiselEnum {
-  val RED     = Value
-  val YELLOW  = Value
-  val GREEN   = Value
+  val RED    = Value
+  val YELLOW = Value
+  val GREEN  = Value
 }
 
 class ChiselEnumModule extends Module {
@@ -48,11 +48,13 @@ class ChiselEnumModule extends Module {
     val in  = Input(TrafficLight())
     val out = Output(TrafficLight())
   })
-  io.out := MuxLookup(io.in, TrafficLight.RED)(Seq(
-    TrafficLight.RED -> TrafficLight.GREEN,
-    TrafficLight.GREEN -> TrafficLight.YELLOW,
-    TrafficLight.YELLOW -> TrafficLight.RED,
-  ))
+  io.out := MuxLookup(io.in, TrafficLight.RED)(
+    Seq(
+      TrafficLight.RED    -> TrafficLight.GREEN,
+      TrafficLight.GREEN  -> TrafficLight.YELLOW,
+      TrafficLight.YELLOW -> TrafficLight.RED
+    )
+  )
 }
 
 class VectorModule extends Module {
@@ -68,10 +70,13 @@ class KitchenSync extends Bundle {
   val u = UInt(12.W)
   val s = SInt(7.W)
   val e = TrafficLight()
-  val v = Vec(3, new Bundle {
-    val nu = UInt(3.W)
-    val ns = SInt(2.W)
-  })
+  val v = Vec(
+    3,
+    new Bundle {
+      val nu = UInt(3.W)
+      val ns = SInt(2.W)
+    }
+  )
 }
 
 class KitchenSyncModule extends Module {
@@ -83,43 +88,43 @@ class KitchenSyncModule extends Module {
 }
 
 class GenerateInterfaceSpec extends AnyFreeSpec with ChiselSim {
-    "BasicModule" in {
-        val expectedInterface =
-            """  input  logic [31:0] io_in,
+  "BasicModule" in {
+    val expectedInterface =
+      """  input  logic [31:0] io_in,
               |  output logic [31:0] io_out""".stripMargin
 
-        simulate(new BasicModule()) { dut =>
-            val interface = GenerateInterface(dut.io, "io")
-            assert(interface === expectedInterface)
-        }
+    simulate(new BasicModule()) { dut =>
+      val interface = GenerateInterface(dut.io, "io")
+      assert(interface === expectedInterface)
     }
+  }
 
-    "ValidModule" in {
-        val expectedInterface =
-            """  input  logic io_in_valid,
+  "ValidModule" in {
+    val expectedInterface =
+      """  input  logic io_in_valid,
               |  input  logic [31:0] io_in_bits,
               |  output logic io_out_valid,
               |  output logic [31:0] io_out_bits""".stripMargin
 
-        simulate(new ValidModule()) { dut =>
-            val interface = GenerateInterface(dut.io, "io")
-            assert(interface === expectedInterface)
-        }
+    simulate(new ValidModule()) { dut =>
+      val interface = GenerateInterface(dut.io, "io")
+      assert(interface === expectedInterface)
     }
+  }
 
-    "ChiselEnumModule" in {
-        val expectedInterface =
-            """  input  logic [1:0] io_in,
+  "ChiselEnumModule" in {
+    val expectedInterface =
+      """  input  logic [1:0] io_in,
               |  output logic [1:0] io_out""".stripMargin
-        simulate(new ChiselEnumModule()) { dut =>
-            val interface = GenerateInterface(dut.io, "io")
-            assert(interface === expectedInterface)
-        }
+    simulate(new ChiselEnumModule()) { dut =>
+      val interface = GenerateInterface(dut.io, "io")
+      assert(interface === expectedInterface)
     }
+  }
 
-    "VectorModule" in {
-        val expectedInterface =
-            """  input  logic [7:0] io_in_0,
+  "VectorModule" in {
+    val expectedInterface =
+      """  input  logic [7:0] io_in_0,
               |  input  logic [7:0] io_in_1,
               |  input  logic [7:0] io_in_2,
               |  input  logic [7:0] io_in_3,
@@ -128,15 +133,15 @@ class GenerateInterfaceSpec extends AnyFreeSpec with ChiselSim {
               |  output logic [7:0] io_out_2,
               |  output logic [7:0] io_out_3""".stripMargin
 
-        simulate(new VectorModule()) { dut =>
-            val interface = GenerateInterface(dut.io, "io")
-            assert(interface === expectedInterface)
-        }
+    simulate(new VectorModule()) { dut =>
+      val interface = GenerateInterface(dut.io, "io")
+      assert(interface === expectedInterface)
     }
+  }
 
-    "KitchenSyncModule" in {
-        val expectedInterface =
-            """  output logic io_in_ready,
+  "KitchenSyncModule" in {
+    val expectedInterface =
+      """  output logic io_in_ready,
               |  input  logic io_in_valid,
               |  input  logic io_in_bits_b,
               |  input  logic [11:0] io_in_bits_u,
@@ -161,9 +166,9 @@ class GenerateInterfaceSpec extends AnyFreeSpec with ChiselSim {
               |  output logic [2:0] io_out_bits_v_2_nu,
               |  output logic [1:0] io_out_bits_v_2_ns""".stripMargin
 
-        simulate(new KitchenSyncModule()) { dut =>
-            val interface = GenerateInterface(dut.io, "io")
-            assert(interface === expectedInterface)
-        }
+    simulate(new KitchenSyncModule()) { dut =>
+      val interface = GenerateInterface(dut.io, "io")
+      assert(interface === expectedInterface)
     }
+  }
 }

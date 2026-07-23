@@ -1,7 +1,5 @@
 # CoralNPU Integration Guide
 
-
-
 This document describes integrating CoralNPU as an AXI/TileLink peripheral in
 a bigger system.
 
@@ -152,7 +150,6 @@ Note: the USER signal is not supported on any of the channels.
 | ->-> bits_addr | The 5-bit register address to which the writh occurred |
 | ->-> bits_data | The 32-bit value which was written to the register |
 
-
 ### CoralNPU Memory Map
 
 Memory accesses to CoralNPU are defined as follows:
@@ -164,64 +161,72 @@ Memory accesses to CoralNPU are defined as follows:
 |  CSR   | 0x30000 - TBD     |   TBD  |  4 bytes  | CSR interface used to query/control CoralNPU.   |
 
 ### Reset Considerations
+
 CoralNPU uses a synchronous reset strategy -- to ensure proper reset behavior, ensure that the clock runs for a cycle with reset active, before enabling either the internal clock gate (via CSR) or gating externally.
 
 ## Booting CoralNPU
+
 A note first -- in these examples, CoralNPU is located in the overall system memory map at 0x70000000.
 
 1. The instruction memory of CoralNPU must be initialized.
-```c
-volatile uint8_t* coralnpu_itcm = (uint8_t*)0x00000000L;
-for (int i = 0; i < coralnpu_binary_len; ++i) {
-    coralnpu_itcm[i] = coralnpu_binary[i];
-}
-```
 
-If something like a DMA engine is present in your system, that is probably a better option for initializing the ITCM.
+   ```c
+   volatile uint8_t* coralnpu_itcm = (uint8_t*)0x00000000L;
+   for (int i = 0; i < coralnpu_binary_len; ++i) {
+       coralnpu_itcm[i] = coralnpu_binary[i];
+   }
+   ```
+
+   If something like a DMA engine is present in your system, that is probably a better option for initializing the ITCM.
 
 2. Program the start PC
-If your program is linked such that the starting address is 0, you may skip this.
+   If your program is linked such that the starting address is 0, you may skip this.
 
-```c
-volatile uint32_t* coralnpu_pc_csr = (uint32_t*)0x00030004L;
-*coralnpu_pc_csr = start_addr;
-```
+   ```c
+   volatile uint32_t* coralnpu_pc_csr = (uint32_t*)0x00030004L;
+   *coralnpu_pc_csr = start_addr;
+   ```
 
 3. Release clock gate
-```c
-volatile uint32_t* coralnpu_reset_csr = (uint32_t*)0x00030000L;
-*coralnpu_reset_csr = 1;
-```
 
-After this, ensure you wait a cycle to allow CoralNPU's reset to occur.
-If you want to configure something like an interrupt that is connected to CoralNPU's
-fault or halted outputs, this is a good time.
+   ```c
+   volatile uint32_t* coralnpu_reset_csr = (uint32_t*)0x00030000L;
+   *coralnpu_reset_csr = 1;
+   ```
+
+   After this, ensure you wait a cycle to allow CoralNPU's reset to occur.
+   If you want to configure something like an interrupt that is connected to CoralNPU's
+   fault or halted outputs, this is a good time.
 
 4. Release reset
-```c
-volatile uint32_t* coralnpu_reset_csr = (uint32_t*)0x00030000L;
-*coralnpu_reset_csr = 0;
-```
 
-At this point, CoralNPU will begin executing at the PC programmed in step 2.
+   ```c
+   volatile uint32_t* coralnpu_reset_csr = (uint32_t*)0x00030000L;
+   *coralnpu_reset_csr = 0;
+   ```
+
+   At this point, CoralNPU will begin executing at the PC programmed in step 2.
 
 5. Monitor for `io_halted`
-The status of CoralNPU's execution can be checked by reading the status CSR:
-```c
-volatile uint32_t* coralnpu_status_csr = (uint32_t*)0x00030008L;
-uint32_t status = *coralnpu_status_csr;
-bool halted = status & 1;
-bool fault = status & 2;
-```
+   The status of CoralNPU's execution can be checked by reading the status CSR:
 
-# CoralNPU CSRs
+   ```c
+   volatile uint32_t* coralnpu_status_csr = (uint32_t*)0x00030008L;
+   uint32_t status = *coralnpu_status_csr;
+   bool halted = status & 1;
+   bool fault = status & 2;
+   ```
+
+## CoralNPU CSRs
+
 Note: These are CSRs that are intended to be read or written externally
 to CoralNPU, e.g. by the host processor in a system.
 They are not the same as the RISC-V CSRs accessed via the Zicsr ISA extension.
 
 ### Register: `RESET_CONTROL`
-*   **Offset**: `0x0`
-*   **Description**: Controls reset and clock gating for the CoralNPU core. On power-up, the core is held in reset with its clock gated. To start the core, the clock gate should be released first, followed by de-asserting reset.
+
+* **Offset**: `0x0`
+* **Description**: Controls reset and clock gating for the CoralNPU core. On power-up, the core is held in reset with its clock gated. To start the core, the clock gate should be released first, followed by de-asserting reset.
 
 | Bits  | Name         | Description                                                                                             | Access | Reset Value |
 | :---- | :----------- | :------------------------------------------------------------------------------------------------------ | :----- | :---------- |
@@ -230,16 +235,18 @@ They are not the same as the RISC-V CSRs accessed via the Zicsr ISA extension.
 | 31:2  | `RESERVED`   | Reserved, writes ignored, reads return 0.                                                               | R      | 0           |
 
 ### Register: `PC_START`
-*   **Offset**: `0x4`
-*   **Description**: Sets the program counter for the CoralNPU core. This should be programmed before releasing the core from reset.
+
+* **Offset**: `0x4`
+* **Description**: Sets the program counter for the CoralNPU core. This should be programmed before releasing the core from reset.
 
 | Bits  | Name            | Description                                         | Access | Reset Value |
 | :---- | :-------------- | :-------------------------------------------------- | :----- | :---------- |
 | 31:0  | `START_ADDRESS` | The address where the core will begin execution.    | R/W    | 0           |
 
 ### Register: `STATUS`
-*   **Offset**: `0x8`
-*   **Description**: Provides status on the CoralNPU core. This is a read-only register.
+
+* **Offset**: `0x8`
+* **Description**: Provides status on the CoralNPU core. This is a read-only register.
 
 | Bits  | Name       | Description                                                              | Access | Reset Value |
 | :---- | :--------- | :----------------------------------------------------------------------- | :----- | :---------- |

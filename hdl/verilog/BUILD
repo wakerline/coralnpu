@@ -17,13 +17,13 @@ load("@rules_hdl//verilog:providers.bzl", "verilog_library")
 exports_files(
     srcs = [
         "ClockGate.sv",
+        "RstSync.sv",
         "Sram.v",
-        "sram_backdoor.core",
         "Sram_1rw_256x256.v",
         "Sram_1rwm_256x288.v",
-        "RstSync.sv",
         "TlulAdapterSram.sv",
         "Uart.sv",
+        "sram_backdoor.core",
     ],
     visibility = ["//visibility:public"],
 )
@@ -40,7 +40,7 @@ verilog_library(
     visibility = ["//visibility:public"],
     deps = [
         ":clock_gate",
-    ]
+    ],
 )
 
 verilog_library(

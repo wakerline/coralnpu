@@ -22,14 +22,14 @@ class FabricMuxSpec extends AnyFreeSpec with ChiselSim {
   var p = new Parameters
 
   val memoryRegions = Seq(
-    new MemoryRegion(0x0000, 0x2000, MemoryRegionType.IMEM), // ITCM
-    new MemoryRegion(0x10000, 0x8000, MemoryRegionType.DMEM), // DTCM
-    new MemoryRegion(0x30000, 0x2000, MemoryRegionType.Peripheral), // CSR
+    new MemoryRegion(0x0000, 0x2000, MemoryRegionType.IMEM),       // ITCM
+    new MemoryRegion(0x10000, 0x8000, MemoryRegionType.DMEM),      // DTCM
+    new MemoryRegion(0x30000, 0x2000, MemoryRegionType.Peripheral) // CSR
   )
 
   "Writes" in {
     simulate(new FabricMux(p, memoryRegions)) { dut =>
-      val inputAddrs = Seq(0x10, 0x10020, 0x30004)
+      val inputAddrs  = Seq(0x10, 0x10020, 0x30004)
       val outputAddrs = Seq(0x10, 0x20, 0x4)
       for (i <- 0 until memoryRegions.length) {
         dut.io.source.readDataAddr.valid.poke(false.B)
@@ -70,7 +70,7 @@ class FabricMuxSpec extends AnyFreeSpec with ChiselSim {
 
   "Reads" in {
     simulate(new FabricMux(p, memoryRegions)) { dut =>
-      val inputAddrs = Seq(0x10, 0x10020, 0x30004)
+      val inputAddrs  = Seq(0x10, 0x10020, 0x30004)
       val outputAddrs = Seq(0x10, 0x20, 0x4)
       for (i <- 0 until memoryRegions.length) {
         dut.io.source.readDataAddr.valid.poke(true.B)

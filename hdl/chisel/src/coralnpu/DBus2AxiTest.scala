@@ -24,15 +24,27 @@ class DBus2AxiSpec extends AnyFreeSpec with ChiselSim {
 
   def rotateLeft(num: BigInt, shift: Int, width: Int): BigInt = {
     val effectiveShift = shift % width // Handle shifts larger than width
-    val leftPart = (num << effectiveShift) & ((BigInt(1) << width) - 1)
-    val rightPart = num >> (width - effectiveShift)
+    val leftPart       = (num << effectiveShift) & ((BigInt(1) << width) - 1)
+    val rightPart      = num >> (width - effectiveShift)
     leftPart | rightPart
   }
 
   def generateMasks(addr: Int, size: Int, txnSizes: Seq[Int]): List[BigInt] = {
-    val bottom: Int = addr & 0x1F
-    val mask0 = rotateLeft((31 to 0 by -1).map(i => i < txnSizes(0)).foldLeft(0L) { (acc, b) => (acc << 1 | (if (b) 1L else 0L))}, bottom, 32)
-    val mask1 = rotateLeft((31 to 0 by -1).map(i => i < txnSizes(1)).foldLeft(0L) { (acc, b) => (acc << 1 | (if (b) 1L else 0L))}, bottom + txnSizes(0), 32)
+    val bottom: Int = addr & 0x1f
+    val mask0       = rotateLeft(
+      (31 to 0 by -1).map(i => i < txnSizes(0)).foldLeft(0L) { (acc, b) =>
+        (acc << 1 | (if (b) 1L else 0L))
+      },
+      bottom,
+      32
+    )
+    val mask1 = rotateLeft(
+      (31 to 0 by -1).map(i => i < txnSizes(1)).foldLeft(0L) { (acc, b) =>
+        (acc << 1 | (if (b) 1L else 0L))
+      },
+      bottom + txnSizes(0),
+      32
+    )
     List(mask0, mask1)
   }
 
@@ -104,11 +116,11 @@ class DBus2AxiSpec extends AnyFreeSpec with ChiselSim {
         new Case(0x0000001c, 1, 0xe, 0x10000000L),
         new Case(0x0000001d, 1, 0xf, 0x20000000L),
         new Case(0x0000001e, 1, 0x1, 0x40000000L),
-        new Case(0x0000001f, 1, 0x2, 0x80000000L),
+        new Case(0x0000001f, 1, 0x2, 0x80000000L)
       )
       cases.foreach(c => {
         val shiftedData: BigInt = c.data << (c.addr * 8)
-        val alignedAddr = c.addr - (c.addr % c.size)
+        val alignedAddr         = c.addr - (c.addr % c.size)
 
         dut.io.axi.read.addr.ready.poke(false.B)
         dut.io.axi.read.data.valid.poke(false.B)
@@ -127,13 +139,17 @@ class DBus2AxiSpec extends AnyFreeSpec with ChiselSim {
 
         val (waddr, wsize, wlen) = {
           dut.io.axi.write.addr.ready.poke(true.B)
-          while (dut.io.axi.write.addr.valid.peek().litValue != 1 || dut.io.axi.write.addr.ready.peek().litValue != 1) {
+          while (
+            dut.io.axi.write.addr.valid
+              .peek()
+              .litValue != 1 || dut.io.axi.write.addr.ready.peek().litValue != 1
+          ) {
             dut.clock.step()
           }
           val rv = (
             dut.io.axi.write.addr.bits.addr.peek().litValue,
             dut.io.axi.write.addr.bits.size.peek().litValue,
-            dut.io.axi.write.addr.bits.len.peek().litValue,
+            dut.io.axi.write.addr.bits.len.peek().litValue
           )
           dut.clock.step()
           dut.io.axi.write.addr.ready.poke(false.B)
@@ -146,13 +162,17 @@ class DBus2AxiSpec extends AnyFreeSpec with ChiselSim {
 
         val (wdata, wstrb) = {
           dut.io.axi.write.data.ready.poke(true.B)
-          while (dut.io.axi.write.data.valid.peek().litValue != 1 || dut.io.axi.write.data.ready.peek().litValue != 1) {
+          while (
+            dut.io.axi.write.data.valid
+              .peek()
+              .litValue != 1 || dut.io.axi.write.data.ready.peek().litValue != 1
+          ) {
             dut.clock.step()
           }
           assertResult(1) { dut.io.axi.write.data.bits.last.peek().litValue }
           val rv = (
             dut.io.axi.write.data.bits.data.peek().litValue,
-            dut.io.axi.write.data.bits.strb.peek().litValue,
+            dut.io.axi.write.data.bits.strb.peek().litValue
           )
           dut.clock.step()
           dut.io.axi.write.data.ready.poke(false.B)
@@ -166,7 +186,11 @@ class DBus2AxiSpec extends AnyFreeSpec with ChiselSim {
           dut.io.axi.write.resp.valid.poke(true.B)
           dut.io.axi.write.resp.bits.id.poke(0.U)
           dut.io.axi.write.resp.bits.resp.poke(0.U)
-          while (dut.io.axi.write.resp.ready.peek().litValue != 1 || dut.io.axi.write.resp.valid.peek().litValue != 1) {
+          while (
+            dut.io.axi.write.resp.ready
+              .peek()
+              .litValue != 1 || dut.io.axi.write.resp.valid.peek().litValue != 1
+          ) {
             dut.clock.step()
           }
           assertResult(1) { dut.io.dbus.ready.peek().litValue }
@@ -185,13 +209,17 @@ class DBus2AxiSpec extends AnyFreeSpec with ChiselSim {
         val (len, addr, size) = {
           assertResult(0) { dut.io.axi.read.addr.ready.peek().litValue }
           dut.io.axi.read.addr.ready.poke(true.B)
-          while (dut.io.axi.read.addr.valid.peek().litValue != 1 || dut.io.axi.read.addr.ready.peek().litValue != 1) {
+          while (
+            dut.io.axi.read.addr.valid
+              .peek()
+              .litValue != 1 || dut.io.axi.read.addr.ready.peek().litValue != 1
+          ) {
             dut.clock.step()
           }
           val rv = (
             dut.io.axi.read.addr.bits.len.peek().litValue,
             dut.io.axi.read.addr.bits.addr.peek().litValue,
-            dut.io.axi.read.addr.bits.size.peek().litValue,
+            dut.io.axi.read.addr.bits.size.peek().litValue
           )
           dut.clock.step()
           dut.io.axi.read.addr.ready.poke(false.B)
@@ -212,7 +240,11 @@ class DBus2AxiSpec extends AnyFreeSpec with ChiselSim {
             dut.io.axi.read.data.bits.last.poke(true)
             assertResult(1) { dut.io.dbus.ready.peek().litValue }
             dut.clock.step()
-            while (dut.io.axi.read.data.valid.peek().litValue != 1 || dut.io.axi.read.data.ready.peek().litValue != 1) {
+            while (
+              dut.io.axi.read.data.valid
+                .peek()
+                .litValue != 1 || dut.io.axi.read.data.ready.peek().litValue != 1
+            ) {
               dut.clock.step()
             }
             dut.io.dbus.valid.poke(false.B)

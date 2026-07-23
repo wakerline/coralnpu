@@ -39,10 +39,10 @@ struct Core_tb : Sysc_tb {
   sc_in<bool> io_halted;
   sc_in<bool> io_fault;
   sc_in<bool> io_ebus_dbus_valid;
-  sc_in<sc_bv<32>> io_ebus_dbus_addr;
+  sc_in<sc_bv<KP_lsuAddrBits>> io_ebus_dbus_addr;
   sc_out<bool> io_ebus_fault_valid;
   sc_out<bool> io_ebus_dbus_ready;
-  sc_out<sc_bv<32>> io_ebus_fault_bits_addr;
+  sc_out<sc_bv<KP_programCounterBits>> io_ebus_fault_bits_addr;
 
   using Sysc_tb::Sysc_tb;  // constructor
 
@@ -84,69 +84,70 @@ static void Core_run(const char* name, const char* bin, const int cycles,
   sc_signal<bool> io_ebus_fault_valid;
   sc_signal<bool> io_ebus_fault_bits_write;
   sc_signal<bool> io_iflush_valid;
-  sc_signal<sc_bv<32> > io_iflush_pcNext;
+  sc_signal<sc_bv<KP_programCounterBits> > io_iflush_pcNext;
   sc_signal<bool> io_iflush_ready;
   sc_signal<bool> io_dflush_valid;
   sc_signal<bool> io_dflush_ready;
   sc_signal<bool> io_dflush_all;
   sc_signal<bool> io_dflush_clean;
-  sc_signal<sc_bv<32> > io_csr_in_value_0;
-  sc_signal<sc_bv<32> > io_csr_in_value_1;
-  sc_signal<sc_bv<32> > io_csr_in_value_2;
-  sc_signal<sc_bv<32> > io_csr_in_value_3;
-  sc_signal<sc_bv<32> > io_csr_in_value_4;
-  sc_signal<sc_bv<32> > io_csr_in_value_5;
-  sc_signal<sc_bv<32> > io_csr_in_value_6;
-  sc_signal<sc_bv<32> > io_csr_in_value_7;
-  sc_signal<sc_bv<32> > io_csr_in_value_8;
-  sc_signal<sc_bv<32> > io_csr_in_value_9;
-  sc_signal<sc_bv<32> > io_csr_in_value_10;
-  sc_signal<sc_bv<32> > io_csr_in_value_11;
-  sc_signal<sc_bv<32> > io_csr_in_value_12;
-  sc_signal<sc_bv<32> > io_csr_out_value_0;
-  sc_signal<sc_bv<32> > io_csr_out_value_1;
-  sc_signal<sc_bv<32> > io_csr_out_value_2;
-  sc_signal<sc_bv<32> > io_csr_out_value_3;
-  sc_signal<sc_bv<32> > io_csr_out_value_4;
-  sc_signal<sc_bv<32> > io_csr_out_value_5;
-  sc_signal<sc_bv<32> > io_csr_out_value_6;
-  sc_signal<sc_bv<32> > io_csr_out_value_7;
-  sc_signal<sc_bv<32> > io_csr_out_value_8;
-  sc_signal<sc_bv<32> > io_ibus_addr;
+  sc_signal<sc_bv<KP_xlen> > io_csr_in_value_0;
+  sc_signal<sc_bv<KP_xlen> > io_csr_in_value_1;
+  sc_signal<sc_bv<KP_xlen> > io_csr_in_value_2;
+  sc_signal<sc_bv<KP_xlen> > io_csr_in_value_3;
+  sc_signal<sc_bv<KP_xlen> > io_csr_in_value_4;
+  sc_signal<sc_bv<KP_xlen> > io_csr_in_value_5;
+  sc_signal<sc_bv<KP_xlen> > io_csr_in_value_6;
+  sc_signal<sc_bv<KP_xlen> > io_csr_in_value_7;
+  sc_signal<sc_bv<KP_xlen> > io_csr_in_value_8;
+  sc_signal<sc_bv<KP_xlen> > io_csr_in_value_9;
+  sc_signal<sc_bv<KP_xlen> > io_csr_in_value_10;
+  sc_signal<sc_bv<KP_xlen> > io_csr_in_value_11;
+  sc_signal<sc_bv<KP_xlen> > io_csr_in_value_12;
+  sc_signal<sc_bv<KP_xlen> > io_csr_out_value_0;
+  sc_signal<sc_bv<KP_xlen> > io_csr_out_value_1;
+  sc_signal<sc_bv<KP_xlen> > io_csr_out_value_2;
+  sc_signal<sc_bv<KP_xlen> > io_csr_out_value_3;
+  sc_signal<sc_bv<KP_xlen> > io_csr_out_value_4;
+  sc_signal<sc_bv<KP_xlen> > io_csr_out_value_5;
+  sc_signal<sc_bv<KP_xlen> > io_csr_out_value_6;
+  sc_signal<sc_bv<KP_xlen> > io_csr_out_value_7;
+  sc_signal<sc_bv<KP_xlen> > io_csr_out_value_8;
+  sc_signal<sc_bv<KP_programCounterBits> > io_ibus_addr;
   sc_signal<sc_bv<KP_fetchDataBits> > io_ibus_rdata;
-  sc_signal<sc_bv<32>> io_ibus_fault_bits_epc;
-  sc_signal<sc_bv<32>> io_ibus_fault_bits_addr;
-  sc_signal<sc_bv<32> > io_dbus_addr;
-  sc_signal<sc_bv<32> > io_dbus_adrx;
+  sc_signal<sc_bv<KP_programCounterBits>> io_ibus_fault_bits_epc;
+  sc_signal<sc_bv<KP_programCounterBits>> io_ibus_fault_bits_addr;
+  sc_signal<sc_bv<KP_lsuAddrBits> > io_dbus_addr;
+  sc_signal<sc_bv<KP_lsuAddrBits> > io_dbus_adrx;
   sc_signal<sc_bv<32> > io_dbus_pc;
   sc_signal<sc_bv<KP_dbusSize> > io_dbus_size;
   sc_signal<sc_bv<KP_lsuDataBits> > io_dbus_wdata;
   sc_signal<sc_bv<KP_lsuDataBits / 8> > io_dbus_wmask;
   sc_signal<sc_bv<KP_lsuDataBits> > io_dbus_rdata;
-  sc_signal<sc_bv<32> > io_ebus_dbus_addr;
-  sc_signal<sc_bv<32> > io_ebus_dbus_adrx;
+  sc_signal<sc_bv<KP_lsuAddrBits> > io_ebus_dbus_addr;
+  sc_signal<sc_bv<KP_lsuAddrBits> > io_ebus_dbus_adrx;
   sc_signal<sc_bv<32> > io_ebus_dbus_pc;
-  sc_signal<sc_bv<32>> io_ebus_fault_bits_epc;
-  sc_signal<sc_bv<32>> io_ebus_fault_bits_addr;
+  sc_signal<sc_bv<KP_programCounterBits>> io_ebus_fault_bits_epc;
+  sc_signal<sc_bv<KP_programCounterBits>> io_ebus_fault_bits_addr;
   sc_signal<sc_bv<KP_dbusSize> > io_ebus_dbus_size;
   sc_signal<sc_bv<KP_lsuDataBits> > io_ebus_dbus_wdata;
   sc_signal<sc_bv<KP_lsuDataBits / 8> > io_ebus_dbus_wmask;
   sc_signal<sc_bv<KP_lsuDataBits> > io_ebus_dbus_rdata;
   sc_signal<bool> io_ebus_internal;
+#if KP_exposeDebugPorts
   sc_signal<sc_bv<4> > io_debug_en;
-  sc_signal<sc_bv<32> > io_debug_cycles;
+  sc_signal<sc_bv<KP_xlen> > io_debug_cycles;
   sc_signal<bool> io_debug_dbus_valid;
-  sc_signal<sc_bv<32>> io_debug_dbus_bits_addr;
+  sc_signal<sc_bv<KP_lsuAddrBits>> io_debug_dbus_bits_addr;
   sc_signal<sc_bv<KP_lsuDataBits>> io_debug_dbus_bits_wdata;
   sc_signal<bool> io_debug_dbus_bits_write;
   sc_signal<bool> io_debug_dispatch_0_instFire;
   sc_signal<bool> io_debug_dispatch_1_instFire;
   sc_signal<bool> io_debug_dispatch_2_instFire;
   sc_signal<bool> io_debug_dispatch_3_instFire;
-  sc_signal<sc_bv<32>> io_debug_dispatch_0_instAddr;
-  sc_signal<sc_bv<32>> io_debug_dispatch_1_instAddr;
-  sc_signal<sc_bv<32>> io_debug_dispatch_2_instAddr;
-  sc_signal<sc_bv<32>> io_debug_dispatch_3_instAddr;
+  sc_signal<sc_bv<KP_programCounterBits>> io_debug_dispatch_0_instAddr;
+  sc_signal<sc_bv<KP_programCounterBits>> io_debug_dispatch_1_instAddr;
+  sc_signal<sc_bv<KP_programCounterBits>> io_debug_dispatch_2_instAddr;
+  sc_signal<sc_bv<KP_programCounterBits>> io_debug_dispatch_3_instAddr;
   sc_signal<sc_bv<32>> io_debug_dispatch_0_instInst;
   sc_signal<sc_bv<32>> io_debug_dispatch_1_instInst;
   sc_signal<sc_bv<32>> io_debug_dispatch_2_instInst;
@@ -155,35 +156,36 @@ static void Core_run(const char* name, const char* bin, const int cycles,
   sc_signal<bool> io_debug_regfile_writeAddr_1_valid;
   sc_signal<bool> io_debug_regfile_writeAddr_2_valid;
   sc_signal<bool> io_debug_regfile_writeAddr_3_valid;
-  sc_signal<sc_bv<5>> io_debug_regfile_writeAddr_0_bits;
-  sc_signal<sc_bv<5>> io_debug_regfile_writeAddr_1_bits;
-  sc_signal<sc_bv<5>> io_debug_regfile_writeAddr_2_bits;
-  sc_signal<sc_bv<5>> io_debug_regfile_writeAddr_3_bits;
+  sc_signal<sc_bv<KP_scalarRegCountWidth>> io_debug_regfile_writeAddr_0_bits;
+  sc_signal<sc_bv<KP_scalarRegCountWidth>> io_debug_regfile_writeAddr_1_bits;
+  sc_signal<sc_bv<KP_scalarRegCountWidth>> io_debug_regfile_writeAddr_2_bits;
+  sc_signal<sc_bv<KP_scalarRegCountWidth>> io_debug_regfile_writeAddr_3_bits;
   sc_signal<bool> io_debug_regfile_writeData_0_valid;
   sc_signal<bool> io_debug_regfile_writeData_1_valid;
   sc_signal<bool> io_debug_regfile_writeData_2_valid;
   sc_signal<bool> io_debug_regfile_writeData_3_valid;
   sc_signal<bool> io_debug_regfile_writeData_4_valid;
   sc_signal<bool> io_debug_regfile_writeData_5_valid;
-  sc_signal<sc_bv<5>> io_debug_regfile_writeData_0_bits_addr;
-  sc_signal<sc_bv<5>> io_debug_regfile_writeData_1_bits_addr;
-  sc_signal<sc_bv<5>> io_debug_regfile_writeData_2_bits_addr;
-  sc_signal<sc_bv<5>> io_debug_regfile_writeData_3_bits_addr;
-  sc_signal<sc_bv<5>> io_debug_regfile_writeData_4_bits_addr;
-  sc_signal<sc_bv<5>> io_debug_regfile_writeData_5_bits_addr;
-  sc_signal<sc_bv<32>> io_debug_regfile_writeData_0_bits_data;
-  sc_signal<sc_bv<32>> io_debug_regfile_writeData_1_bits_data;
-  sc_signal<sc_bv<32>> io_debug_regfile_writeData_2_bits_data;
-  sc_signal<sc_bv<32>> io_debug_regfile_writeData_3_bits_data;
-  sc_signal<sc_bv<32>> io_debug_regfile_writeData_4_bits_data;
-  sc_signal<sc_bv<32>> io_debug_regfile_writeData_5_bits_data;
+  sc_signal<sc_bv<KP_scalarRegCountWidth>> io_debug_regfile_writeData_0_bits_addr;
+  sc_signal<sc_bv<KP_scalarRegCountWidth>> io_debug_regfile_writeData_1_bits_addr;
+  sc_signal<sc_bv<KP_scalarRegCountWidth>> io_debug_regfile_writeData_2_bits_addr;
+  sc_signal<sc_bv<KP_scalarRegCountWidth>> io_debug_regfile_writeData_3_bits_addr;
+  sc_signal<sc_bv<KP_scalarRegCountWidth>> io_debug_regfile_writeData_4_bits_addr;
+  sc_signal<sc_bv<KP_scalarRegCountWidth>> io_debug_regfile_writeData_5_bits_addr;
+  sc_signal<sc_bv<KP_xlen>> io_debug_regfile_writeData_0_bits_data;
+  sc_signal<sc_bv<KP_xlen>> io_debug_regfile_writeData_1_bits_data;
+  sc_signal<sc_bv<KP_xlen>> io_debug_regfile_writeData_2_bits_data;
+  sc_signal<sc_bv<KP_xlen>> io_debug_regfile_writeData_3_bits_data;
+  sc_signal<sc_bv<KP_xlen>> io_debug_regfile_writeData_4_bits_data;
+  sc_signal<sc_bv<KP_xlen>> io_debug_regfile_writeData_5_bits_data;
 
 
-#define IO_DEBUG(x)                       \
-  sc_signal<sc_bv<32> > io_debug_addr##x; \
+#define IO_DEBUG(x)                                  \
+  sc_signal<sc_bv<KP_programCounterBits> > io_debug_addr##x; \
   sc_signal<sc_bv<32> > io_debug_inst##x;
   REPEAT(IO_DEBUG, KP_instructionLanes);
 #undef IO_DEBUG
+#endif
 
   io_iflush_ready = 1;
   io_dflush_ready = 1;
@@ -265,6 +267,7 @@ static void Core_run(const char* name, const char* bin, const int cycles,
   core.io_ebus_dbus_wmask(io_ebus_dbus_wmask);
   core.io_ebus_dbus_rdata(io_ebus_dbus_rdata);
   core.io_ebus_internal(io_ebus_internal);
+#if KP_exposeDebugPorts
   core.io_debug_en(io_debug_en);
   core.io_debug_cycles(io_debug_cycles);
   core.io_debug_dbus_valid(io_debug_dbus_valid);
@@ -315,6 +318,7 @@ static void Core_run(const char* name, const char* bin, const int cycles,
   core.io_debug_inst_##x(io_debug_inst##x);
   REPEAT(BIND_DEBUG, KP_instructionLanes);
 #undef BIND_DEBUG
+#endif
 
   mif.clock(tb.clock);
   mif.reset(tb.reset);

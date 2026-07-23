@@ -19,94 +19,102 @@ import chisel3.util._
 import _root_.circt.stage.ChiselStage
 
 object Slice {
-  def apply[T <: Data](t: T, doubleBuffered: Boolean = true,
-      passReady: Boolean = false, passValid: Boolean = false) = {
+  def apply[T <: Data](
+    t: T,
+    doubleBuffered: Boolean = true,
+    passReady: Boolean = false,
+    passValid: Boolean = false
+  ) = {
     Module(new Slice(t, doubleBuffered, passReady, passValid))
   }
 }
 
-class Slice[T <: Data](t: T, doubleBuffered: Boolean,
-    passReady: Boolean, passValid: Boolean) extends Module {
+class Slice[T <: Data](t: T, doubleBuffered: Boolean, passReady: Boolean, passValid: Boolean)
+    extends Module {
   val io = IO(new Bundle {
-    val in  = Flipped(Decoupled(t))
-    val out = Decoupled(t)
+    val in    = Flipped(Decoupled(t))
+    val out   = Decoupled(t)
     val count = Output(UInt(2.W))
     val value = Output(Vec(if (doubleBuffered) 2 else 1, Valid(t)))
   })
 
   val size = if (doubleBuffered) 2 else 1
 
-  val ipos = RegInit(0.U(size.W))
-  val opos = RegInit(0.U(size.W))
+  val ipos  = RegInit(0.U(size.W))
+  val opos  = RegInit(0.U(size.W))
   val count = RegInit(0.U(size.W))
-  val mem = RegInit(VecInit(Seq.fill(size)(0.U(t.getWidth.W).asTypeOf(t))))
+  val mem   = RegInit(VecInit(Seq.fill(size)(0.U(t.getWidth.W).asTypeOf(t))))
 
-  val empty = ipos === opos
+  val empty  = ipos === opos
   val bypass = if (passValid) io.in.valid && io.out.ready && empty else false.B
   val ivalid = io.in.valid && io.in.ready && !bypass
   val ovalid = io.out.valid && io.out.ready && !bypass
 
-  when (ivalid) {
+  when(ivalid) {
     ipos := ipos + 1.U
   }
 
-  when (ovalid) {
+  when(ovalid) {
     opos := opos + 1.U
   }
 
-  when (ivalid =/= ovalid) {
+  when(ivalid =/= ovalid) {
     count := count + ivalid - ovalid
   }
 
   if (doubleBuffered) {
     val full = ipos(0) === opos(0) && ipos(1) =/= opos(1)
     if (passReady) {
-      io.in.ready := !full || io.out.ready                      // pass-through
+      io.in.ready := !full || io.out.ready // pass-through
     } else {
       io.in.ready := !full
     }
 
-    when (ovalid && full) {
+    when(ovalid && full) {
       mem(0) := mem(1)
-    } .elsewhen (ivalid && !ovalid && empty ||
-          ivalid && ovalid && !full) {
+    }.elsewhen(
+      ivalid && !ovalid && empty ||
+        ivalid && ovalid && !full
+    ) {
       mem(0) := io.in.bits
-    } .otherwise {
+    }.otherwise {
       mem(0) := mem(0)
     }
 
-    when (ivalid && !ovalid && !empty ||
-          ivalid && ovalid && full) {
+    when(
+      ivalid && !ovalid && !empty ||
+        ivalid && ovalid && full
+    ) {
       mem(1) := io.in.bits
     }
 
     io.value(0).valid := !empty
     io.value(1).valid := full
-    io.value(0).bits := mem(0)
-    io.value(1).bits := mem(1)
+    io.value(0).bits  := mem(0)
+    io.value(1).bits  := mem(1)
   } else {
     if (passReady) {
-      io.in.ready := empty || io.out.ready                      // pass-through
+      io.in.ready := empty || io.out.ready // pass-through
     } else {
       io.in.ready := empty
     }
 
-    when (ivalid) {
+    when(ivalid) {
       mem(0) := io.in.bits
-    } .otherwise {
+    }.otherwise {
       mem(0) := mem(0)
     }
 
     io.value(0).valid := !empty
-    io.value(0).bits := mem(0)
+    io.value(0).bits  := mem(0)
   }
 
   if (!passValid) {
     io.out.valid := !empty
     io.out.bits  := mem(0)
   } else {
-    io.out.valid := !empty || io.in.valid                       // pass-through
-    io.out.bits  := Mux(!empty, mem(0), io.in.bits)             // pass-through
+    io.out.valid := !empty || io.in.valid           // pass-through
+    io.out.bits  := Mux(!empty, mem(0), io.in.bits) // pass-through
   }
 
   io.count := count

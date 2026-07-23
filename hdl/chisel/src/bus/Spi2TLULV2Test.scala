@@ -46,8 +46,8 @@ class Spi2TLULV2TestWrapper extends Module {
 
   var p = new Parameters()
   p.lsuDataBits = 128
-  val tlul_p = new TLULParameters(p)
-  val v2     = Module(new Spi2TLULV2(p))
+  val tlul_p = p.toTLUL()
+  val v2     = Module(new Spi2TLULV2(tlul_p))
 
   // Clock and reset wiring
   v2.io.spi_clk   := io.spi_clk_in.asClock
@@ -326,7 +326,10 @@ class Spi2TLULV2Spec extends AnyFreeSpec with ChiselSim {
     def spiWriteMulti(addr: Long, beats: Seq[Array[Int]]): Unit = {
       csbAssert()
       spiSendHeader(0x02, addr, beats.length - 1)
-      for (beat <- beats; byte <- beat) spiXferByte(byte)
+      for {
+        beat <- beats
+        byte <- beat
+      } spiXferByte(byte)
       csbDeassert()
     }
 
@@ -336,10 +339,10 @@ class Spi2TLULV2Spec extends AnyFreeSpec with ChiselSim {
     * byte. Returns bit offset or -1.
     */
   def findBitPattern(
-      haystack: Array[Int],
-      hayBits: Int,
-      needle: Array[Int],
-      needleBits: Int
+    haystack: Array[Int],
+    hayBits: Int,
+    needle: Array[Int],
+    needleBits: Int
   ): Int = {
     for (off <- 0 to (hayBits - needleBits)) {
       var matched = true
@@ -646,7 +649,7 @@ class Spi2TLULV2Spec extends AnyFreeSpec with ChiselSim {
 
   "regression - repeated 0xFE" in {
     withDualClock { dut =>
-      val dc = new DualClockState(dut)
+      val dc       = new DualClockState(dut)
       val baseAddr = 0x0000cc00L
 
       dc.csbAssert()
@@ -656,16 +659,16 @@ class Spi2TLULV2Spec extends AnyFreeSpec with ChiselSim {
       dc.waitTlACapture(2, 1000)
 
       // Wait for 0xFE bit-by-bit to align with the stream
-      var rxBuf = 0
+      var rxBuf   = 0
       var timeout = 0
-      while (rxBuf != 0xFE && timeout < 2000) {
+      while (rxBuf != 0xfe && timeout < 2000) {
         dut.io.spi_mosi.poke(false.B)
         dc.spiCycles(1)
         val bit = if (dut.io.spi_miso.peek().litValue != 0) 1 else 0
-        rxBuf = ((rxBuf << 1) & 0xFF) | bit
+        rxBuf = ((rxBuf << 1) & 0xff) | bit
         timeout += 1
       }
-      assert(rxBuf == 0xFE, "Should have found 0xFE sync byte bit-by-bit")
+      assert(rxBuf == 0xfe, "Should have found 0xFE sync byte bit-by-bit")
 
       // Now we are bit-aligned. Read next 16 bytes (first beat data)
       val beat0 = (0 until 16).map(_ => dc.spiRecvByte())
@@ -674,7 +677,7 @@ class Spi2TLULV2Spec extends AnyFreeSpec with ChiselSim {
 
       // Now check if next byte is 0xFE or something else
       val rx = dc.spiRecvByte()
-      assert(rx == 0xFE, s"Should have received second 0xFE sync byte, got 0x${rx.toHexString}")
+      assert(rx == 0xfe, s"Should have received second 0xFE sync byte, got 0x${rx.toHexString}")
 
       // Read next 16 bytes (second beat data)
       val beat1 = (0 until 16).map(_ => dc.spiRecvByte())

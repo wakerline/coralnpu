@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//rules:coralnpu_v2.bzl", "coralnpu_v2_binary")
 load("//rules:coco_tb.bzl", "cocotb_test_suite")
+load("//rules:coralnpu_v2.bzl", "coralnpu_v2_binary")
 load(
     "//tests/cocotb:build_defs.bzl",
     "VCS_BUILD_ARGS",
@@ -37,7 +37,7 @@ coralnpu_v2_binary(
         "float_matmul_16x48x16_runner.cc",
     ],
     deps = [
-        "//sw/utils:utils",
+        "//sw/utils",
     ],
 )
 
@@ -49,7 +49,7 @@ coralnpu_v2_binary(
         "int_matmul_16x48x16_runner.cc",
     ],
     deps = [
-        "//sw/utils:utils",
+        "//sw/utils",
     ],
 )
 

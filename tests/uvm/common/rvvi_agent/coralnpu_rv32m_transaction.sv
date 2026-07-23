@@ -22,11 +22,11 @@ class coralnpu_rv32m_transaction extends coralnpu_rvvi_decode_transaction;
   mult_div_e inst_name;
 
   `uvm_object_utils_begin(coralnpu_rv32m_transaction)
-        `uvm_field_enum (mult_div_e,inst_name, UVM_DEFAULT)
+    `uvm_field_enum(mult_div_e, inst_name, UVM_DEFAULT)
   `uvm_object_utils_end
 
   function new(string name = "coralnpu_rv32m_transaction");
     super.new(name);
-  endfunction:new
+  endfunction : new
 
-endclass:coralnpu_rv32m_transaction
+endclass : coralnpu_rv32m_transaction

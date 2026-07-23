@@ -18,7 +18,7 @@ import chisel3._
 import chisel3.util._
 
 object AxiResponseType extends ChiselEnum {
-  val OKAY = Value(0.U(2.W))
+  val OKAY   = Value(0.U(2.W))
   val EXOKAY = Value(1.U(2.W))
   val SLVERR = Value(2.U(2.W))
   val DECERR = Value(3.U(2.W))
@@ -26,15 +26,15 @@ object AxiResponseType extends ChiselEnum {
 
 object AxiBurstType extends ChiselEnum {
   val FIXED = Value(0.U)
-  val INCR = Value(1.U)
-  val WRAP = Value(2.U)
+  val INCR  = Value(1.U)
+  val WRAP  = Value(2.U)
 }
 
 // ARM IHI 0022E, A2.2 / A2.5
 class AxiAddress(addrWidthBits: Int, dataWidthBits: Int, idBits: Int) extends Bundle {
   // "Required"
-  val addr   = UInt(addrWidthBits.W)
-  val prot   = UInt(3.W)
+  val addr = UInt(addrWidthBits.W)
+  val prot = UInt(3.W)
   // "Optional"
   val id     = UInt(idBits.W)
   val len    = UInt(8.W)
@@ -63,10 +63,10 @@ class AxiWriteData(dataWidthBits: Int, idBits: Int) extends Bundle {
   val data = UInt(dataWidthBits.W)
   val last = Bool()
   // "Optional"
-  val strb = UInt((dataWidthBits/8).W)
+  val strb = UInt((dataWidthBits / 8).W)
 
   def defaults() = {
-    strb := ((1 << (dataWidthBits/8)) - 1).U
+    strb := ((1 << (dataWidthBits / 8)) - 1).U
   }
 }
 
@@ -92,7 +92,7 @@ class AxiReadData(dataWidthBits: Int, idBits: Int) extends Bundle {
   val data = UInt(dataWidthBits.W)
   // "Optional"
   val id   = UInt(idBits.W)
-  val resp = UInt(2.W)  // 00 = Okay, 01 = ExOkay, 10 = SlvErr, 11 = DecErr
+  val resp = UInt(2.W) // 00 = Okay, 01 = ExOkay, 10 = SlvErr, 11 = DecErr
   val last = Bool()
 
   def defaults() = {
@@ -113,7 +113,7 @@ class AxiLiteAddress(addrWidthBits: Int) extends Bundle {
 
 class AxiLiteWriteData(dataWidthBits: Int) extends Bundle {
   val data = UInt(dataWidthBits.W)
-  val strb = UInt((dataWidthBits/8).W)
+  val strb = UInt((dataWidthBits / 8).W)
 }
 
 class AxiLiteReadData(dataWidthBits: Int) extends Bundle {
@@ -121,10 +121,9 @@ class AxiLiteReadData(dataWidthBits: Int) extends Bundle {
   val resp = UInt(2.W)
 }
 
-class AxiMasterIO(addrWidthBits: Int, dataWidthBits: Int, idBits: Int)
-    extends Bundle {
+class AxiMasterIO(addrWidthBits: Int, dataWidthBits: Int, idBits: Int) extends Bundle {
   val write = new AxiMasterWriteIO(addrWidthBits, dataWidthBits, idBits)
-  val read = new AxiMasterReadIO(addrWidthBits, dataWidthBits, idBits)
+  val read  = new AxiMasterReadIO(addrWidthBits, dataWidthBits, idBits)
 
   def defaults() = {
     write.defaults()
@@ -137,8 +136,7 @@ class AxiMasterIO(addrWidthBits: Int, dataWidthBits: Int, idBits: Int)
   }
 }
 
-class AxiMasterWriteIO(addrWidthBits: Int, dataWidthBits: Int, idBits: Int)
-    extends Bundle {
+class AxiMasterWriteIO(addrWidthBits: Int, dataWidthBits: Int, idBits: Int) extends Bundle {
   val addr = Decoupled(new AxiAddress(addrWidthBits, dataWidthBits, idBits))
   val data = Decoupled(new AxiWriteData(dataWidthBits, idBits))
   val resp = Flipped(Decoupled(new AxiWriteResponse(idBits)))
@@ -159,8 +157,7 @@ class AxiMasterWriteIO(addrWidthBits: Int, dataWidthBits: Int, idBits: Int)
   }
 }
 
-class AxiMasterReadIO(addrWidthBits: Int, dataWidthBits: Int, idBits: Int)
-    extends Bundle {
+class AxiMasterReadIO(addrWidthBits: Int, dataWidthBits: Int, idBits: Int) extends Bundle {
   val addr = Decoupled(new AxiAddress(addrWidthBits, dataWidthBits, idBits))
   val data = Flipped(Decoupled(new AxiReadData(dataWidthBits, idBits)))
 
@@ -188,8 +185,7 @@ class AxiLiteMasterWriteIO(val addrWidthBits: Int, val dataWidthBits: Int) exten
   val resp = Flipped(Decoupled(UInt(2.W)))
 }
 
-class AxiLiteMasterReadIO(addrWidthBits: Int, dataWidthBits: Int)
-    extends Bundle {
+class AxiLiteMasterReadIO(addrWidthBits: Int, dataWidthBits: Int) extends Bundle {
   val addr = Decoupled(new AxiLiteAddress(addrWidthBits))
   val data = Flipped(Decoupled(new AxiLiteReadData(dataWidthBits)))
 }

@@ -61,7 +61,12 @@ package coralnpu_cosim_checker_pkg;
 
     // Use fully parameterized virtual interface type
     virtual rvviTrace #(
-      .ILEN(32), .XLEN(32), .FLEN(32), .VLEN(128), .NHART(1), .RETIRE(8)
+        .ILEN  (32),
+        .XLEN  (32),
+        .FLEN  (32),
+        .VLEN  (128),
+        .NHART (1),
+        .RETIRE(8)
     ) rvvi_vif;
 
     // Event to wait on, which will be triggered by the RVVI monitor
@@ -77,16 +82,17 @@ package coralnpu_cosim_checker_pkg;
     // Function: is_varying_csr_read
     // Checks if the instruction is a CSR read of varying counters (mcycle, cycle, time)
     function bit is_varying_csr_read(logic [31:0] insn);
-      logic [6:0]  opcode = insn[6:0];
-      logic [2:0]  funct3 = insn[14:12];
-      logic [11:0] csr    = insn[31:20];
-      logic [4:0]  rd     = insn[11:7];
+      logic [ 6:0] opcode = insn[6:0];
+      logic [ 2:0] funct3 = insn[14:12];
+      logic [11:0] csr = insn[31:20];
+      logic [ 4:0] rd = insn[11:7];
 
-      if (opcode == 7'b1110011) begin // SYSTEM opcode
+      if (opcode == 7'b1110011) begin  // SYSTEM opcode
         if (funct3 != 3'b000) begin
-          if (rd != 0 && (csr == 12'hB00 || csr == 12'hB80 || // mcycle / mcycleh
-                          csr == 12'hC00 || csr == 12'hC80 || // cycle / cycleh
-                          csr == 12'hC01 || csr == 12'hC81)) begin // time / timeh
+          if (rd != 0 && (csr == 12'hB00 || csr == 12'hB80 ||  // mcycle / mcycleh
+              csr == 12'hB02 || csr == 12'hB82 ||  // minstret / minstreth
+              csr == 12'hC00 || csr == 12'hC80 ||  // cycle / cycleh
+              csr == 12'hC01 || csr == 12'hC81)) begin  // time / timeh
             return 1;
           end
         end
@@ -96,30 +102,44 @@ package coralnpu_cosim_checker_pkg;
 
     // Function: update_dirty_registers
     // Tracks the lifetime of registers loaded with varying CSR values
-    function bit [31:0] update_dirty_registers(retired_instr_info_s rtl_info, input int unsigned pre_step_sp);
-      logic [6:0]  opcode = rtl_info.insn[6:0];
-      logic [2:0]  funct3 = rtl_info.insn[14:12];
-      logic [11:0] csr    = rtl_info.insn[31:20];
-      logic [4:0]  rd     = rtl_info.insn[11:7];
-      logic [4:0]  rs1    = rtl_info.insn[19:15];
-      logic [4:0]  rs2    = rtl_info.insn[24:20];
+    function bit [31:0] update_dirty_registers(retired_instr_info_s rtl_info,
+                                               input int unsigned pre_step_sp);
+      logic [ 6:0] opcode = rtl_info.insn[6:0];
+      logic [ 2:0] funct3 = rtl_info.insn[14:12];
+      logic [11:0] csr = rtl_info.insn[31:20];
+      logic [ 4:0] rd = rtl_info.insn[11:7];
+      logic [ 4:0] rs1 = rtl_info.insn[19:15];
+      logic [ 4:0] rs2 = rtl_info.insn[24:20];
 
-      bit reads_rs1 = 0;
-      bit reads_rs2 = 0;
-      bit is_varying_read = 0;
-      bit consumes_dirty = 0;
-      bit [31:0] skip_mask = 0;
+      bit          reads_rs1 = 0;
+      bit          reads_rs2 = 0;
+      bit          is_varying_read = 0;
+      bit          consumes_dirty = 0;
+      bit   [31:0] skip_mask = 0;
 
       // 1. Detect varying CSR read
       is_varying_read = is_varying_csr_read(rtl_info.insn);
 
       // 2. Decode GPR reads
       case (opcode)
-        7'b0110011: begin reads_rs1 = 1; reads_rs2 = 1; end // OP
-        7'b0010011: begin reads_rs1 = 1; end                // OP-IMM
-        7'b0000011: begin reads_rs1 = 1; end                // LOAD
-        7'b0100011: begin reads_rs1 = 1; reads_rs2 = 1; end // STORE
-        7'b1100011: begin reads_rs1 = 1; reads_rs2 = 1; end // BRANCH
+        7'b0110011: begin
+          reads_rs1 = 1;
+          reads_rs2 = 1;
+        end  // OP
+        7'b0010011: begin
+          reads_rs1 = 1;
+        end  // OP-IMM
+        7'b0000011: begin
+          reads_rs1 = 1;
+        end  // LOAD
+        7'b0100011: begin
+          reads_rs1 = 1;
+          reads_rs2 = 1;
+        end  // STORE
+        7'b1100011: begin
+          reads_rs1 = 1;
+          reads_rs2 = 1;
+        end  // BRANCH
 
 
       endcase
@@ -129,18 +149,21 @@ package coralnpu_cosim_checker_pkg;
       if (reads_rs2 && rs2 != 0 && dirty_gprs[rs2]) consumes_dirty = 1;
 
       // 3.5. Trace stack reloads (byte-granular)
-      if (opcode == 7'b0000011 && rs1 == 2) begin // LOAD sp-relative (LB, LH, LW, LBU, LHU)
+      if (opcode == 7'b0000011 && rs1 == 2) begin  // LOAD sp-relative (LB, LH, LW, LBU, LHU)
         int offset = $signed(rtl_info.insn[31:20]);
-        int size = (funct3 == 3'b000 || funct3 == 3'b100) ? 1 : // Byte
-                   (funct3 == 3'b001 || funct3 == 3'b101) ? 2 : // Halfword
-                   (funct3 == 3'b010) ? 4 : 0;                  // Word
+        int size = (funct3 == 3'b000 || funct3 == 3'b100) ? 1 :  // Byte
+        (funct3 == 3'b001 || funct3 == 3'b101) ? 2 :  // Halfword
+        (funct3 == 3'b010) ? 4 : 0;  // Word
         begin
           int addr = pre_step_sp + offset;
           for (int i = 0; i < size; i++) begin
-            if (dirty_stack.exists(addr + i) && dirty_stack[addr + i] == 1) begin
+            if (dirty_stack.exists(addr + i) && dirty_stack[addr+i] == 1) begin
               consumes_dirty = 1;
-              `uvm_info("COSIM_STACK_RELOAD", $sformatf("Stack address 0x%h (sp+0x%h, size=%0d) is DIRTY, GPR[x%0d] marked DIRTY at PC 0x%h",
-                         addr + i, offset + i, size, rd, rtl_info.pc), UVM_LOW)
+              `uvm_info(
+                  "COSIM_STACK_RELOAD",
+                  $sformatf(
+                      "Stack address 0x%h (sp+0x%h, size=%0d) is DIRTY, GPR[x%0d] marked DIRTY at PC 0x%h",
+                      addr + i, offset + i, size, rd, rtl_info.pc), UVM_LOW)
               break;
             end
           end
@@ -151,30 +174,34 @@ package coralnpu_cosim_checker_pkg;
       if (rtl_info.x_wb != 0) begin
         if (rd != 0) begin
           if (is_varying_read || consumes_dirty) begin
-            skip_mask[rd] = 1;
+            skip_mask[rd]  = 1;
             dirty_gprs[rd] = 1;
-            `uvm_info("COSIM_DIRTY", $sformatf("GPR[x%0d] marked DIRTY at PC 0x%h (varying=%b, consumes=%b)",
-                       rd, rtl_info.pc, is_varying_read, consumes_dirty), UVM_LOW)
+            `uvm_info("COSIM_DIRTY",
+                      $sformatf("GPR[x%0d] marked DIRTY at PC 0x%h (varying=%b, consumes=%b)", rd,
+                                rtl_info.pc, is_varying_read, consumes_dirty), UVM_LOW)
           end else begin
-            dirty_gprs[rd] = 0; // Overwritten with clean value
+            dirty_gprs[rd] = 0;  // Overwritten with clean value
           end
         end
       end
 
       // 4.5. Trace stack spills (byte-granular, uses updated dirty state)
-      if (opcode == 7'b0100011 && rs1 == 2) begin // STORE sp-relative (SB, SH, SW)
+      if (opcode == 7'b0100011 && rs1 == 2) begin  // STORE sp-relative (SB, SH, SW)
         int offset = $signed({rtl_info.insn[31:25], rtl_info.insn[11:7]});
-        int size = (funct3 == 3'b000) ? 1 : // Byte
-                   (funct3 == 3'b001) ? 2 : // Halfword
-                   (funct3 == 3'b010) ? 4 : 0; // Word
+        int size = (funct3 == 3'b000) ? 1 :  // Byte
+        (funct3 == 3'b001) ? 2 :  // Halfword
+        (funct3 == 3'b010) ? 4 : 0;  // Word
         begin
           int addr = pre_step_sp + offset;
           if (rs2 != 0 && dirty_gprs[rs2]) begin
             for (int i = 0; i < size; i++) begin
-              dirty_stack[addr + i] = 1;
+              dirty_stack[addr+i] = 1;
             end
-            `uvm_info("COSIM_STACK_SPILL", $sformatf("Stack address 0x%h (sp+0x%h, size=%0d) marked DIRTY (spilled GPR[x%0d]) at PC 0x%h",
-                       addr, offset, size, rs2, rtl_info.pc), UVM_LOW)
+            `uvm_info(
+                "COSIM_STACK_SPILL",
+                $sformatf(
+                    "Stack address 0x%h (sp+0x%h, size=%0d) marked DIRTY (spilled GPR[x%0d]) at PC 0x%h",
+                    addr, offset, size, rs2, rtl_info.pc), UVM_LOW)
           end else begin
             for (int i = 0; i < size; i++) begin
               dirty_stack.delete(addr + i);
@@ -188,8 +215,7 @@ package coralnpu_cosim_checker_pkg;
 
 
     // Constructor
-    function new(string name = "coralnpu_cosim_checker",
-                 uvm_component parent = null);
+    function new(string name = "coralnpu_cosim_checker", uvm_component parent = null);
       super.new(name, parent);
     endfunction
 
@@ -197,24 +223,29 @@ package coralnpu_cosim_checker_pkg;
     virtual function void build_phase(uvm_phase phase);
       super.build_phase(phase);
       // Get the RVVI virtual interface from the config_db (set by tb_top)
-      if (!uvm_config_db#(
-          virtual rvviTrace #(.ILEN(32), .XLEN(32), .FLEN(32), .VLEN(128),
-                              .NHART(1), .RETIRE(8))
-          )::get(this, "", "rvvi_vif", rvvi_vif)) begin
-         `uvm_fatal(get_type_name(), "RVVI virtual interface not found!")
+      if (!uvm_config_db#(virtual rvviTrace #(
+              .ILEN  (32),
+              .XLEN  (32),
+              .FLEN  (32),
+              .VLEN  (128),
+              .NHART (1),
+              .RETIRE(8)
+          ))::get(
+              this, "", "rvvi_vif", rvvi_vif
+          )) begin
+        `uvm_fatal(get_type_name(), "RVVI virtual interface not found!")
       end
 
-      if (!uvm_config_db#(int unsigned)::get(this, "",
-          "initial_misa_value", initial_misa_value)) begin
-        `uvm_fatal(get_type_name(),
-          "'initial_misa_value' not found in config_db")
+      if (!uvm_config_db#(int unsigned)::get(
+              this, "", "initial_misa_value", initial_misa_value
+          )) begin
+        `uvm_fatal(get_type_name(), "'initial_misa_value' not found in config_db")
       end
 
       // Create the event that this component will wait on.
       instruction_retired_event = new("instruction_retired_event");
       // Pass the event to the monitor using an absolute path
-      uvm_config_db#(uvm_event)::set(null, "*.m_rvvi_agent.monitor",
-                                     "instruction_retired_event",
+      uvm_config_db#(uvm_event)::set(null, "*.m_rvvi_agent.monitor", "instruction_retired_event",
                                      instruction_retired_event);
     endfunction
 
@@ -235,11 +266,10 @@ package coralnpu_cosim_checker_pkg;
           info.x_wb = rvvi_vif.x_wb[0][i];
           info.f_wb = rvvi_vif.f_wb[0][i];
           info.v_wb = rvvi_vif.v_wb[0][i];
-          info.retire_index = i; // Store the original channel index
+          info.retire_index = i;  // Store the original channel index
           retired_instr_q.push_back(info);
-          `uvm_info(get_type_name(),
-            $sformatf("RTL Retired: PC=0x%h, Insn=0x%h", info.pc, info.insn),
-            UVM_HIGH)
+          `uvm_info(get_type_name(), $sformatf("RTL Retired: PC=0x%h, Insn=0x%h", info.pc,
+                                               info.insn), UVM_HIGH)
         end
       end
     endtask
@@ -247,7 +277,8 @@ package coralnpu_cosim_checker_pkg;
     // Task: process_instruction
     // Matches the current MPACT state with a retired RTL instruction,
     // steps MPACT, performs Spike sync/check if enabled, and verifies writeback.
-    virtual task process_instruction(ref retired_instr_info_s retired_instr_q[$], input uvm_phase phase);
+    virtual task process_instruction(ref retired_instr_info_s retired_instr_q[$],
+                                     input uvm_phase phase);
       int unsigned mpact_pc;
       int match_index = -1;
       logic [31:0] rtl_instr;
@@ -271,17 +302,15 @@ package coralnpu_cosim_checker_pkg;
           rtl_pcs_str = $sformatf("%s0x%h ", rtl_pcs_str, retired_instr_q[j].pc);
         end
         rtl_pcs_str = {rtl_pcs_str, "]"};
-        `uvm_error("COSIM_PC_MISMATCH",
-          $sformatf("MPACT PC 0x%h mismatches retired RTL PCs: %s",
-                    mpact_pc, rtl_pcs_str))
+        `uvm_error("COSIM_PC_MISMATCH", $sformatf("MPACT PC 0x%h mismatches retired RTL PCs: %s",
+                                                  mpact_pc, rtl_pcs_str))
         mismatch_detected = 1;
         return;
       end
 
       rtl_instr = retired_instr_q[match_index].insn;
-      `uvm_info(get_type_name(),
-                $sformatf("PC match (0x%h). Stepping MPACT with 0x%h",
-                          mpact_pc, rtl_instr), UVM_HIGH)
+      `uvm_info(get_type_name(), $sformatf("PC match (0x%h). Stepping MPACT with 0x%h", mpact_pc,
+                                           rtl_instr), UVM_HIGH)
 
       if (mpact_get_register("sp", pre_step_sp) != 0) begin
         `uvm_error("COSIM_API_FAIL", "Failed to get pre-step SP from MPACT.")
@@ -317,24 +346,17 @@ package coralnpu_cosim_checker_pkg;
       uvm_event test_start_event;
 
       if (!uvm_config_db#(uvm_event)::get(this, "", "test_start_event", test_start_event)) begin
-         // If not found, assume it is provided by the test via top
+        // If not found, assume it is provided by the test via top
       end
 
       itcm_start_address = memory_map_pkg::ITCM_START_ADDR;
       itcm_length = memory_map_pkg::ITCM_LENGTH;
 
-      `uvm_info("DPI_CALL",
-        $sformatf({"Configuring MPACT with: MISA=0x%h, ITCM Start=0x%h, ",
-                   "ITCM Length=0x%h"},
-                  initial_misa_value, itcm_start_address,
-                  itcm_length),
-        UVM_MEDIUM)
+      `uvm_info("DPI_CALL", $sformatf({"Configuring MPACT with: MISA=0x%h, ITCM Start=0x%h, ",
+                                       "ITCM Length=0x%h"}, initial_misa_value, itcm_start_address,
+                                        itcm_length), UVM_MEDIUM)
 
-      dpi_cfg_s = {<<32{
-          itcm_start_address,
-          itcm_length,
-          initial_misa_value,
-          32'd1 // M3
+      dpi_cfg_s = {<<32{itcm_start_address, itcm_length, initial_misa_value, 32'd1  // M3
       }};
 
       forever begin
@@ -352,25 +374,26 @@ package coralnpu_cosim_checker_pkg;
         uvm_config_db#(bit)::set(null, "*", "cosim_mismatch_detected", 0);
 
         if (uvm_config_db#(string)::get(this, "", "current_test_elf", current_test_elf)) begin
-           test_elf = current_test_elf;
+          test_elf = current_test_elf;
         end
 
         // Spike checker initialization per test
-        if (uvm_config_db#(string)::get(this, "", "current_spike_log", current_spike_log) && current_spike_log != "" && current_spike_log != "NONE") begin
-           if (spike_checker == null) begin
-              spike_checker = spike_cosim_checker::type_id::create("spike_checker");
-           end
-           spike_checker.initialize(current_spike_log);
+        if (uvm_config_db#(string)::get(
+                this, "", "current_spike_log", current_spike_log
+            ) && current_spike_log != "" && current_spike_log != "NONE") begin
+          if (spike_checker == null) begin
+            spike_checker = spike_cosim_checker::type_id::create("spike_checker");
+          end
+          spike_checker.initialize(current_spike_log);
         end else begin
-           spike_checker = null;
+          spike_checker = null;
         end
 
         `uvm_info(get_type_name(), $sformatf("Initializing Co-Sim for %s", test_elf), UVM_LOW)
 
         void'(mpact_fini());
 
-        if (mpact_init() != 0)
-          `uvm_error(get_type_name(), "MPACT simulator DPI init failed.")
+        if (mpact_init() != 0) `uvm_error(get_type_name(), "MPACT simulator DPI init failed.")
         if (mpact_config(dpi_cfg_s) != 0)
           `uvm_error(get_type_name(), "MPACT simulator DPI config failed.")
         if (mpact_load_program(test_elf) != 0)
@@ -393,8 +416,8 @@ package coralnpu_cosim_checker_pkg;
             end
           end
           begin : wait_for_next_test
-             // Wait for the event again (which signals next test) to kill the processing loop
-             test_start_event.wait_trigger();
+            // Wait for the event again (which signals next test) to kill the processing loop
+            test_start_event.wait_trigger();
           end
         join_any
         disable fork;
@@ -408,7 +431,8 @@ package coralnpu_cosim_checker_pkg;
     // 2. FPR (floating-point) writes: Checks the f_wb mask and compares the written data.
     // 3. VPR (vector) writes: Checks the v_wb bitmask and compares each written vector register.
     // Returns 1 if all checks pass, 0 otherwise.
-    virtual function bit step_and_compare(retired_instr_info_s rtl_info, input bit [31:0] skip_mask);
+    virtual function bit step_and_compare(retired_instr_info_s rtl_info,
+                                          input bit [31:0] skip_mask);
       int unsigned mpact_gpr_val;
       int unsigned rd_index;
       logic [31:0] rtl_wdata;
@@ -417,30 +441,29 @@ package coralnpu_cosim_checker_pkg;
       `uvm_info(get_type_name(), "Comparing GPR writeback state...", UVM_HIGH)
 
       if (!$onehot0(rtl_info.x_wb)) begin
-        `uvm_error("COSIM_GPR_MISMATCH",
-          $sformatf({"Invalid GPR writeback flag at PC 0x%h. ",
-                     "x_wb is not one-hot: 0x%h"},
-                    rtl_info.pc, rtl_info.x_wb))
-        return 0; // FAIL
+        `uvm_error("COSIM_GPR_MISMATCH", $sformatf({"Invalid GPR writeback flag at PC 0x%h. ",
+                                                    "x_wb is not one-hot: 0x%h"}, rtl_info.pc,
+                                                     rtl_info.x_wb))
+        return 0;  // FAIL
       end
 
       if (rtl_info.x_wb == 1) begin
-        `uvm_error("COSIM_GPR_MISMATCH",
-          $sformatf("Illegal write to x0 detected at PC 0x%h.", rtl_info.pc))
-        return 0; // FAIL
-      end
-      else if (rtl_info.x_wb != 0) begin
+        `uvm_error("COSIM_GPR_MISMATCH", $sformatf("Illegal write to x0 detected at PC 0x%h.",
+                                                   rtl_info.pc))
+        return 0;  // FAIL
+      end else if (rtl_info.x_wb != 0) begin
         rd_index = $clog2(rtl_info.x_wb);
         reg_name = $sformatf("x%0d", rd_index);
         if (skip_mask[rd_index]) begin
-          `uvm_info("COSIM_SKIP", $sformatf("Skipping GPR[%s] comparison at PC 0x%h due to dirty mask", reg_name, rtl_info.pc), UVM_LOW)
-          return 1; // PASS (skipped)
+          `uvm_info("COSIM_SKIP", $sformatf(
+                                      "Skipping GPR[%s] comparison at PC 0x%h due to dirty mask",
+                                      reg_name, rtl_info.pc), UVM_LOW)
+          return 1;  // PASS (skipped)
         end
 
         if (mpact_get_register(reg_name, mpact_gpr_val) != 0) begin
-          `uvm_error("COSIM_API_FAIL",
-            $sformatf("Failed to get GPR '%s'", reg_name));
-          return 0; // FAIL
+          `uvm_error("COSIM_API_FAIL", $sformatf("Failed to get GPR '%s'", reg_name));
+          return 0;  // FAIL
         end
 
         // Get the specific write data from the correct retire channel and
@@ -449,16 +472,27 @@ package coralnpu_cosim_checker_pkg;
 
         if (mpact_gpr_val != rtl_wdata) begin
           string msg;
-          msg = $sformatf({"GPR[x%0d] mismatch at PC 0x%h. ",
-                           "RTL: 0x%h, MPACT: 0x%h"},
-                          rd_index, rtl_info.pc,
-                          rtl_wdata, mpact_gpr_val);
+          msg = $sformatf(
+              {
+                "GPR[x%0d] mismatch at PC 0x%h. ", "RTL: 0x%h, MPACT: 0x%h"
+              },
+              rd_index,
+              rtl_info.pc,
+              rtl_wdata,
+              mpact_gpr_val
+          );
           `uvm_error("COSIM_GPR_MISMATCH", msg)
-          return 0; // FAIL
+          return 0;  // FAIL
         end else begin
-          `uvm_info("MPACT_MATCH", $sformatf({"GPR[x%0d] match at PC 0x%h. ",
-                                              "RTL: 0x%h, MPACT: 0x%h"},
-                                             rd_index, rtl_info.pc, rtl_wdata, mpact_gpr_val), UVM_HIGH)
+          `uvm_info("MPACT_MATCH", $sformatf(
+                    {
+                      "GPR[x%0d] match at PC 0x%h. ", "RTL: 0x%h, MPACT: 0x%h"
+                    },
+                    rd_index,
+                    rtl_info.pc,
+                    rtl_wdata,
+                    mpact_gpr_val
+                    ), UVM_HIGH)
         end
       end
 
@@ -466,11 +500,10 @@ package coralnpu_cosim_checker_pkg;
       if (rtl_info.f_wb != 0) begin
         int unsigned mpact_fpr_val;
         if (!$onehot0(rtl_info.f_wb)) begin
-          `uvm_error("COSIM_FPR_MISMATCH",
-                     $sformatf({"Invalid FPR writeback flag at PC 0x%h. ",
-                                "f_wb is not one-hot: 0x%h"},
-                               rtl_info.pc, rtl_info.f_wb))
-          return 0; // FAIL
+          `uvm_error("COSIM_FPR_MISMATCH", $sformatf({"Invalid FPR writeback flag at PC 0x%h. ",
+                                                      "f_wb is not one-hot: 0x%h"}, rtl_info.pc,
+                                                       rtl_info.f_wb))
+          return 0;  // FAIL
         end
 
         rd_index = $clog2(rtl_info.f_wb);
@@ -479,9 +512,8 @@ package coralnpu_cosim_checker_pkg;
 
         reg_name = $sformatf("f%0d", rd_index);
         if (mpact_get_register(reg_name, mpact_fpr_val) != 0) begin
-          `uvm_error("COSIM_API_FAIL",
-                     $sformatf("Failed to get FPR '%s'", reg_name));
-          return 0; // FAIL
+          `uvm_error("COSIM_API_FAIL", $sformatf("Failed to get FPR '%s'", reg_name));
+          return 0;  // FAIL
         end
 
         // Get the specific write data from the correct retire channel and register index
@@ -489,14 +521,20 @@ package coralnpu_cosim_checker_pkg;
 
         if (mpact_fpr_val != rtl_wdata) begin
           string msg;
-          msg = $sformatf("FPR[f%0d] mismatch at PC 0x%h. RTL: 0x%h, MPACT: 0x%h",
-                          rd_index, rtl_info.pc, rtl_wdata, mpact_fpr_val);
+          msg = $sformatf(
+              "FPR[f%0d] mismatch at PC 0x%h. RTL: 0x%h, MPACT: 0x%h",
+              rd_index,
+              rtl_info.pc,
+              rtl_wdata,
+              mpact_fpr_val
+          );
           `uvm_error("COSIM_FPR_MISMATCH", msg)
-          return 0; // FAIL
+          return 0;  // FAIL
         end
 
         `uvm_info("MPACT_MATCH", $sformatf("FPR[f%0d] match at PC 0x%h. RTL: 0x%h, MPACT: 0x%h",
-                                           rd_index, rtl_info.pc, rtl_wdata, mpact_fpr_val), UVM_HIGH)
+                                           rd_index, rtl_info.pc, rtl_wdata, mpact_fpr_val),
+                  UVM_HIGH)
       end
 
       // Vector Writeback Detection
@@ -509,9 +547,8 @@ package coralnpu_cosim_checker_pkg;
             rd_index = i;
             reg_name = $sformatf("v%0d", rd_index);
             if (mpact_get_vector_register(reg_name, mpact_vpr_val) != 0) begin
-              `uvm_error("COSIM_API_FAIL",
-                         $sformatf("Failed to get VPR '%s'", reg_name));
-              return 0; // FAIL
+              `uvm_error("COSIM_API_FAIL", $sformatf("Failed to get VPR '%s'", reg_name));
+              return 0;  // FAIL
             end
 
             // Get the specific write data from the correct retire channel and register index
@@ -519,20 +556,26 @@ package coralnpu_cosim_checker_pkg;
 
             if (mpact_vpr_val != rtl_vpr_wdata) begin
               string msg;
-              msg = $sformatf("VPR[v%0d] mismatch at PC 0x%h. RTL: 0x%h, MPACT: 0x%h",
-                              rd_index, rtl_info.pc, rtl_vpr_wdata, mpact_vpr_val);
+              msg = $sformatf(
+                  "VPR[v%0d] mismatch at PC 0x%h. RTL: 0x%h, MPACT: 0x%h",
+                  rd_index,
+                  rtl_info.pc,
+                  rtl_vpr_wdata,
+                  mpact_vpr_val
+              );
               `uvm_error("COSIM_VPR_MISMATCH", msg)
-              return 0; // FAIL
+              return 0;  // FAIL
             end
 
-            `uvm_info("MPACT_MATCH", $sformatf("VPR[v%0d] match at PC 0x%h. RTL: 0x%h, MPACT: 0x%h",
-                                               rd_index, rtl_info.pc, rtl_vpr_wdata, mpact_vpr_val), UVM_HIGH)
+            `uvm_info("MPACT_MATCH",
+                      $sformatf("VPR[v%0d] match at PC 0x%h. RTL: 0x%h, MPACT: 0x%h", rd_index,
+                                rtl_info.pc, rtl_vpr_wdata, mpact_vpr_val), UVM_HIGH)
           end
         end
       end
 
       // If we reach here, all checks passed for this instruction.
-      return 1; // PASS
+      return 1;  // PASS
     endfunction
 
   endclass : coralnpu_cosim_checker

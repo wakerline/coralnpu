@@ -18,11 +18,16 @@ import chisel3._
 import chisel3.simulator.scalatest.ChiselSim
 import org.scalatest.freespec.AnyFreeSpec
 
-
 class FetchReorderBufferSpec extends AnyFreeSpec with ChiselSim {
   val capacity = 4
 
-  def makeDut(flowResponse: Boolean = false) = new FetchReorderBuffer(txidBits=4, addrBits=32, dataBits=128, capacity=capacity, flowResponse=flowResponse)
+  def makeDut(flowResponse: Boolean = false) = new FetchReorderBuffer(
+    txidBits = 4,
+    addrBits = 32,
+    dataBits = 128,
+    capacity = capacity,
+    flowResponse = flowResponse
+  )
 
   def runTest(testFn: FetchReorderBuffer => Unit): Unit = {
     simulate(makeDut()) { dut =>
@@ -47,7 +52,12 @@ class FetchReorderBufferSpec extends AnyFreeSpec with ChiselSim {
     dut.io.newTx.valid.poke(false.B)
   }
 
-  def pokeBusResp(dut: => FetchReorderBuffer, txid: UInt, data: UInt, fault: Bool = false.B): Unit = {
+  def pokeBusResp(
+    dut: => FetchReorderBuffer,
+    txid: UInt,
+    data: UInt,
+    fault: Bool = false.B
+  ): Unit = {
     dut.io.busResp.valid.poke(true.B)
     dut.io.busResp.bits.txid.poke(txid)
     dut.io.busResp.bits.resp.data.poke(data)
@@ -59,7 +69,12 @@ class FetchReorderBufferSpec extends AnyFreeSpec with ChiselSim {
     dut.io.freeTxid.bits.expect(txid)
   }
 
-  def expectCommit(dut: => FetchReorderBuffer, addr: UInt, data: UInt, fault: Bool = false.B): Unit = {
+  def expectCommit(
+    dut: => FetchReorderBuffer,
+    addr: UInt,
+    data: UInt,
+    fault: Bool = false.B
+  ): Unit = {
     dut.io.commit.valid.expect(true.B)
     dut.io.commit.bits.addr.expect(addr)
     dut.io.commit.bits.resp.data.expect(data)
@@ -90,7 +105,11 @@ class FetchReorderBufferSpec extends AnyFreeSpec with ChiselSim {
     dut.io.newTx.ready.expect(ready.B)
   }
 
-  def setupQueue(dut: => FetchReorderBuffer, txids: Seq[Int], respondedTxids: Seq[Int] = Seq.empty): Unit = {
+  def setupQueue(
+    dut: => FetchReorderBuffer,
+    txids: Seq[Int],
+    respondedTxids: Seq[Int] = Seq.empty
+  ): Unit = {
     for (txid <- txids) {
       enqueueTx(dut, txid.U, (txid * 0x100).U)
     }
@@ -121,7 +140,7 @@ class FetchReorderBufferSpec extends AnyFreeSpec with ChiselSim {
         setCommitReady(dut, true)
 
         enqueueTx(dut, 1.U, 0x100.U)
-        
+
         // Provide response with fault = true
         pokeBusResp(dut, 1.U, 0x1000.U, fault = true.B)
         dut.clock.step()
@@ -212,7 +231,7 @@ class FetchReorderBufferSpec extends AnyFreeSpec with ChiselSim {
       runTest { dut =>
         // Setup: Enqueue Tx 1, 2, 3 and provide response for Tx 3 (out of order)
         setupQueue(dut, Seq(1, 2, 3), Seq(3))
-        
+
         // Tx 1 is at head, un-responded. Commit must be blocked.
         expectNoCommit(dut)
 
@@ -434,14 +453,14 @@ class FetchReorderBufferSpec extends AnyFreeSpec with ChiselSim {
 
         setCommitReady(dut, true)
         pokeNewTx(dut, 5.U, 0x500.U)
-        
+
         expectCommit(dut, 0x100.U, 0x1000.U)
         expectNewTxReady(dut, true)
         dut.clock.step()
 
         setCommitReady(dut, false)
         dut.io.newTx.valid.poke(false.B)
-        
+
         // Buffer is full again (Tx 2, 3, 4, 5 waiting for responses)
         expectNewTxReady(dut, false)
       }
@@ -454,9 +473,9 @@ class FetchReorderBufferSpec extends AnyFreeSpec with ChiselSim {
 
         setFlush(dut, true)
         pokeBusResp(dut, 1.U, 0x1000.U)
-        
+
         expectFreeTxid(dut, 1.U)
-        
+
         pokeNewTx(dut, 5.U, 0x500.U)
         expectNewTxReady(dut, true)
         dut.clock.step()
@@ -481,7 +500,7 @@ class FetchReorderBufferSpec extends AnyFreeSpec with ChiselSim {
 
         // Provide response. Because flowResponse=true, commit goes valid immediately!
         pokeBusResp(d, 1.U, 0x1000.U)
-        
+
         // Unblocked in the SAME cycle
         expectCommit(d, 0x100.U, 0x1000.U)
 
@@ -494,7 +513,7 @@ class FetchReorderBufferSpec extends AnyFreeSpec with ChiselSim {
         setCommitReady(d, false)
         expectNoCommit(d)
         expectNewTxReady(d, true)
-        
+
         // Enqueue enough to prove the buffer is empty
         verifyQueueEmpty(d)
       }
@@ -515,7 +534,7 @@ class FetchReorderBufferSpec extends AnyFreeSpec with ChiselSim {
 
         // Provide response with fault = true. Because flowResponse=true, commit goes valid immediately!
         pokeBusResp(d, 1.U, 0x1000.U, fault = true.B)
-        
+
         // Unblocked in the SAME cycle, and the fault bit is propagated!
         expectCommit(d, 0x100.U, 0x1000.U, fault = true.B)
 
@@ -528,7 +547,7 @@ class FetchReorderBufferSpec extends AnyFreeSpec with ChiselSim {
         setCommitReady(d, false)
         expectNoCommit(d)
         expectNewTxReady(d, true)
-        
+
         verifyQueueEmpty(d)
       }
     }

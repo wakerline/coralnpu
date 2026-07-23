@@ -16,7 +16,6 @@ package bus
 
 import chisel3._
 import chisel3.util._
-import coralnpu.Parameters
 
 /** IO bundle for standard 4-wire SPI interface.
   */
@@ -32,8 +31,8 @@ class SpiIO extends Bundle {
   * This module manages the SPI protocol state machine, baud rate generation, and data buffering
   * using internal FIFOs. It interfaces with the bus via a TileLink-UL slave port.
   */
-class SpiMasterCtrl(p: Parameters) extends Module {
-  val tlul_p = new TLULParameters(p)
+class SpiMasterCtrl(p: TLULParameters) extends Module {
+  val tlul_p = p
   val io     = IO(new Bundle {
     val tl  = Flipped(new OpenTitanTileLink.Host2Device(tlul_p))
     val spi = new SpiIO
@@ -107,7 +106,7 @@ class SpiMasterCtrl(p: Parameters) extends Module {
   val manual_cs     = reg_csmode(0)
   val manual_cs_val = !reg_csid(0) // CS0 selected if bit 0 set
 
-  val phase = RegInit(0.U(1.W)) // Half-cycle phase indicator
+  val phase        = RegInit(0.U(1.W)) // Half-cycle phase indicator
   val sample_count = RegInit(0.U(4.W)) // Number of bits sampled
 
   // Reset and Enable management
@@ -320,8 +319,8 @@ class SpiMasterCtrl(p: Parameters) extends Module {
   * Wraps the synchronous controller and uses TlulFifoAsync to bridge between high-speed system bus
   * (clk_i) and potentially slower SPI clock (spi_clk_i).
   */
-class SpiMaster(p: Parameters) extends RawModule {
-  val tlul_p = new TLULParameters(p)
+class SpiMaster(p: TLULParameters) extends RawModule {
+  val tlul_p = p
   val io     = IO(new Bundle {
     val clk_i     = Input(Clock())
     val rst_ni    = Input(AsyncReset())
@@ -357,10 +356,10 @@ import scala.annotation.nowarn
 
 @nowarn
 object EmitSpiMaster extends App {
-  val p = new Parameters
+  val tlul_p = new TLULParameters(dataBits = 32, addrBits = 32, idBits = 10)
   (new ChiselStage).execute(
     Array("--target", "systemverilog") ++ args,
-    Seq(ChiselGeneratorAnnotation(() => new SpiMaster(p))) ++ Seq(
+    Seq(ChiselGeneratorAnnotation(() => new SpiMaster(tlul_p))) ++ Seq(
       FirtoolOption("-enable-layers=Verification")
     )
   )

@@ -33,13 +33,13 @@ class FabricArbiterSpec extends AnyFreeSpec with ChiselSim {
       dut.io.source(1).writeDataStrb.poke(0x1.U)
 
       for (i <- 0 until 3) {
-        if (i == 0) {  // None
+        if (i == 0) { // None
           dut.io.source(1).readDataAddr.valid.poke(false.B)
           dut.io.source(1).writeDataAddr.valid.poke(false.B)
-        } else if (i == 1) {  // Read
+        } else if (i == 1) { // Read
           dut.io.source(1).readDataAddr.valid.poke(true.B)
           dut.io.source(1).writeDataAddr.valid.poke(false.B)
-        } else {  // Write
+        } else { // Write
           dut.io.source(1).readDataAddr.valid.poke(false.B)
           dut.io.source(1).writeDataAddr.valid.poke(true.B)
         }
@@ -65,23 +65,23 @@ class FabricArbiterSpec extends AnyFreeSpec with ChiselSim {
     simulate(new FabricArbiter(p)) { dut =>
       dut.io.source(0).readDataAddr.valid.poke(false.B)
       dut.io.source(0).writeDataAddr.valid.poke(true.B)
-      dut.io.source(0).writeDataAddr.bits.poke(0x80B0.U)
-      dut.io.source(0).writeDataBits.poke(0x50B0.U)
-      dut.io.source(0).writeDataStrb.poke(0xF.U)
+      dut.io.source(0).writeDataAddr.bits.poke(0x80b0.U)
+      dut.io.source(0).writeDataBits.poke(0x50b0.U)
+      dut.io.source(0).writeDataStrb.poke(0xf.U)
 
-      dut.io.source(1).readDataAddr.bits.poke(0x40B0.U)
-      dut.io.source(1).writeDataAddr.bits.poke(0x40B0.U)
-      dut.io.source(1).writeDataBits.poke(0x60B0.U)
+      dut.io.source(1).readDataAddr.bits.poke(0x40b0.U)
+      dut.io.source(1).writeDataAddr.bits.poke(0x40b0.U)
+      dut.io.source(1).writeDataBits.poke(0x60b0.U)
       dut.io.source(1).writeDataStrb.poke(0x12.U)
 
       for (i <- 0 until 3) {
-        if (i == 0) {  // None
+        if (i == 0) { // None
           dut.io.source(1).readDataAddr.valid.poke(false.B)
           dut.io.source(1).writeDataAddr.valid.poke(false.B)
-        } else if (i == 1) {  // Read
+        } else if (i == 1) { // Read
           dut.io.source(1).readDataAddr.valid.poke(true.B)
           dut.io.source(1).writeDataAddr.valid.poke(false.B)
-        } else {  // Write
+        } else { // Write
           dut.io.source(1).readDataAddr.valid.poke(false.B)
           dut.io.source(1).writeDataAddr.valid.poke(true.B)
         }
@@ -90,9 +90,9 @@ class FabricArbiterSpec extends AnyFreeSpec with ChiselSim {
         dut.io.fabricBusy(1).expect(1)
         dut.io.port.readDataAddr.valid.expect(0)
         dut.io.port.writeDataAddr.valid.expect(1)
-        dut.io.port.writeDataAddr.bits.expect(0x80B0)
-        dut.io.port.writeDataBits.expect(0x50B0)
-        dut.io.port.writeDataStrb.expect(0xF)
+        dut.io.port.writeDataAddr.bits.expect(0x80b0)
+        dut.io.port.writeDataBits.expect(0x50b0)
+        dut.io.port.writeDataStrb.expect(0xf)
       }
     }
   }
@@ -103,12 +103,12 @@ class FabricArbiterSpec extends AnyFreeSpec with ChiselSim {
       dut.io.source(0).writeDataAddr.valid.poke(false.B)
 
       dut.io.source(1).readDataAddr.valid.poke(true.B)
-      dut.io.source(1).readDataAddr.bits.poke(0x40B0.U)
+      dut.io.source(1).readDataAddr.bits.poke(0x40b0.U)
       dut.io.source(1).writeDataAddr.valid.poke(false.B)
 
       dut.io.fabricBusy(1).expect(0)
       dut.io.port.readDataAddr.valid.expect(1)
-      dut.io.port.readDataAddr.bits.expect(0x40B0)
+      dut.io.port.readDataAddr.bits.expect(0x40b0)
       dut.io.port.writeDataAddr.valid.expect(0)
 
       dut.clock.step()
@@ -127,14 +127,14 @@ class FabricArbiterSpec extends AnyFreeSpec with ChiselSim {
 
       dut.io.source(1).readDataAddr.valid.poke(false.B)
       dut.io.source(1).writeDataAddr.valid.poke(true.B)
-      dut.io.source(1).writeDataAddr.bits.poke(0xB0B0.U)
-      dut.io.source(1).writeDataBits.poke(0xA0B0.U)
-      dut.io.source(1).writeDataStrb.poke(0xA.U)
+      dut.io.source(1).writeDataAddr.bits.poke(0xb0b0.U)
+      dut.io.source(1).writeDataBits.poke(0xa0b0.U)
+      dut.io.source(1).writeDataStrb.poke(0xa.U)
 
       dut.io.fabricBusy(1).expect(0)
       dut.io.port.readDataAddr.valid.expect(0)
       dut.io.port.writeDataAddr.valid.expect(1)
-      dut.io.port.writeDataAddr.bits.expect(0xB0B0)
+      dut.io.port.writeDataAddr.bits.expect(0xb0b0)
     }
   }
 
@@ -196,14 +196,14 @@ class FabricArbiterSpec extends AnyFreeSpec with ChiselSim {
       // Broadcast response check
       dut.clock.step()
       dut.io.port.readData.valid.poke(true.B)
-      dut.io.port.readData.bits.poke(0xDEADBEEFL.U)
+      dut.io.port.readData.bits.poke(0xdeadbeefL.U)
 
       dut.io.source(0).readData.valid.expect(1)
-      dut.io.source(0).readData.bits.expect(0xDEADBEEFL.U)
+      dut.io.source(0).readData.bits.expect(0xdeadbeefL.U)
       dut.io.source(1).readData.valid.expect(1)
-      dut.io.source(1).readData.bits.expect(0xDEADBEEFL.U)
+      dut.io.source(1).readData.bits.expect(0xdeadbeefL.U)
       dut.io.source(2).readData.valid.expect(1)
-      dut.io.source(2).readData.bits.expect(0xDEADBEEFL.U)
+      dut.io.source(2).readData.bits.expect(0xdeadbeefL.U)
     }
   }
 }

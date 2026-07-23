@@ -40,8 +40,8 @@ py_binary(
     srcs = ["run_simulation.py"],
     data = [
         ":loader",
-        "//fpga:copy_chip_verilator_binary",
         "//coralnpu_test_utils:run_sram_test",
+        "//fpga:copy_chip_verilator_binary",
     ],
     tags = ["manual"],
     deps = [
@@ -53,13 +53,13 @@ py_binary(
 py_binary(
     name = "sim_test_runner",
     srcs = ["sim_test_runner.py"],
-    main = "sim_test_runner.py",
     data = [
         ":loader",
-        "//fpga/ip/ispyocto:grey_bars_320x240.raw",
-        "//fpga:copy_chip_verilator_binary",
         "//coralnpu_test_utils:run_sram_test",
+        "//fpga:copy_chip_verilator_binary",
+        "//fpga/ip/ispyocto:grey_bars_320x240.raw",
     ],
+    main = "sim_test_runner.py",
     tags = ["manual"],
     deps = [
         "@bazel_tools//tools/python/runfiles",
@@ -69,13 +69,13 @@ py_binary(
 py_binary(
     name = "sim_test_runner_highmem",
     srcs = ["sim_test_runner.py"],
-    main = "sim_test_runner.py",
     data = [
         ":loader",
-        "//fpga/ip/ispyocto:grey_bars_320x240.raw",
-        "//fpga:copy_chip_verilator_highmem_binary",
         "//coralnpu_test_utils:run_sram_test",
+        "//fpga:copy_chip_verilator_highmem_binary",
+        "//fpga/ip/ispyocto:grey_bars_320x240.raw",
     ],
+    main = "sim_test_runner.py",
     tags = ["manual"],
     deps = [
         "@bazel_tools//tools/python/runfiles",
@@ -85,7 +85,6 @@ py_binary(
 py_binary(
     name = "run_isp_cam_sim",
     srcs = ["run_simulation.py"],
-    main = "run_simulation.py",
     args = [
         "--elf_file",
         "$(location //fpga:isp_cam_test.elf)",
@@ -98,6 +97,7 @@ py_binary(
         "//fpga:isp_cam_test.elf",
         "//fpga/ip/ispyocto:grey_bars_320x240.raw",
     ],
+    main = "run_simulation.py",
     deps = [
         "@bazel_tools//tools/python/runfiles",
     ],

@@ -28,5 +28,5 @@ module clkgen_wrapper #(
       .clk_spim_o(clk_spim_o),
       .rst_no(rst_no),
       .locked_o(locked_o)
-);
+  );
 endmodule

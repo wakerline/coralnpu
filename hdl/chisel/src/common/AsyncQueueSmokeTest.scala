@@ -10,7 +10,7 @@ import svsim.verilator.Backend
 import svsim.CommonCompilationSettings
 
 trait WithVcd { this: HasCliOptions =>
-  override implicit def backendSettingsModifications: svsim.BackendSettingsModifications =
+  implicit override def backendSettingsModifications: svsim.BackendSettingsModifications =
     (original: svsim.Backend.Settings) => {
       original match {
         case settings: Backend.CompilationSettings =>
@@ -23,7 +23,7 @@ trait WithVcd { this: HasCliOptions =>
       }
     }
 
-  override implicit def commonSettingsModifications: svsim.CommonSettingsModifications =
+  implicit override def commonSettingsModifications: svsim.CommonSettingsModifications =
     (original: CommonCompilationSettings) => {
       original.copy(
         simulationSettings = original.simulationSettings.copy(enableWavesAtTimeZero = true)
@@ -46,13 +46,13 @@ class AsyncQueueSmokeTest extends Module {
   // A simple clock divider to create a slower enqueue clock (half frequency).
   val enq_clock_divider = RegInit(false.B)
   enq_clock_divider := !enq_clock_divider
-  enq_clock_wire := enq_clock_divider.asClock
+  enq_clock_wire    := enq_clock_divider.asClock
 
   // A different divider to create an even slower dequeue clock (quarter frequency)
   // that is phase-shifted relative to the enqueue clock.
   val deq_clock_divider = RegInit(0.U(2.W))
   deq_clock_divider := deq_clock_divider + 1.U
-  deq_clock_wire := deq_clock_divider(1).asClock
+  deq_clock_wire    := deq_clock_divider(1).asClock
 
   // Tie resets to the main test harness reset
   enq_reset_wire := reset.asBool
@@ -75,9 +75,9 @@ class AsyncQueueSmokeTest extends Module {
 class AsyncQueueSmokeSpec extends AnyFreeSpec with ChiselSim with WithVcd {
   "AsyncQueueSmokeTest should pass a value across clock domains" in {
     simulate(new AsyncQueueSmokeTest) { dut =>
-      val resetCycles = 2
-      val initialDelayCycles = 5
-      val enqHoldCycles = 3
+      val resetCycles           = 2
+      val initialDelayCycles    = 5
+      val enqHoldCycles         = 3
       val deqValidTimeoutCycles = 50
 
       // Initialize inputs

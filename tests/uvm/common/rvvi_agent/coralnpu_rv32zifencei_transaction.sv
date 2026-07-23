@@ -18,16 +18,16 @@
 //----------------------------------------------------------------------------
 class coralnpu_rv32zifencei_transaction extends coralnpu_rvvi_decode_transaction;
 
-  logic[11:0] funct12;
+  logic [11:0] funct12;
   fencei_e inst_name;
 
   `uvm_object_utils_begin(coralnpu_rv32zifencei_transaction)
-        `uvm_field_int (funct12, UVM_DEFAULT)
-        `uvm_field_enum (fencei_e,inst_name, UVM_DEFAULT)
+    `uvm_field_int(funct12, UVM_DEFAULT)
+    `uvm_field_enum(fencei_e, inst_name, UVM_DEFAULT)
   `uvm_object_utils_end
 
   function new(string name = "coralnpu_rv32zifencei_transaction");
     super.new(name);
-  endfunction:new
+  endfunction : new
 
-endclass:coralnpu_rv32zifencei_transaction
+endclass : coralnpu_rv32zifencei_transaction

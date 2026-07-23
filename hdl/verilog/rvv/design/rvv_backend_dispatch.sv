@@ -33,9 +33,14 @@ module rvv_backend_dispatch
     rs_dp2div,
     rs_ready_div2dp,
 `ifdef ZVE32F_ON
-    rs_valid_dp2fma,
-    rs_dp2fma,
-    rs_ready_fma2dp,
+    rs_valid_dp2falu,
+    rs_dp2falu,
+    rs_ready_falu2dp,
+`endif
+`ifdef ZVT_ON
+    rs_valid_dp2zvt,
+    rs_dp2zvt,
+    rs_ready_zvt2dp,
 `endif
     rs_valid_dp2lsu,
     rs_dp2lsu,
@@ -85,10 +90,17 @@ module rvv_backend_dispatch
     input  logic          [`NUM_DP_UOP-1:0]       rs_ready_div2dp;
 
 `ifdef ZVE32F_ON
-// Dispatch unit to FMA reservation station
-    output logic          [`NUM_DP_UOP-1:0]       rs_valid_dp2fma;
-    output FMA_RS_t       [`NUM_DP_UOP-1:0]       rs_dp2fma;
-    input  logic          [`NUM_DP_UOP-1:0]       rs_ready_fma2dp;
+// Dispatch unit to FALU reservation station
+    output logic          [`NUM_DP_UOP-1:0]       rs_valid_dp2falu;
+    output FALU_RS_t      [`NUM_DP_UOP-1:0]       rs_dp2falu;
+    input  logic          [`NUM_DP_UOP-1:0]       rs_ready_falu2dp;
+`endif
+
+`ifdef ZVT_ON
+// Dispatch unit to VME reservation station
+    output logic          [`NUM_DP_UOP-1:0]       rs_valid_dp2zvt;
+    output ZVT_RS_t       [`NUM_DP_UOP-1:0]       rs_dp2zvt;
+    input  logic          [`NUM_DP_UOP-1:0]       rs_ready_zvt2dp;
 `endif
 
 // Dispatch unit to LSU 
@@ -138,6 +150,7 @@ module rvv_backend_dispatch
     UOP_INFO_t          [`NUM_DP_UOP-1:0]   uop_info;
     UOP_OPN_BYTE_TYPE_t [`NUM_DP_UOP-1:0]   uop_operand_byte_type;
 
+    logic [`NUM_DP_UOP-1:0][2:0]                    lmul;
     logic [`NUM_DP_UOP-1:0][`VL_WIDTH-1:0]          vlmax;
     logic [`NUM_DP_UOP-1:0][$clog2(`VL_WIDTH)-1:0]  vlmax_shift;
 
@@ -149,10 +162,11 @@ module rvv_backend_dispatch
     // vlmax = lmul * `VLENB / sew 
     generate
       for (i=0; i<`NUM_DP_UOP; i++) begin : gen_vlmax
-        assign vlmax_shift[i] = ($clog2(`VL_WIDTH))'(uop_uop2dp[i].vector_csr.lmul[1:0]) 
+        assign lmul[i] = uop_uop2dp[i].uop_exe_unit==PMT ? uop_uop2dp[i].vector_csr.lmul_orig : uop_uop2dp[i].vector_csr.lmul;
+        assign vlmax_shift[i] = ($clog2(`VL_WIDTH))'(lmul[i][1:0]) 
                                 + $clog2(`VLENB) 
                                 - ($clog2(`VL_WIDTH))'(uop_uop2dp[i].vector_csr.sew) 
-                                - {{($clog2(`VL_WIDTH)-3){1'b0}},uop_uop2dp[i].vector_csr.lmul[2],2'b0};
+                                - {{($clog2(`VL_WIDTH)-3){1'b0}}, lmul[i][2],2'b0};
         assign vlmax[i] = (`VL_WIDTH)'(1) << vlmax_shift[i];
       end
     endgenerate
@@ -291,8 +305,12 @@ module rvv_backend_dispatch
         .rs_valid_dp2div        (rs_valid_dp2div),
         .rs_ready_div2dp        (rs_ready_div2dp),
       `ifdef ZVE32F_ON
-        .rs_valid_dp2fma        (rs_valid_dp2fma),
-        .rs_ready_fma2dp        (rs_ready_fma2dp),
+        .rs_valid_dp2falu       (rs_valid_dp2falu),
+        .rs_ready_falu2dp       (rs_ready_falu2dp),
+      `endif
+      `ifdef ZVT_ON
+        .rs_valid_dp2zvt        (rs_valid_dp2zvt),
+        .rs_ready_zvt2dp        (rs_ready_zvt2dp),
       `endif
         .rs_valid_dp2lsu        (rs_valid_dp2lsu),
         .rs_ready_lsu2dp        (rs_ready_lsu2dp),
@@ -431,32 +449,63 @@ module rvv_backend_dispatch
           `endif
 
           `ifdef ZVE32F_ON
-          // FMA RS
+          // FALU RS
           `ifdef TB_SUPPORT
-            assign rs_dp2fma[i].uop_pc          = uop_uop2dp[i].uop_pc; 
+            assign rs_dp2falu[i].uop_pc          = uop_uop2dp[i].uop_pc; 
           `endif
-            assign rs_dp2fma[i].rob_entry       = rob_address[i]; 
-            assign rs_dp2fma[i].uop_funct6      = uop_uop2dp[i].uop_funct6;
-            assign rs_dp2fma[i].uop_funct3      = uop_uop2dp[i].uop_funct3;
-            assign rs_dp2fma[i].uop_exe_unit    = uop_uop2dp[i].uop_exe_unit;
-            assign rs_dp2fma[i].vstart          = uop_uop2dp[i].vector_csr.vstart;
-            assign rs_dp2fma[i].vl              = uop_uop2dp[i].vs_evl;
-            assign rs_dp2fma[i].vm              = uop_uop2dp[i].vm;
-            assign rs_dp2fma[i].frm             = uop_uop2dp[i].vector_csr.frm;
-            assign rs_dp2fma[i].v0_data         = uop_operand[i].v0[`VLENW*`EMUL_MAX-1:0];
-            assign rs_dp2fma[i].v0_data_valid   = uop_uop2dp[i].v0_valid;
-            assign rs_dp2fma[i].vs1             = uop_uop2dp[i].vs1;
-            assign rs_dp2fma[i].vs1_data        = uop_operand[i].vs1;
-            assign rs_dp2fma[i].vs1_data_valid  = uop_uop2dp[i].vs1_valid;
-            assign rs_dp2fma[i].vs2_data        = uop_operand[i].vs2;
-            assign rs_dp2fma[i].vs2_data_valid  = uop_uop2dp[i].vs2_valid;
-            assign rs_dp2fma[i].vs2_eew         = uop_uop2dp[i].vs2_eew;
-            assign rs_dp2fma[i].vs3_data        = uop_operand[i].vd;
-            assign rs_dp2fma[i].vs3_data_valid  = uop_uop2dp[i].vs3_valid;
-            assign rs_dp2fma[i].rs1_data        = uop_uop2dp[i].rs1_data;
-            assign rs_dp2fma[i].rs1_data_valid  = uop_uop2dp[i].rs1_data_valid;
-            assign rs_dp2fma[i].last_uop_valid  = uop_uop2dp[i].last_uop_valid;
-            assign rs_dp2fma[i].uop_index       = uop_uop2dp[i].uop_index[$clog2(`EMUL_MAX)-1:0];            
+            assign rs_dp2falu[i].rob_entry       = rob_address[i]; 
+            assign rs_dp2falu[i].uop_funct6      = uop_uop2dp[i].uop_funct6;
+            assign rs_dp2falu[i].uop_funct3      = uop_uop2dp[i].uop_funct3;
+            assign rs_dp2falu[i].uop_exe_unit    = uop_uop2dp[i].uop_exe_unit;
+            assign rs_dp2falu[i].vstart          = uop_uop2dp[i].vector_csr.vstart;
+            assign rs_dp2falu[i].vl              = uop_uop2dp[i].vs_evl;
+            assign rs_dp2falu[i].vm              = uop_uop2dp[i].vm;
+            assign rs_dp2falu[i].frm             = uop_uop2dp[i].vector_csr.frm;
+            assign rs_dp2falu[i].v0_data         = uop_operand[i].v0[`VLENW*`EMUL_MAX-1:0];
+            assign rs_dp2falu[i].v0_data_valid   = uop_uop2dp[i].v0_valid;
+            assign rs_dp2falu[i].vs1             = uop_uop2dp[i].vs1;
+            assign rs_dp2falu[i].vs1_data        = uop_operand[i].vs1;
+            assign rs_dp2falu[i].vs1_data_valid  = uop_uop2dp[i].vs1_valid;
+            assign rs_dp2falu[i].vs2_data        = uop_operand[i].vs2;
+            assign rs_dp2falu[i].vs2_data_valid  = uop_uop2dp[i].vs2_valid;
+            assign rs_dp2falu[i].vs2_eew         = uop_uop2dp[i].vs2_eew;
+            assign rs_dp2falu[i].vs3_data        = uop_operand[i].vd;
+            assign rs_dp2falu[i].vs3_data_valid  = uop_uop2dp[i].vs3_valid;
+            assign rs_dp2falu[i].rs1_data        = uop_uop2dp[i].rs1_data;
+            assign rs_dp2falu[i].rs1_data_valid  = uop_uop2dp[i].rs1_data_valid;
+            assign rs_dp2falu[i].last_uop_valid  = uop_uop2dp[i].last_uop_valid;
+            assign rs_dp2falu[i].uop_index       = uop_uop2dp[i].uop_index[$clog2(`EMUL_MAX)-1:0];            
+          `endif
+
+          `ifdef ZVT_ON
+          // ZVT RS
+          `ifdef TB_SUPPORT
+            assign rs_dp2zvt[i].uop_pc          = uop_uop2dp[i].uop_pc; 
+          `endif
+            assign rs_dp2zvt[i].rob_entry       = rob_address[i]; 
+            assign rs_dp2zvt[i].uop_funct6      = uop_uop2dp[i].uop_funct6;
+            assign rs_dp2zvt[i].uop_funct3      = uop_uop2dp[i].uop_funct3;
+            assign rs_dp2zvt[i].vs2             = uop_uop2dp[i].vs2_index;
+            assign rs_dp2zvt[i].is_lsu          = uop_uop2dp[i].uop_exe_unit==VMELSU;
+            assign rs_dp2zvt[i].is_store        = uop_uop2dp[i].lsu_is_store;
+            assign rs_dp2zvt[i].vstart          = uop_uop2dp[i].vector_csr.vstart;
+            assign rs_dp2zvt[i].altfmt          = uop_uop2dp[i].vector_csr.altfmt;
+            assign rs_dp2zvt[i].mtwiden         = uop_uop2dp[i].vector_csr.mtwiden;
+            assign rs_dp2zvt[i].tm              = uop_uop2dp[i].vector_csr.tm;
+            assign rs_dp2zvt[i].vl              = uop_uop2dp[i].vs_evl[$clog2(`TE):0];
+            assign rs_dp2zvt[i].tk              = uop_uop2dp[i].vector_csr.tk;
+            assign rs_dp2zvt[i].sew             = uop_uop2dp[i].vector_csr.sew;
+            assign rs_dp2zvt[i].eew_mt          = EEW_e'(uop_uop2dp[i].vector_csr.sew);
+            assign rs_dp2zvt[i].rndMode         = fpnew_pkg::roundmode_e'(uop_uop2dp[i].vector_csr.frm);
+            assign rs_dp2zvt[i].tss             = {uop_uop2dp[i].rs1_data[30:27],
+                                                   uop_uop2dp[i].rs1_data[24],
+                                                   uop_uop2dp[i].rs1_data[$clog2(`TE)-1:0]};
+            assign rs_dp2zvt[i].vs1_data        = uop_operand[i].vs1;
+            assign rs_dp2zvt[i].vs2_data        = uop_operand[i].vs2;
+            assign rs_dp2zvt[i].dst_index       = uop_uop2dp[i].dst_index;
+            assign rs_dp2zvt[i].first_uop_valid = uop_uop2dp[i].first_uop_valid;
+            assign rs_dp2zvt[i].last_uop_valid  = uop_uop2dp[i].last_uop_valid;
+            assign rs_dp2zvt[i].uop_index       = uop_uop2dp[i].uop_index[$clog2(`EMUL_MAX)-1:0];            
           `endif
 
           // LSU RS
@@ -478,7 +527,7 @@ module rvv_backend_dispatch
           `endif
             assign mapinfo_dp2lsu[i].valid               = mapinfo_valid_dp2lsu[i];
             assign mapinfo_dp2lsu[i].rob_entry           = rob_address[i];
-            assign mapinfo_dp2lsu[i].lsu_class           = uop_uop2dp[i].uop_funct6.lsu_funct6.lsu_is_store;
+            assign mapinfo_dp2lsu[i].lsu_is_store        = uop_uop2dp[i].lsu_is_store;
             assign mapinfo_dp2lsu[i].vregfile_write_addr = uop_uop2dp[i].dst_index;
 
           // ROB

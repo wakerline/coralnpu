@@ -26,7 +26,7 @@ pybind_extension(
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
-        "@coralnpu_mpact//sim:coralnpu_v2_simulator",
+        "@coralnpu_mpact//sim:coralnpu_simulator",
         "@pybind11_abseil//pybind11_abseil:status_casters",
     ],
 )

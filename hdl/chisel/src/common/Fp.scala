@@ -46,7 +46,7 @@ class Fp32 extends Bundle {
 
   def negate(): Fp32 = {
     val negated = Wire(new Fp32)
-    negated.sign := ~sign
+    negated.sign     := ~sign
     negated.exponent := exponent
     negated.mantissa := mantissa
     negated
@@ -70,7 +70,7 @@ object Bf16 {
     val fp = Wire(new Bf16)
     fp.mantissa := mantissa
     fp.exponent := exponent
-    fp.sign := sign
+    fp.sign     := sign
     fp
   }
 
@@ -79,7 +79,7 @@ object Bf16 {
     val fp = Wire(new Bf16)
     fp.mantissa := word(6, 0)
     fp.exponent := word(14, 7)
-    fp.sign := word(15)
+    fp.sign     := word(15)
     fp
   }
 }
@@ -91,7 +91,7 @@ object Fp32 {
     val fp = Wire(new Fp32)
     fp.mantissa := mantissa
     fp.exponent := exponent
-    fp.sign := sign
+    fp.sign     := sign
     fp
   }
 
@@ -100,22 +100,25 @@ object Fp32 {
     val fp = Wire(new Fp32)
     fp.mantissa := word(22, 0)
     fp.exponent := word(30, 23)
-    fp.sign := word(31)
+    fp.sign     := word(31)
     fp
   }
 
   /** "static_cast" an integer into a fp32 number.
-    * @param word The integer to convert.
-    * @param sign If the integer is signed.
-    * @return The converted floating point number.
+    * @param word
+    *   The integer to convert.
+    * @param sign
+    *   If the integer is signed.
+    * @return
+    *   The converted floating point number.
     */
   def fromInteger(int: UInt, sign: Bool): Fp32 = {
     val intLength = int.getWidth
     assert(intLength == 32, "fromInteger currently only supports 32-bit ints")
     val floatSign = sign & int(intLength - 1)
-    val absInt = Mux(floatSign, (~int) + 1.U, int)
+    val absInt    = Mux(floatSign, (~int) + 1.U, int)
 
-    val preround = Wire(UInt(25.W))
+    val preround     = Wire(UInt(25.W))
     val leadingZeros = Clz(absInt)
     if (intLength >= 25) {
       preround := (absInt << leadingZeros)(intLength - 1, intLength - 25)
@@ -125,10 +128,9 @@ object Fp32 {
 
     val zero = (preround === 0.U)
     // TODO(derekjchow): Rounding mode
-    val rounded = preround +& (~floatSign) // 26 bits
+    val rounded  = preround +& (~floatSign) // 26 bits
     val mantissa = Mux(rounded(25), rounded(24, 2), rounded(23, 1))
-    val exponent = Mux(
-        zero, 0.U(8.W), (intLength + 127 - 1).U(8.W) - leadingZeros)
+    val exponent = Mux(zero, 0.U(8.W), (intLength + 127 - 1).U(8.W) - leadingZeros)
 
     Fp32(floatSign, exponent, mantissa)
   }
@@ -137,7 +139,7 @@ object Fp32 {
     val fp = Wire(new Fp32)
     fp.mantissa := 0.U
     fp.exponent := 0.U
-    fp.sign := sign
+    fp.sign     := sign
     fp
   }
 
@@ -145,15 +147,15 @@ object Fp32 {
     val fp = Wire(new Fp32)
     fp.mantissa := 0.U
     fp.exponent := "b11111111".U
-    fp.sign := sign
+    fp.sign     := sign
     fp
   }
 
   def NaN(): Fp32 = {
     val fp = Wire(new Fp32)
-    fp.mantissa := (1 << 22).U  // Cannonical NaN per RV32F spec
+    fp.mantissa := (1 << 22).U // Cannonical NaN per RV32F spec
     fp.exponent := "b11111111".U
-    fp.sign := 0.U
+    fp.sign     := 0.U
     fp
   }
 }

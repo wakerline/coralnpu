@@ -16,11 +16,12 @@ package common
 
 import chisel3._
 
-/** Effectively "reinterpret_casts" a float32 into a BigInt. BigInt is used
-  * because there's no easy uint32 type in scala, but BigInt works well enough
-  * for Chisel use cases.
-  * @param f A scala float.
-  * @return A BigInt (representing uint32) bit interpretation of the float.
+/** Effectively "reinterpret_casts" a float32 into a BigInt. BigInt is used because there's no easy
+  * uint32 type in scala, but BigInt works well enough for Chisel use cases.
+  * @param f
+  *   A scala float.
+  * @return
+  *   A BigInt (representing uint32) bit interpretation of the float.
   */
 object Float2BigInt {
   def apply(f: Float): BigInt = {
@@ -34,8 +35,10 @@ object Float2BigInt {
 }
 
 /** Breaks down a float32 into it's sign, exponent and mantissa.
-  * @param f A scala float.
-  * @return A tuple of the sign, exponent and mantissa.
+  * @param f
+  *   A scala float.
+  * @return
+  *   A tuple of the sign, exponent and mantissa.
   */
 object Float2Bits {
   def apply(f: Float): (Boolean, Int, Int) = {
@@ -51,25 +54,30 @@ object Float2Bits {
 }
 
 /** Pokes a float.
-  * @param dut The float input.
-  * @param f A scala float.
+  * @param dut
+  *   The float input.
+  * @param f
+  *   A scala float.
   */
 object PokeFloat {
   def apply(dut: Fp32, f: Float) = {
-    val int = java.lang.Float.floatToRawIntBits(f)
-    val sign = if (int < 0) { true.B } else { false.B }
-    val mantissa = int & 0x7FFFFF
-    val exponent = (int >> 23) & 0xFF
+    val int  = java.lang.Float.floatToRawIntBits(f)
+    val sign = if (int < 0) { true.B }
+    else { false.B }
+    val mantissa = int & 0x7fffff
+    val exponent = (int >> 23) & 0xff
 
-    dut.sign := sign
+    dut.sign     := sign
     dut.mantissa := mantissa.U
     dut.exponent := exponent.U
   }
 }
 
 /** Peeks a float.
-  * @param dut The float input.
-  * @param f A scala float.
+  * @param dut
+  *   The float input.
+  * @param f
+  *   A scala float.
   */
 object PeekFloat {
   def apply(sign: Int, exponent: Int, mantissa: Int): Float = {

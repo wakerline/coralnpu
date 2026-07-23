@@ -18,6 +18,7 @@ import os
 import sys
 import time
 import logging
+import subprocess
 
 # To support 'import coralnpu_hw.coralnpu_test_utils' without Bazel:
 _script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -51,6 +52,7 @@ class BinaryRunner:
         csr_base_addr=0x30000,
         verify=False,
         exit_after_start=False,
+        reset=False,
     ):
         """
         Initializes the BinaryRunner.
@@ -68,6 +70,7 @@ class BinaryRunner:
         self.entry_point = None
         self.verify = verify
         self.exit_after_start = exit_after_start
+        self.reset = reset
         self.status_msg_addr = None
         self.status_msg_size = 0
         self._parse_elf()
@@ -96,18 +99,37 @@ class BinaryRunner:
 
     def run_binary(self):
         """Executes the binary load and run flow."""
-        # Note: self.spi_master.device_reset() (ADBUS7 toggle) currently breaks DDR
-        # initialization on this bitstream. We rely on bitstream reload for a clean state.
-        # self.spi_master.device_reset()
+        is_responsive = False
+        if not self.reset:
+            try:
+                logger.info("Checking if FPGA bus is responsive...")
+                # ITCM (0x0) is always mapped and safe to read.
+                self.spi_master.read_word(0x0)
+                is_responsive = True
+                logger.info("FPGA bus is responsive.")
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                logger.warning(
+                    "FPGA bus is unresponsive. Attempting automatic recovery reset..."
+                )
+
+        if self.reset or not is_responsive:
+            logger.info("Performing hardware reset (toggle PROG_B)...")
+            self.spi_master.device_reset()
+            # Wait a bit for DDR calibration to complete
+            time.sleep(0.1)
 
         if self.exit_after_start:
             logger.info(f"Loading ELF file: {self.elf_path}")
-            self.spi_master.load_elf(self.elf_path, start_core=True, verify=self.verify)
+            self.spi_master.load_elf(
+                self.elf_path, start_core=True, verify=self.verify
+            )
             logger.info("Exiting after start as requested.")
             return
 
         # 1. Load, Start and Poll for halt in a single call to avoid subprocess overhead.
-        logger.info(f"Loading {self.elf_path}, starting core and polling for halt...")
+        logger.info(
+            f"Loading {self.elf_path}, starting core and polling for halt..."
+        )
         timeout = 60.0
         try:
             self.spi_master.load_elf(
@@ -118,20 +140,29 @@ class BinaryRunner:
                 status_addr=self.status_msg_addr,
                 status_size=self.status_msg_size,
             )
-            logger.info("Binary execution COMPLETED: Core halted successfully.")
+            logger.info(
+                "Binary execution COMPLETED: Core halted successfully."
+            )
         except Exception as e:
             logger.error(f"Binary execution FAILED: {e}")
             sys.exit(1)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Load and run a binary on CoralNPU.")
+    parser = argparse.ArgumentParser(
+        description="Load and run a binary on CoralNPU."
+    )
     parser.add_argument("elf_file", help="Path to the ELF file to run.")
     parser.add_argument(
-        "--usb-serial", required=True, help="USB serial number of the FTDI device."
+        "--usb-serial",
+        required=True,
+        help="USB serial number of the FTDI device."
     )
     parser.add_argument(
-        "--ftdi-port", type=int, default=1, help="Port number of the FTDI device."
+        "--ftdi-port",
+        type=int,
+        default=1,
+        help="Port number of the FTDI device."
     )
     parser.add_argument(
         "--csr-base-addr",
@@ -159,6 +190,12 @@ def main():
         action="store_true",
         help="Enable verbose logging.",
     )
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help=
+        "Perform hardware reset (toggle PROG_B) before loading (will wipe DDR).",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -178,6 +215,7 @@ def main():
             csr_base_addr,
             verify=args.verify,
             exit_after_start=args.exit_after_start,
+            reset=args.reset,
         )
         runner.run_binary()
     except (ValueError, RuntimeError, FileNotFoundError) as e:

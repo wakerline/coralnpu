@@ -32,8 +32,9 @@ object FifoXValid {
     for (i <- 0 until in.getWidth) {
       inx(i) = Cat(
         (0 until in.getWidth).reverse.map(x =>
-          if (x < i) { false.B } else {
-            (PopCount(in(x,0)) === (i + 1).U) && in(x)
+          if (x < i) { false.B }
+          else {
+            (PopCount(in(x, 0)) === (i + 1).U) && in(x)
           }
         )
       )
@@ -44,12 +45,12 @@ object FifoXValid {
 
 class FifoX[T <: Data](t: T, x: Int, n: Int) extends Module {
   val io = IO(new Bundle {
-    val in  = Flipped(Decoupled(Vec(x, Valid(t))))
-    val out = Decoupled(t)
-    val count = Output(UInt(log2Ceil(n+1).W))
+    val in    = Flipped(Decoupled(Vec(x, Valid(t))))
+    val out   = Decoupled(t)
+    val count = Output(UInt(log2Ceil(n + 1).W))
   })
 
-  val m = n - 1  // n = Mem(n-1) + Slice
+  val m = n - 1 // n = Mem(n-1) + Slice
 
   def Increment(a: UInt, b: UInt): UInt = {
     val c = a +& b
@@ -57,13 +58,13 @@ class FifoX[T <: Data](t: T, x: Int, n: Int) extends Module {
     d
   }
 
-  val mem = RegInit(VecInit(Seq.fill(n)(0.U(t.getWidth.W).asTypeOf(t))))
+  val mem    = RegInit(VecInit(Seq.fill(n)(0.U(t.getWidth.W).asTypeOf(t))))
   val mslice = Slice(t, false, true)
 
   val inxpos = RegInit(VecInit((0 until x).map(x => x.U(log2Ceil(m).W))))
   // val outpos = RegInit(0.U(log2Ceil(m).W))
   val outpos = RegInit(0.U(log2Ceil(n).W))
-  val mcount = RegInit(0.U(log2Ceil(n+1).W))
+  val mcount = RegInit(0.U(log2Ceil(n + 1).W))
 
   io.count := mcount + io.out.valid
 
@@ -76,20 +77,20 @@ class FifoX[T <: Data](t: T, x: Int, n: Int) extends Module {
 
   // ---------------------------------------------------------------------------
   // Fifo Control.
-  when (ivalid) {
+  when(ivalid) {
     for (i <- 0 until x) {
       inxpos(i) := Increment(inxpos(i), icount)
     }
   }
 
-  when (ovalid) {
+  when(ovalid) {
     outpos := Increment(outpos, 1.U)
   }
 
   val inc = MuxOR(ivalid, icount)
   val dec = mslice.io.in.valid && mslice.io.in.ready
 
-  when (ivalid || ovalid) {
+  when(ivalid || ovalid) {
     mcount := mcount + inc - dec
   }
 
@@ -100,39 +101,38 @@ class FifoX[T <: Data](t: T, x: Int, n: Int) extends Module {
   for (i <- 0 until m) {
     val valid = Cat(
       (0 until x).reverse.map(q =>
-      if (q == 0) { inxpos(0) === i.U && inxvalid(0)(0) } else {
-          (0 to q).map(y =>
-            inxpos(y) === i.U && inxvalid(y)(q)
-          ).reduce(_ || _)
+        if (q == 0) { inxpos(0) === i.U && inxvalid(0)(0) }
+        else {
+          (0 to q).map(y => inxpos(y) === i.U && inxvalid(y)(q)).reduce(_ || _)
         }
       )
     )
 
-    when (ivalid) {
-     when (PopCount(valid) >= 1.U) {
-      val idx = PriorityEncoder(valid)
-      mem(i) := io.in.bits(idx).bits
-     }
+    when(ivalid) {
+      when(PopCount(valid) >= 1.U) {
+        val idx = PriorityEncoder(valid)
+        mem(i) := io.in.bits(idx).bits
+      }
     }
   }
 
   mslice.io.in.valid := false.B
-  mslice.io.in.bits := io.in.bits(0).bits  // defaults
+  mslice.io.in.bits  := io.in.bits(0).bits // defaults
 
-  when (mcount > 0.U) {
-    when (io.out.ready) {
+  when(mcount > 0.U) {
+    when(io.out.ready) {
       mslice.io.in.valid := true.B
     }
-  } .otherwise {
-    when (ivalid && iactive =/= 0.U) {
+  }.otherwise {
+    when(ivalid && iactive =/= 0.U) {
       mslice.io.in.valid := true.B
     }
   }
 
-  when (mcount > 0.U) {
+  when(mcount > 0.U) {
     mslice.io.in.bits := mem(outpos)
-  } .elsewhen (ivalid) {
-    when (iactive =/= 0.U) {
+  }.elsewhen(ivalid) {
+    when(iactive =/= 0.U) {
       val idx = PriorityEncoder(iactive)
       mslice.io.in.bits := io.in.bits(idx).bits
     }
@@ -142,9 +142,8 @@ class FifoX[T <: Data](t: T, x: Int, n: Int) extends Module {
   // Valid Entries.
   val active = RegInit(0.U(m.W))
 
-  val activeSet = MuxOR(ivalid,
-    (0 until x).map(i => (icount >= (i + 1).U) << inxpos(i)).reduce(_ | _)
-  )
+  val activeSet =
+    MuxOR(ivalid, (0 until x).map(i => (icount >= (i + 1).U) << inxpos(i)).reduce(_ | _))
 
   val activeClr = MuxOR(mslice.io.in.valid && mslice.io.in.ready, 1.U << outpos)
 

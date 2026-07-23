@@ -20,6 +20,7 @@ from coralnpu_test_utils.core_mini_axi_interface import CoreMiniAxiInterface, Dm
 from coralnpu_test_utils.core_mini_axi_pyocd_gdbserver import CoreMiniAxiGDBServer
 from bazel_tools.tools.python.runfiles import runfiles
 
+
 @cocotb.test()
 async def core_mini_axi_debug_gdbserver(dut):
     core_mini_axi = CoreMiniAxiInterface(dut)
@@ -31,7 +32,8 @@ async def core_mini_axi_debug_gdbserver(dut):
     r = runfiles.Create()
 
     # Just poke some FPU register.
-    with open(r.Rlocation("coralnpu_hw/tests/cocotb/registers.elf"), "rb") as f:
+    with open(r.Rlocation("coralnpu_hw/tests/cocotb/registers.elf"),
+              "rb") as f:
         cmds = [
             "info reg f0",
         ]
@@ -267,6 +269,7 @@ async def core_mini_axi_debug_probe_impl(dut):
     dataaddr = hartinfo & 0xFFF
     assert (dataaddr == 0x7B4)
 
+
 @cocotb.test()
 async def core_mini_axi_debug_ndmreset(dut):
     core_mini_axi = CoreMiniAxiInterface(dut)
@@ -293,6 +296,7 @@ async def core_mini_axi_debug_ndmreset(dut):
         rsp = await core_mini_axi.dm_write(0x10, dmcontrol)
         assert rsp["op"] == DmRspOp.SUCCESS
         await core_mini_axi.wait_for_halted()
+
 
 @cocotb.test()
 async def core_mini_axi_debug_halt_resume(dut):
@@ -326,6 +330,7 @@ async def core_mini_axi_debug_halt_resume(dut):
 
         await core_mini_axi.wait_for_halted()
 
+
 @cocotb.test()
 async def core_mini_axi_debug_hartsel(dut):
     # This should be 1
@@ -342,6 +347,7 @@ async def core_mini_axi_debug_hartsel(dut):
     dmcontrol = await core_mini_axi.dm_read(0x10)
     hartsel = (dmcontrol >> 6) & 0xFFFFF
     assert (hartsel == 1)
+
 
 @cocotb.test()
 async def core_mini_axi_debug_abstract_access_registers(dut):
@@ -369,9 +375,9 @@ async def core_mini_axi_debug_abstract_access_registers(dut):
         assert (mvendorid == 0x426)
 
         regs = [
-            0x7B2, # dscratch0
-            0x100a, # a0
-            0x1030, # f10
+            0x7B2,  # dscratch0
+            0x100a,  # a0
+            0x1030,  # f10
         ]
 
         for reg in regs:
@@ -386,6 +392,7 @@ async def core_mini_axi_debug_abstract_access_registers(dut):
             # Read dscratch0
             readback = await core_mini_axi.dm_read_reg(reg)
             assert (readback == new_val)
+
 
 @cocotb.test()
 async def core_mini_axi_debug_abstract_access_nonexistent_register(dut):
@@ -403,6 +410,7 @@ async def core_mini_axi_debug_abstract_access_nonexistent_register(dut):
 
         # Read a non-existent register. This should fail.
         await core_mini_axi.dm_read_reg(0xDEAD, DmRspOp.FAILED)
+
 
 @cocotb.test()
 async def core_mini_axi_debug_single_step(dut):
@@ -433,7 +441,7 @@ async def core_mini_axi_debug_single_step(dut):
         # Read `dpc`
         dpc = await core_mini_axi.dm_read_reg(0x7B1)
 
-        for i in range(0,3):
+        for i in range(0, 3):
             await core_mini_axi.dm_request_resume()
 
             # Probe for halted to re-occur
@@ -455,6 +463,7 @@ async def core_mini_axi_debug_single_step(dut):
         await core_mini_axi.dm_request_resume()
 
         await core_mini_axi.wait_for_halted()
+
 
 @cocotb.test()
 async def core_mini_axi_debug_breakpoint(dut):
@@ -531,6 +540,7 @@ async def core_mini_axi_debug_breakpoint(dut):
         # Assert that the program eventually terminates successfully.
         await core_mini_axi.wait_for_halted()
 
+
 @cocotb.test()
 async def core_mini_axi_debug_scalar_registers(dut):
     core_mini_axi = CoreMiniAxiInterface(dut)
@@ -538,7 +548,8 @@ async def core_mini_axi_debug_scalar_registers(dut):
     await core_mini_axi.reset()
     cocotb.start_soon(core_mini_axi.clock.start())
     r = runfiles.Create()
-    with open(r.Rlocation("coralnpu_hw/tests/cocotb/registers.elf"), "rb") as f:
+    with open(r.Rlocation("coralnpu_hw/tests/cocotb/registers.elf"),
+              "rb") as f:
         entry_point = await core_mini_axi.load_elf(f)
         await core_mini_axi.execute_from(entry_point)
         await core_mini_axi.wait_for_wfi()
@@ -547,14 +558,14 @@ async def core_mini_axi_debug_scalar_registers(dut):
         await core_mini_axi.dm_wait_for_halted()
 
         # After WFI, check that the registers have their expected values.
-        for i in range(1,32):
+        for i in range(1, 32):
             scalar = await core_mini_axi.dm_read_reg(i + 0x1000)
             expected_val = (1 << i)
             assert (scalar == expected_val)
 
         flt = await core_mini_axi.dm_read_reg(0x1020)
-        assert(flt == 0)
-        for i in range(1,32):
+        assert (flt == 0)
+        for i in range(1, 32):
             flt = await core_mini_axi.dm_read_reg(i + 0x1020)
             expected_val = (1 << i)
             assert (flt == expected_val)
@@ -568,3 +579,75 @@ async def core_mini_axi_debug_scalar_registers(dut):
 
         await core_mini_axi.wait_for_halted()
         assert core_mini_axi.dut.io_fault.value == 0
+
+
+@cocotb.test()
+async def core_mini_axi_debug_trigger_match(dut):
+    core_mini_axi = CoreMiniAxiInterface(dut)
+    await core_mini_axi.init()
+    await core_mini_axi.reset()
+    cocotb.start_soon(core_mini_axi.clock.start())
+
+    r = runfiles.Create()
+    with open(r.Rlocation("coralnpu_hw/tests/cocotb/debug_trigger_test.elf"),
+              "rb") as f:
+        entry_point = await core_mini_axi.load_elf(f)
+
+        await core_mini_axi.dm_request_halt()
+        await core_mini_axi.execute_from(entry_point)
+        await core_mini_axi.dm_wait_for_halted()
+
+        addr_b = core_mini_axi.lookup_symbol(f, "trigger_target")
+        tdata1_val = 0x68001044
+
+        await core_mini_axi.dm_write_reg(0x7A0, 0)  # Select trigger 0
+        await core_mini_axi.dm_write_reg(
+            0x7A1, tdata1_val
+        )  # Configure trigger 0 (tdata1)
+        await core_mini_axi.dm_write_reg(
+            0x7A2, addr_b
+        )  # Set match address (tdata2)
+
+        await core_mini_axi.dm_request_resume()
+
+        # Wait for trigger halt
+        await core_mini_axi.dm_wait_for_halted()
+
+        # Verify cause is trigger (2)
+        dcsr = await core_mini_axi.dm_read_reg(0x7B0)
+        dcsr_cause = (dcsr >> 6) & 0b111
+        assert dcsr_cause == 2, f"Expected trigger cause (2), got {dcsr_cause}"
+
+        # Verify dpc is AddrB
+        dpc = await core_mini_axi.dm_read_reg(0x7B1)
+        assert dpc == addr_b, f"Expected dpc to be trigger_target ({hex(addr_b)}), got {hex(dpc)}"
+
+        # Verify x1 is 1 (Instruction B not executed yet)
+        x1_val = await core_mini_axi.dm_read_reg(0x1001)
+        assert x1_val == 1, f"Expected x1 to be 1, got {x1_val}"
+
+        # Re-program trigger 0 to match end_target
+        addr_end = core_mini_axi.lookup_symbol(f, "end_target")
+        await core_mini_axi.dm_write_reg(0x7A0, 0)  # Select trigger 0
+        await core_mini_axi.dm_write_reg(
+            0x7A2, addr_end
+        )  # Set match address (tdata2)
+
+        # Resume
+        await core_mini_axi.dm_request_resume()
+
+        # Wait for trigger halt at end_target
+        await core_mini_axi.dm_wait_for_halted()
+
+        # Verify cause is trigger (2)
+        dcsr = await core_mini_axi.dm_read_reg(0x7B0)
+        dcsr_cause = (dcsr >> 6) & 0b111
+        assert dcsr_cause == 2, f"Expected trigger cause (2), got {dcsr_cause}"
+
+        # Verify dpc is AddrEnd
+        dpc = await core_mini_axi.dm_read_reg(0x7B1)
+        assert dpc == addr_end, f"Expected dpc to be end_target ({hex(addr_end)}), got {hex(dpc)}"
+
+        # Verify final x1 is 3 (not 4)
+        x1_val_final = await core_mini_axi.dm_read_reg(0x1001)
+        assert x1_val_final == 3, f"Expected final x1 to be 3, got {x1_val_final} (Duplicate execution detected!)"

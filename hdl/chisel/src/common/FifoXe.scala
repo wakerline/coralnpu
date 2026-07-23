@@ -26,12 +26,12 @@ object FifoXe {
   }
 }
 
-class FifoXe[T <: Data](t: T, x:Int, n: Int) extends Module {
+class FifoXe[T <: Data](t: T, x: Int, n: Int) extends Module {
   val io = IO(new Bundle {
-    val in  = Flipped(Decoupled(Vec(x, Valid(t))))
-    val out = Decoupled(t)
-    val count = Output(UInt(log2Ceil(n+1).W))
-    val entry = Output(Vec(n, Valid(t)))
+    val in     = Flipped(Decoupled(Vec(x, Valid(t))))
+    val out    = Decoupled(t)
+    val count  = Output(UInt(log2Ceil(n + 1).W))
+    val entry  = Output(Vec(n, Valid(t)))
     val nempty = Output(Bool())
   })
 
@@ -45,10 +45,10 @@ class FifoXe[T <: Data](t: T, x:Int, n: Int) extends Module {
 
   val inxpos = RegInit(VecInit((0 until x).map(x => x.U((log2Ceil(n) + 1).W))))
   val outpos = RegInit(0.U(log2Ceil(n).W))
-  val mcount = RegInit(0.U(log2Ceil(n+1).W))
+  val mcount = RegInit(0.U(log2Ceil(n + 1).W))
   val nempty = RegInit(false.B)
 
-  io.count := mcount
+  io.count  := mcount
   io.nempty := nempty
 
   val ivalid = io.in.valid && io.in.ready
@@ -60,20 +60,20 @@ class FifoXe[T <: Data](t: T, x:Int, n: Int) extends Module {
 
   // ---------------------------------------------------------------------------
   // Fifo Control.
-  when (ivalid) {
+  when(ivalid) {
     for (i <- 0 until x) {
       inxpos(i) := Increment(inxpos(i), icount)
     }
   }
 
-  when (ovalid) {
+  when(ovalid) {
     outpos := Increment(outpos, 1.U)
   }
 
   val inc = MuxOR(ivalid, icount)
   val dec = ovalid
 
-  when (ivalid || ovalid) {
+  when(ivalid || ovalid) {
     val nxtcount = mcount + inc - dec
     mcount := nxtcount
     nempty := nxtcount =/= 0.U
@@ -86,19 +86,18 @@ class FifoXe[T <: Data](t: T, x:Int, n: Int) extends Module {
   for (i <- 0 until n) {
     val valid = Cat(
       (0 until x).reverse.map(q =>
-        if (q == 0) { inxpos(0) === i.U && inxvalid(0)(0) } else {
-          (0 to q).map(y =>
-            inxpos(y) === i.U && inxvalid(y)(q)
-          ).reduce(_ || _)
+        if (q == 0) { inxpos(0) === i.U && inxvalid(0)(0) }
+        else {
+          (0 to q).map(y => inxpos(y) === i.U && inxvalid(y)(q)).reduce(_ || _)
         }
       )
     )
 
-    when (ivalid) {
-     when (PopCount(valid) >= 1.U) {
-      val idx = PriorityEncoder(valid)
-      mem(i) := io.in.bits(idx).bits
-     }
+    when(ivalid) {
+      when(PopCount(valid) >= 1.U) {
+        val idx = PriorityEncoder(valid)
+        mem(i) := io.in.bits(idx).bits
+      }
     }
   }
 
@@ -106,13 +105,12 @@ class FifoXe[T <: Data](t: T, x:Int, n: Int) extends Module {
   // Valid Entries.
   val active = RegInit(0.U(n.W))
 
-  val activeSet = MuxOR(ivalid,
-    (0 until x).map(i => (icount >= (i + 1).U) << inxpos(i)).reduce(_ | _)
-  )
+  val activeSet =
+    MuxOR(ivalid, (0 until x).map(i => (icount >= (i + 1).U) << inxpos(i)).reduce(_ | _))
 
   val activeClr = MuxOR(io.out.valid && io.out.ready, 1.U << outpos)
 
-  when (io.in.valid && io.in.ready || io.out.valid && io.out.ready) {
+  when(io.in.valid && io.in.ready || io.out.valid && io.out.ready) {
     active := (active | activeSet) & ~activeClr
   }
 
@@ -121,13 +119,13 @@ class FifoXe[T <: Data](t: T, x:Int, n: Int) extends Module {
   io.in.ready := mcount <= (n.U - icount)
 
   io.out.valid := mcount =/= 0.U
-  io.out.bits := mem(outpos)
+  io.out.bits  := mem(outpos)
 
   assert(mcount <= n.U)
 
   for (i <- 0 until n) {
     io.entry(i).valid := active(i)
-    io.entry(i).bits := mem(i)
+    io.entry(i).bits  := mem(i)
   }
 }
 

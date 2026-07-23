@@ -21,9 +21,9 @@ import scala.util.Random
 
 class GatherTester extends Module {
   val io = IO(new Bundle {
-    val indices  = Input(Vec(16, UInt(4.W)))
-    val data  = Input(Vec(16, UInt(8.W)))
-    val out = Output(Vec(16, UInt(8.W)))
+    val indices = Input(Vec(16, UInt(4.W)))
+    val data    = Input(Vec(16, UInt(8.W)))
+    val out     = Output(Vec(16, UInt(8.W)))
   })
 
   io.out := Gather(io.indices, io.data)
@@ -35,7 +35,7 @@ class GatherSpec extends AnyFreeSpec with ChiselSim {
       for (_ <- 0 until 100) {
         // Set inputs
         val indices = Seq.fill(16)(Random.between(0, 16))
-        val data = Seq.fill(16)(Random.between(0, 256))
+        val data    = Seq.fill(16)(Random.between(0, 256))
         for (i <- 0 until 16) {
           dut.io.indices(i).poke(indices(i))
           dut.io.data(i).poke(data(i))

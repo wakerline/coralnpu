@@ -33,30 +33,38 @@ class L1ICache(p: Parameters) extends Module {
   assert(p.axi0IdBits == 4)
   assert(p.axi0DataBits == 256 || p.axi0DataBits == 128)
 
-  val slots = p.l1islots
+  val slots    = p.l1islots
   val slotBits = log2Ceil(slots)
-  val assoc = p.l1iassoc
-  val sets = slots / assoc
-  val setLsb = log2Ceil(p.fetchDataBits / 8)
-  val setMsb = log2Ceil(sets) + setLsb - 1
-  val tagLsb = setMsb + 1
-  val tagMsb = 31
+  val assoc    = p.l1iassoc
+  val sets     = slots / assoc
+  val setLsb   = log2Ceil(p.fetchDataBits / 8)
+  val setMsb   = log2Ceil(sets) + setLsb - 1
+  val tagLsb   = setMsb + 1
+  val tagMsb   = p.axi0AddrBits - 1
 
   val io = IO(new Bundle {
-    val ibus = Flipped(new IBusIO(p))
+    val ibus  = Flipped(new IBusIO(p))
     val flush = Flipped(new IFlushIO(p))
-    val axi = new Bundle {
+    val axi   = new Bundle {
       val read = new AxiMasterReadIO(p.axi0AddrBits, p.axi0DataBits, p.axi0IdBits)
     }
     val volt_sel = Input(Bool())
   })
   io.ibus.fault := MakeInvalid(new FaultInfo(p))
 
-  assert(assoc == 2 ||  assoc == 4 || assoc == 8 || assoc == 16 || assoc == slots)
-  assert(assoc != 2 || (setLsb == 5 && setMsb == 11 && tagLsb == 12) || (setLsb == 4 && setMsb == 10 && tagLsb == 11))
-  assert(assoc != 4 || (setLsb == 5 && setMsb == 10 && tagLsb == 11) || (setLsb == 4 && setMsb == 9 && tagLsb == 10))
-  assert(assoc != 8 || (setLsb == 5 && setMsb == 9  && tagLsb == 10) || (setLsb == 4 && setMsb == 8 && tagLsb == 9))
-  assert(assoc != 16 || (setLsb == 5 && setMsb == 8  && tagLsb == 9) || (setLsb == 4 && setMsb == 7 && tagLsb == 8))
+  assert(assoc == 2 || assoc == 4 || assoc == 8 || assoc == 16 || assoc == slots)
+  assert(
+    assoc != 2 || (setLsb == 5 && setMsb == 11 && tagLsb == 12) || (setLsb == 4 && setMsb == 10 && tagLsb == 11)
+  )
+  assert(
+    assoc != 4 || (setLsb == 5 && setMsb == 10 && tagLsb == 11) || (setLsb == 4 && setMsb == 9 && tagLsb == 10)
+  )
+  assert(
+    assoc != 8 || (setLsb == 5 && setMsb == 9 && tagLsb == 10) || (setLsb == 4 && setMsb == 8 && tagLsb == 9)
+  )
+  assert(
+    assoc != 16 || (setLsb == 5 && setMsb == 8 && tagLsb == 9) || (setLsb == 4 && setMsb == 7 && tagLsb == 8)
+  )
   assert(assoc != slots || tagLsb == 5)
 
   class Sram_1rw_256x256 extends BlackBox {
@@ -73,19 +81,19 @@ class L1ICache(p: Parameters) extends Module {
 
   // ---------------------------------------------------------------------------
   // CAM state.
-  val valid = RegInit(VecInit(Seq.fill(slots)(false.B)))
-  val camaddr = Reg(Vec(slots, UInt(32.W)))
-  val mem = Module(new Sram_1rw_256x256())
+  val valid   = RegInit(VecInit(Seq.fill(slots)(false.B)))
+  val camaddr = Reg(Vec(slots, UInt(p.fetchAddrBits.W)))
+  val mem     = Module(new Sram_1rw_256x256())
 
   val history = Reg(Vec(slots / assoc, Vec(assoc, UInt(log2Ceil(assoc).W))))
 
-  val matchSet = Wire(Vec(slots, Bool()))
+  val matchSet  = Wire(Vec(slots, Bool()))
   val matchAddr = Wire(Vec(assoc, Bool()))
 
-  val matchSlotB = Wire(Vec(slots, Bool()))
-  val matchSlot = matchSlotB.asUInt
+  val matchSlotB   = Wire(Vec(slots, Bool()))
+  val matchSlot    = matchSlotB.asUInt
   val replaceSlotB = Wire(Vec(slots, Bool()))
-  val replaceSlot = replaceSlotB.asUInt
+  val replaceSlot  = replaceSlotB.asUInt
 
   // OR mux lookup of associative entries.
   def camaddrRead(i: Int, value: UInt = 0.U(32.W)): UInt = {
@@ -102,13 +110,13 @@ class L1ICache(p: Parameters) extends Module {
   }
 
   for (i <- 0 until slots) {
-    val set = i / assoc
+    val set      = i / assoc
     val setMatch = if (assoc == slots) true.B else io.ibus.addr(setMsb, setLsb) === set.U
     matchSet(i) := setMatch
   }
 
   for (i <- 0 until slots) {
-    val set = i / assoc
+    val set   = i / assoc
     val index = i % assoc
 
     matchSlotB(i) := valid(i) && matchSet(i) && matchAddr(index)
@@ -150,11 +158,14 @@ class L1ICache(p: Parameters) extends Module {
     val matchValue = history(i)(matchIndex)
 
     // History based on count values so that high set size has less DFF usage.
-    when (io.ibus.valid && io.ibus.ready && (if (assoc == slots) true.B else io.ibus.addr(setMsb, setLsb) === i.U)) {
+    when(
+      io.ibus.valid && io.ibus.ready && (if (assoc == slots) true.B
+                                         else io.ibus.addr(setMsb, setLsb) === i.U)
+    ) {
       for (j <- 0 until assoc) {
-        when (matchSet(j)) {
+        when(matchSet(j)) {
           history(i)(j) := (assoc - 1).U
-        } .elsewhen (history(i)(j) > matchValue) {
+        }.elsewhen(history(i)(j) > matchValue) {
           history(i)(j) := history(i)(j) - 1.U
           assert(history(i)(j) > 0.U)
         }
@@ -165,7 +176,7 @@ class L1ICache(p: Parameters) extends Module {
   // Reset history to unique values within sets.
   // Must be placed below all other assignments.
   // Note the definition is Reg() so will generate an asynchronous reset.
-  when (reset.asBool) {
+  when(reset.asBool) {
     for (i <- 0 until slots / assoc) {
       for (j <- 0 until assoc) {
         history(i)(j) := j.U
@@ -194,65 +205,65 @@ class L1ICache(p: Parameters) extends Module {
 
   // ---------------------------------------------------------------------------
   // axi interface.
-  val axivalid = RegInit(false.B)  // io.axi.read.addr.valid
-  val axiready = RegInit(false.B)  // io.axi.read.data.ready
-  val axiaddr = Reg(UInt(32.W))
+  val axivalid = RegInit(false.B) // io.axi.read.addr.valid
+  val axiready = RegInit(false.B) // io.axi.read.data.ready
+  val axiaddr  = Reg(UInt(p.axi0AddrBits.W))
 
   val replaceIdReg = Reg(UInt(slotBits.W))
 
-  when (io.ibus.valid && !io.ibus.ready && !axivalid && !axiready) {
+  when(io.ibus.valid && !io.ibus.ready && !axivalid && !axiready) {
     replaceIdReg := replaceId
   }
 
-  when (io.axi.read.addr.valid && io.axi.read.addr.ready) {
+  when(io.axi.read.addr.valid && io.axi.read.addr.ready) {
     axivalid := false.B
-  } .elsewhen (io.ibus.valid && !io.ibus.ready && !axivalid && !axiready) {
+  }.elsewhen(io.ibus.valid && !io.ibus.ready && !axivalid && !axiready) {
     axivalid := true.B
   }
 
-  when (io.axi.read.data.valid && io.axi.read.data.ready) {
+  when(io.axi.read.data.valid && io.axi.read.data.ready) {
     axiready := false.B
-  } .elsewhen (io.axi.read.addr.valid && io.axi.read.addr.ready && !axiready) {
+  }.elsewhen(io.axi.read.addr.valid && io.axi.read.addr.ready && !axiready) {
     axiready := true.B
   }
 
-  when (io.flush.valid) {
+  when(io.flush.valid) {
     for (i <- 0 until slots) {
       valid(i) := false.B
     }
-  } .elsewhen (io.ibus.valid && !io.ibus.ready && !axivalid && !axiready) {
+  }.elsewhen(io.ibus.valid && !io.ibus.ready && !axivalid && !axiready) {
     valid(replaceId) := false.B
-  } .elsewhen (io.axi.read.data.valid && io.axi.read.data.ready) {
+  }.elsewhen(io.axi.read.data.valid && io.axi.read.data.ready) {
     valid(replaceIdReg) := true.B
   }
 
-  when (io.ibus.valid && !io.ibus.ready && !axivalid && !axiready) {
-    val alignedAddr = Cat(io.ibus.addr(31, setLsb), 0.U(setLsb.W))
-    axiaddr := alignedAddr
+  when(io.ibus.valid && !io.ibus.ready && !axivalid && !axiready) {
+    val alignedAddr = Cat(io.ibus.addr(p.fetchAddrBits - 1, setLsb), 0.U(setLsb.W))
+    axiaddr            := alignedAddr
     camaddr(replaceId) := alignedAddr
-  } .elsewhen (io.axi.read.addr.valid && io.axi.read.addr.ready) {
+  }.elsewhen(io.axi.read.addr.valid && io.axi.read.addr.ready) {
     axiaddr := axiaddr + (p.axi0DataBits / 8).U
   }
 
   io.axi.read.defaults()
-  io.axi.read.addr.valid := axivalid
+  io.axi.read.addr.valid     := axivalid
   io.axi.read.addr.bits.addr := axiaddr
-  io.axi.read.addr.bits.id := 0.U
+  io.axi.read.addr.bits.id   := 0.U
   io.axi.read.addr.bits.prot := 2.U
-  io.axi.read.data.ready := axiready
+  io.axi.read.data.ready     := axiready
 
   io.flush.ready := true.B
 
   // IBus transaction must latch until completion.
   val addrLatchActive = RegInit(false.B)
-  val addrLatchData = Reg(UInt(32.W))
+  val addrLatchData   = Reg(UInt(p.fetchAddrBits.W))
 
-  when (io.flush.valid) {
+  when(io.flush.valid) {
     addrLatchActive := false.B
-  } .elsewhen (io.ibus.valid && !io.ibus.ready && !addrLatchActive) {
+  }.elsewhen(io.ibus.valid && !io.ibus.ready && !addrLatchActive) {
     addrLatchActive := true.B
-    addrLatchData := io.ibus.addr
-  } .elsewhen (addrLatchActive && io.ibus.ready) {
+    addrLatchData   := io.ibus.addr
+  }.elsewhen(addrLatchActive && io.ibus.ready) {
     addrLatchActive := false.B
   }
 

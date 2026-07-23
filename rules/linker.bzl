@@ -39,9 +39,10 @@ def _generate_linker_script_impl(ctx):
     # If heap is in DTCM and no size is specified, use the "remainder" logic.
     if heap_location == "DTCM" and (not heap_size or heap_size == "MAX"):
         heap_size_spec = ". = ORIGIN(DTCM) + LENGTH(DTCM) - STACK_SIZE;"
-        stack_start_spec = "" # Just follows heap
+        stack_start_spec = ""  # Just follows heap
     else:
         heap_size_spec = ". += {};".format(heap_size if heap_size else "1K")
+
         # Stack stays in DTCM, force it to the end to maximize space.
         stack_start_spec = ". = ORIGIN(DTCM) + LENGTH(DTCM) - STACK_SIZE;"
 

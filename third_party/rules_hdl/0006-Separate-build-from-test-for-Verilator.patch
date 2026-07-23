@@ -1,7 +1,7 @@
-From 4e7de9e20892973b46be2fb9761a670cf0509003 Mon Sep 17 00:00:00 2001
+From 70724561c18794f818a45acc1a6fa50fbc35edf3 Mon Sep 17 00:00:00 2001
 From: Alex Van Damme <atv@google.com>
 Date: Thu, 10 Jul 2025 16:03:33 -0700
-Subject: [PATCH 6/6] Separate build from test for Verilator
+Subject: [PATCH 06/11] Separate build from test for Verilator
 
 ---
  cocotb/BUILD.bazel       |  2 +-
@@ -55,7 +55,7 @@ index 2b0a3c2..90c70bc 100644
          doc = "Verilog parameters or VHDL generics",
          default = {},
 diff --git a/cocotb/cocotb_wrapper.py b/cocotb/cocotb_wrapper.py
-index ce392a9..1703e4f 100644
+index ce392a9..a3625f6 100644
 --- a/cocotb/cocotb_wrapper.py
 +++ b/cocotb/cocotb_wrapper.py
 @@ -165,6 +165,11 @@ def cocotb_argument_parser():
@@ -82,7 +82,7 @@ index ce392a9..1703e4f 100644
 +        r = runfiles.Create()
 +        sim_build = os.path.dirname(r.Rlocation(f"coralnpu_hw/{args.model}"))
 +        test_flags['build_dir'] = sim_build
-+        test_flags['extra_env']['LD_LIBRARY_PATH'] = "{}:{}".format(r.Rlocation("coralnpu_hw/external/coralnpu_pip_deps_cocotb/cocotb/libs"), os.environ.get("LD_LIBRARY_PATH", ""))
++        test_flags['extra_env']['LD_LIBRARY_PATH'] = "{}:{}".format(r.Rlocation("coralnpu_pip_deps_cocotb/cocotb/libs"), os.environ.get("LD_LIBRARY_PATH", ""))
 +        os.environ.pop('LD_LIBRARY_PATH', None)
 +    else:
 +        runner.build(**build_flags)
@@ -90,5 +90,5 @@ index ce392a9..1703e4f 100644
      (num_tests, num_failed) = get_results(results_xml)
      sys.exit(num_failed)
 -- 
-2.50.0.727.gbf7dc18ff4-goog
+2.54.0.563.g4f69b47b94-goog
 

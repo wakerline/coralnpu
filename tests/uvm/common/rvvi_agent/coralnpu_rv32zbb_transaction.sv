@@ -18,15 +18,15 @@
 //----------------------------------------------------------------------------
 class coralnpu_rv32zbb_transaction extends coralnpu_rvvi_decode_transaction;
 
-    logic[4:0] shamt;
-    bit_manipulation_e inst_name;
-    `uvm_object_utils_begin(coralnpu_rv32zbb_transaction)
-        `uvm_field_int (shamt, UVM_DEFAULT)
-        `uvm_field_enum (bit_manipulation_e,inst_name, UVM_DEFAULT)
-    `uvm_object_utils_end
+  logic [4:0] shamt;
+  bit_manipulation_e inst_name;
+  `uvm_object_utils_begin(coralnpu_rv32zbb_transaction)
+    `uvm_field_int(shamt, UVM_DEFAULT)
+    `uvm_field_enum(bit_manipulation_e, inst_name, UVM_DEFAULT)
+  `uvm_object_utils_end
 
-    function new(string name = "coralnpu_rv32zbb_transaction");
-        super.new(name);
-    endfunction:new
+  function new(string name = "coralnpu_rv32zbb_transaction");
+    super.new(name);
+  endfunction : new
 
-endclass:coralnpu_rv32zbb_transaction
+endclass : coralnpu_rv32zbb_transaction

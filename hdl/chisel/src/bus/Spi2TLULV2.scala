@@ -17,7 +17,6 @@ package bus
 import chisel3._
 import chisel3.util._
 import chisel3.experimental.BundleLiterals._
-import coralnpu.Parameters
 import freechips.rocketchip.util.{AsyncQueue, AsyncQueueParams}
 
 class DmaDesc extends Bundle {
@@ -27,7 +26,8 @@ class DmaDesc extends Bundle {
 }
 
 object SpiFrameParserPhase extends ChiselEnum {
-  val sOp, sAddr3, sAddr2, sAddr1, sAddr0, sLen1, sLen0, sSendDesc, sWriteData, sWaitEnd = Value
+  val sOp, sAddr3, sAddr2, sAddr1, sAddr0, sLen1, sLen0, sSendDesc, sWriteData, sWaitEnd, sReset =
+    Value
 }
 
 object DmaEnginePhase extends ChiselEnum {
@@ -47,8 +47,13 @@ class SpiFrameParserRegs extends Bundle {
   val wr_remain = UInt(32.W)
 
   def onOp(byte_valid: Bool, byte_bits: UInt): SpiFrameParserRegs = {
-    val res = Wire(new SpiFrameParserRegs)
-    res.phase     := Mux(byte_valid, SpiFrameParserPhase.sAddr3, this.phase)
+    val res      = Wire(new SpiFrameParserRegs)
+    val is_reset = (byte_bits === 3.U)
+    res.phase := Mux(
+      byte_valid,
+      Mux(is_reset, SpiFrameParserPhase.sReset, SpiFrameParserPhase.sAddr3),
+      this.phase
+    )
     res.op        := Mux(byte_valid, byte_bits, this.op)
     res.addr      := Mux(byte_valid, 0.U, this.addr)
     res.len       := Mux(byte_valid, 0.U, this.len)
@@ -56,11 +61,21 @@ class SpiFrameParserRegs extends Bundle {
     res
   }
 
+  def onReset(): SpiFrameParserRegs = {
+    val res = Wire(new SpiFrameParserRegs)
+    res.phase     := SpiFrameParserPhase.sReset
+    res.op        := this.op
+    res.addr      := this.addr
+    res.len       := this.len
+    res.wr_remain := 0.U
+    res
+  }
+
   def onAddr(
-      next_phase: SpiFrameParserPhase.Type,
-      byte_valid: Bool,
-      byte_bits: UInt,
-      shift: Int
+    next_phase: SpiFrameParserPhase.Type,
+    byte_valid: Bool,
+    byte_bits: UInt,
+    shift: Int
   ): SpiFrameParserRegs = {
     val res = Wire(new SpiFrameParserRegs)
     res.phase := Mux(byte_valid, next_phase, this.phase)
@@ -76,10 +91,10 @@ class SpiFrameParserRegs extends Bundle {
   }
 
   def onLen(
-      next_phase: SpiFrameParserPhase.Type,
-      byte_valid: Bool,
-      byte_bits: UInt,
-      shift: Int
+    next_phase: SpiFrameParserPhase.Type,
+    byte_valid: Bool,
+    byte_bits: UInt,
+    shift: Int
   ): SpiFrameParserRegs = {
     val res = Wire(new SpiFrameParserRegs)
     res.phase := Mux(byte_valid, next_phase, this.phase)
@@ -241,7 +256,7 @@ class DmaEngineRegs extends Bundle {
 }
 
 /** Spi2TLULV2_SpiDomain: Handles SPI interface logic (clocked by `spi_clk`). */
-class Spi2TLULV2_SpiDomain(p: Parameters) extends Module {
+class Spi2TLULV2_SpiDomain(p: TLULParameters) extends Module {
   val io = IO(new Bundle {
     val q_mosi_pin = Flipped(Decoupled(UInt(1.W)))
     val q_miso_pin = Decoupled(UInt(1.W))
@@ -250,6 +265,8 @@ class Spi2TLULV2_SpiDomain(p: Parameters) extends Module {
     val q_desc_enq    = Decoupled(new DmaDesc)
     val q_wr_data_enq = Decoupled(UInt(8.W))
     val q_rd_data_deq = Flipped(Decoupled(UInt(128.W)))
+
+    val sys_rst_o = Output(Bool())
   })
 
   val c_SpiByteAssembler = RegInit(0.U.asTypeOf(new SpiByteAssemblerRegs))
@@ -291,7 +308,8 @@ class Spi2TLULV2_SpiDomain(p: Parameters) extends Module {
     Seq(
       SpiFrameParserPhase.sWriteData -> (r_SpiFrameParser_byte_valid && !r_SpiFrameParser_is_wr_remain_zero && r_SpiFrameParser_wr_data_ready),
       SpiFrameParserPhase.sSendDesc -> false.B,
-      SpiFrameParserPhase.sWaitEnd  -> false.B
+      SpiFrameParserPhase.sWaitEnd  -> false.B,
+      SpiFrameParserPhase.sReset    -> false.B
     )
   )
 
@@ -346,9 +364,12 @@ class Spi2TLULV2_SpiDomain(p: Parameters) extends Module {
       SpiFrameParserPhase.sSendDesc  -> c_SpiFrameParser.onSendDesc(r_SpiFrameParser_desc_ready),
       SpiFrameParserPhase.sWriteData -> c_SpiFrameParser
         .onWriteData(r_SpiFrameParser_byte_valid, r_SpiFrameParser_wr_data_ready),
-      SpiFrameParserPhase.sWaitEnd -> c_SpiFrameParser.onWaitEnd()
+      SpiFrameParserPhase.sWaitEnd -> c_SpiFrameParser.onWaitEnd(),
+      SpiFrameParserPhase.sReset   -> c_SpiFrameParser.onReset()
     )
   )
+
+  io.sys_rst_o := (c_SpiFrameParser.phase === SpiFrameParserPhase.sReset)
 
   // Rule: SpiBulkDeserializer.tick
   val r_SpiMisoShifter_is_count_zero    = (c_SpiMisoShifter.count === 0.U)
@@ -421,8 +442,8 @@ class Spi2TLULV2_SpiDomain(p: Parameters) extends Module {
 }
 
 /** Spi2TLULV2_TlulDomain: Handles TileLink-related logic (clocked by system `clock`). */
-class Spi2TLULV2_TlulDomain(p: Parameters) extends Module {
-  val tlul_p = new TLULParameters(p)
+class Spi2TLULV2_TlulDomain(p: TLULParameters) extends Module {
+  val tlul_p = p
   val io     = IO(new Bundle {
     val q_tl_a = Decoupled(new OpenTitanTileLink.A_Channel(tlul_p))
     val q_tl_d = Flipped(Decoupled(new OpenTitanTileLink.D_Channel(tlul_p)))
@@ -508,9 +529,9 @@ class Spi2TLULV2_TlulDomain(p: Parameters) extends Module {
 /** Spi2TLULV2: Converts SPI frames into TileLink-UL (TL-UL) transactions. Wrapper that instantiates
   * SPI and TLUL domains and connects them via AsyncQueues.
   */
-class Spi2TLULV2(p: Parameters) extends Module {
-  assert(p.lsuDataBits == 128)
-  val tlul_p = new TLULParameters(p)
+class Spi2TLULV2(p: TLULParameters) extends Module {
+  assert(p.w == 16)
+  val tlul_p = p
   val io     = IO(new Bundle {
     val spi_clk    = Input(Clock())
     val spi_rst_n  = Input(Bool())
@@ -518,6 +539,7 @@ class Spi2TLULV2(p: Parameters) extends Module {
     val q_miso_pin = Decoupled(UInt(1.W))
     val q_tl_a     = Decoupled(new OpenTitanTileLink.A_Channel(tlul_p))
     val q_tl_d     = Flipped(Decoupled(new OpenTitanTileLink.D_Channel(tlul_p)))
+    val sys_rst_o  = Output(Bool())
   })
 
   // CDC FIFOs
@@ -558,4 +580,10 @@ class Spi2TLULV2(p: Parameters) extends Module {
   u_tlul_domain.io.q_desc_deq <> q_desc_cdc.io.deq
   u_tlul_domain.io.q_wr_data_deq <> q_wr_data_cdc.io.deq
   u_tlul_domain.io.q_rd_data_enq <> q_rd_data_cdc.io.enq
+
+  // Synchronize soft reset to system clock domain
+  val sys_rst_sync = withClockAndReset(clock, reset) {
+    ShiftRegister(u_spi_domain.io.sys_rst_o, 2)
+  }
+  io.sys_rst_o := sys_rst_sync
 }

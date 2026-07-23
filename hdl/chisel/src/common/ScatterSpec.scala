@@ -23,23 +23,22 @@ import scala.util.Random
 class ScatterTester extends Module {
   val io = IO(new Bundle {
     val indicesValid = Input(Vec(16, Bool()))
-    val indices = Input(Vec(16, UInt(4.W)))
-    val data = Input(Vec(16, UInt(8.W)))
+    val indices      = Input(Vec(16, UInt(4.W)))
+    val data         = Input(Vec(16, UInt(8.W)))
 
     val indicesSelected = Output(Vec(16, Bool()))
-    val writeMask = Output(Vec(16, Bool()))
-    val outData = Output(Vec(16, UInt(8.W)))
+    val writeMask       = Output(Vec(16, Bool()))
+    val outData         = Output(Vec(16, UInt(8.W)))
 
     val maskCount = Output(UInt(5.W))
   })
 
-  val (result, writeMask, indicesSelected) = Scatter(
-      io.indicesValid, io.indices, io.data)
+  val (result, writeMask, indicesSelected) = Scatter(io.indicesValid, io.indices, io.data)
 
   io.indicesSelected := indicesSelected
-  io.writeMask := writeMask
-  io.outData := result
-  io.maskCount := PopCount(writeMask)
+  io.writeMask       := writeMask
+  io.outData         := result
+  io.maskCount       := PopCount(writeMask)
 }
 
 class ScatterSpec extends AnyFreeSpec with ChiselSim {
@@ -48,8 +47,8 @@ class ScatterSpec extends AnyFreeSpec with ChiselSim {
       for (_ <- 0 until 500) {
         // Set inputs
         val indices = Seq.fill(16)(Random.between(0, 16))
-        val data = Seq.fill(16)(Random.between(0, 256))
-        val valid = Seq.fill(16)(Random.nextBoolean())
+        val data    = Seq.fill(16)(Random.between(0, 256))
+        val valid   = Seq.fill(16)(Random.nextBoolean())
         for (i <- 0 until 16) {
           dut.io.indices(i).poke(indices(i))
           dut.io.data(i).poke(data(i))
@@ -57,7 +56,7 @@ class ScatterSpec extends AnyFreeSpec with ChiselSim {
         }
 
         // Check results
-        val indicesSet = Array.fill(16)(false)
+        val indicesSet  = Array.fill(16)(false)
         var nIndicesSet = 0
         for (i <- 0 until 16) {
           if (dut.io.indicesSelected(i).peek().litValue == 1) {

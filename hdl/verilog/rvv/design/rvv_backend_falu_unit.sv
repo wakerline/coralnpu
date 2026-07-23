@@ -2,8 +2,8 @@
 `ifndef HDL_VERILOG_RVV_DESIGN_RVV_SVH
 `include "rvv_backend.svh"
 `endif
-`ifndef RVV_ASSERT__SVH
-`include "rvv_backend_sva.svh"
+`ifndef HDL_VERILOG_RVV_INC_FALU_SVH
+`include "rvv_backend_falu.svh"
 `endif
 
 // description
@@ -15,49 +15,49 @@
 //VFCVT_F2I, VFCVT_F2I, VFCVT_F2IT, VFCVT_F2IT, VFCVT_I2F, VFCVT_I2F
 
 `ifdef ZVE32F_ON
-module rvv_backend_fma_wrapper(
+module rvv_backend_falu_unit(
   //global
   clk,
   rst_n,
   //rs in
-  fma_uop_vld,
-  fma_uop,
+  falu_uop_vld,
+  falu_uop,
   //dec tye
-  fma_type,
+  falu_type,
   //rdy to rs
-  fma_uop_addmul_rdy,
-  fma_uop_cmp_rdy,
-  fma_uop_cvt_rdy,
-  fma_uop_tbl_rdy,
+  falu_uop_addmul_rdy,
+  falu_uop_cmp_rdy,
+  falu_uop_cvt_rdy,
+  falu_uop_tbl_rdy,
   //flush
   trap_flush_rvv,
   //result to rob
-  fma_result_vld,
-  fma_result,
+  falu_result_vld,
+  falu_result,
   //rob ready 2 unit
-  fma_result_rdy
+  falu_result_rdy
 );
   parameter PIPEREGS  = 3; 
   //global
   input   logic         clk;
   input   logic         rst_n;
   //rs in
-  input   logic         fma_uop_vld;
-  input   FMA_RS_t      fma_uop;
+  input   logic         falu_uop_vld;
+  input   FALU_RS_t     falu_uop;
   //dec tye
-  input   logic [3:0]   fma_type;
+  input   logic [3:0]   falu_type;
   //rdy to rs
-  output  logic         fma_uop_addmul_rdy;
-  output  logic         fma_uop_cmp_rdy;
-  output  logic         fma_uop_cvt_rdy;
-  output  logic         fma_uop_tbl_rdy;
+  output  logic         falu_uop_addmul_rdy;
+  output  logic         falu_uop_cmp_rdy;
+  output  logic         falu_uop_cvt_rdy;
+  output  logic         falu_uop_tbl_rdy;
   //flush
   input   logic         trap_flush_rvv;
   //result to rob
-  output  logic         fma_result_vld;
-  output  PU2ROB_t      fma_result;
+  output  logic         falu_result_vld;
+  output  PU2ROB_t      falu_result;
   //rob ready 
-  input   logic         fma_result_rdy;
+  input   logic         falu_result_rdy;
 
 //
 // internal signals
@@ -74,7 +74,6 @@ module rvv_backend_fma_wrapper(
   logic [`VLEN-1:0]                         src3;
   logic [`VLENW-1:0][2:0][`WORD_WIDTH-1:0]  op_i;
   EEW_e                                     vd_eew;
-  fpnew_pkg::roundmode_e                    rnd_mod_dec;
   fpnew_pkg::roundmode_e                    rnd_mod_i;    // also opcode
   fpnew_pkg::operation_e                    op_type;
   logic                                     op_mod;
@@ -146,81 +145,83 @@ module rvv_backend_fma_wrapper(
 // code start
 //
   // valid uop
-  assign addmul_vld = fma_uop_vld & fma_type[0];
-  assign allcmp_vld = fma_uop_vld & fma_type[1];
-  assign cvt_vld    = fma_uop_vld & fma_type[2];
-  assign tbl_vld    = fma_uop_vld & fma_type[3];
+  assign addmul_vld = falu_uop_vld & falu_type[0];
+  assign allcmp_vld = falu_uop_vld & falu_type[1];
+  assign cvt_vld    = falu_uop_vld & falu_type[2];
+  assign tbl_vld    = falu_uop_vld & falu_type[3];
 
-`ifdef ZVFBFWMA_ON
-  assign vd_eew     = (fma_uop.uop_funct6.ari_funct6 == VFUNARY0 && fma_uop.vs1 == VFNCVTBF16)? EEW16 : EEW32;
-`else
-  assign vd_eew     = EEW32;
-`endif
+  always_comb begin
+    vd_eew = EEW32;
+
+    if(falu_uop.uop_funct6.ari_funct6 == VFUNARY0) begin
+      case(falu_uop.vs1)
+      `ifdef ZVFBFWMA_ON
+        VFNCVTBF16,
+      `endif
+        VFNCVTXUF,
+        VFNCVTXF,
+        VFNCVTRTZXUF,
+        VFNCVTRTZXF: vd_eew = EEW16;
+      endcase
+    end
+  end
 
   // prepare source data
   always_comb begin
-    src1 = fma_uop.vs1_data;
-    src2 = fma_uop.vs2_data;
-    src3 = fma_uop.vs3_data;
+    src1 = falu_uop.vs1_data;
+    src2 = falu_uop.vs2_data;
+    src3 = falu_uop.vs3_data;
     
-    case(fma_uop.uop_funct3)
+    case(falu_uop.uop_funct3)
       OPFVF: begin
-        src1 = {`VLENW{fma_uop.rs1_data}};
+        src1 = {`VLENW{falu_uop.rs1_data}};
       `ifdef ZVFBFWMA_ON
-        if(fma_uop.uop_funct6.ari_funct6==VFWMACCBF16) begin
+        if(falu_uop.uop_funct6.ari_funct6==VFWMACCBF16) begin
           for(int i=0;i<`VLENW;i++) begin
-            if(fma_uop.uop_index[0]) begin
-              src2[i*`WORD_WIDTH+:`WORD_WIDTH] = {(`HWORD_WIDTH'('1)), fma_uop.vs2_data[`VLEN/2+i*`HWORD_WIDTH+:`HWORD_WIDTH]};    
+            if(falu_uop.uop_index[0]) begin
+              src2[i*`WORD_WIDTH+:`WORD_WIDTH] = {(`HWORD_WIDTH'('1)), falu_uop.vs2_data[`VLEN/2+i*`HWORD_WIDTH+:`HWORD_WIDTH]};
             end
             else begin
-              src2[i*`WORD_WIDTH+:`WORD_WIDTH] = {(`HWORD_WIDTH'('1)), fma_uop.vs2_data[i*`HWORD_WIDTH+:`HWORD_WIDTH]};    
+              src2[i*`WORD_WIDTH+:`WORD_WIDTH] = {(`HWORD_WIDTH'('1)), falu_uop.vs2_data[i*`HWORD_WIDTH+:`HWORD_WIDTH]};
             end
           end
         end
       `endif
       end
-    `ifdef ZVFBFWMA_ON
       OPFVV: begin
-        case(fma_uop.uop_funct6.ari_funct6)
+        case(falu_uop.uop_funct6.ari_funct6)
           VFUNARY0: begin 
-            for(int i=0;i<`VLENW;i++) begin
-              if(fma_uop.vs1==VFWCVTBF16) begin
-                if(fma_uop.uop_index[0]) begin
-                  src2[i*`WORD_WIDTH+:`WORD_WIDTH] = {(`HWORD_WIDTH'('1)), fma_uop.vs2_data[`VLEN/2+i*`HWORD_WIDTH+:`HWORD_WIDTH]};    
-                end
-                else begin
-                  src2[i*`WORD_WIDTH+:`WORD_WIDTH] = {(`HWORD_WIDTH'('1)), fma_uop.vs2_data[i*`HWORD_WIDTH+:`HWORD_WIDTH]};    
+            case(falu_uop.vs1)
+            `ifdef ZVFBFWMA_ON
+              VFWCVTBF16,
+            `endif
+              VFWCVTFXU,
+              VFWCVTFX: begin
+                for(int i=0;i<`VLENW;i++) begin
+                  if(falu_uop.uop_index[0])
+                    src2[i*`WORD_WIDTH+:`WORD_WIDTH] = {(`HWORD_WIDTH'('1)), falu_uop.vs2_data[`VLEN/2+i*`HWORD_WIDTH+:`HWORD_WIDTH]};
+                  else
+                    src2[i*`WORD_WIDTH+:`WORD_WIDTH] = {(`HWORD_WIDTH'('1)), falu_uop.vs2_data[i*`HWORD_WIDTH+:`HWORD_WIDTH]};
                 end
               end
-            end
+            endcase
           end
+          `ifdef ZVFBFWMA_ON
           VFWMACCBF16: begin
             for(int i=0;i<`VLENW;i++) begin
-              if(fma_uop.uop_index[0]) begin
-                src1[i*`WORD_WIDTH+:`WORD_WIDTH] = {(`HWORD_WIDTH'('1)), fma_uop.vs1_data[`VLEN/2+i*`HWORD_WIDTH+:`HWORD_WIDTH]};    
-                src2[i*`WORD_WIDTH+:`WORD_WIDTH] = {(`HWORD_WIDTH'('1)), fma_uop.vs2_data[`VLEN/2+i*`HWORD_WIDTH+:`HWORD_WIDTH]};    
+              if(falu_uop.uop_index[0]) begin
+                src1[i*`WORD_WIDTH+:`WORD_WIDTH] = {(`HWORD_WIDTH'('1)), falu_uop.vs1_data[`VLEN/2+i*`HWORD_WIDTH+:`HWORD_WIDTH]};
+                src2[i*`WORD_WIDTH+:`WORD_WIDTH] = {(`HWORD_WIDTH'('1)), falu_uop.vs2_data[`VLEN/2+i*`HWORD_WIDTH+:`HWORD_WIDTH]};
               end
               else begin
-                src1[i*`WORD_WIDTH+:`WORD_WIDTH] = {(`HWORD_WIDTH'('1)), fma_uop.vs1_data[i*`HWORD_WIDTH+:`HWORD_WIDTH]};    
-                src2[i*`WORD_WIDTH+:`WORD_WIDTH] = {(`HWORD_WIDTH'('1)), fma_uop.vs2_data[i*`HWORD_WIDTH+:`HWORD_WIDTH]};    
+                src1[i*`WORD_WIDTH+:`WORD_WIDTH] = {(`HWORD_WIDTH'('1)), falu_uop.vs1_data[i*`HWORD_WIDTH+:`HWORD_WIDTH]};
+                src2[i*`WORD_WIDTH+:`WORD_WIDTH] = {(`HWORD_WIDTH'('1)), falu_uop.vs2_data[i*`HWORD_WIDTH+:`HWORD_WIDTH]};
               end
             end
           end
+          `endif
         endcase
       end
-    `endif
-    endcase
-  end
-
-  // rounding mode
-  always_comb begin
-    case(fma_uop.frm)
-      FRNE:    rnd_mod_dec = fpnew_pkg::RNE;
-      FRTZ:    rnd_mod_dec = fpnew_pkg::RTZ;
-      FRDN:    rnd_mod_dec = fpnew_pkg::RDN;
-      FRUP:    rnd_mod_dec = fpnew_pkg::RUP;
-      FRMM:    rnd_mod_dec = fpnew_pkg::RMM;
-      default: rnd_mod_dec = fpnew_pkg::DYN;
     endcase
   end
 
@@ -230,7 +231,7 @@ module rvv_backend_fma_wrapper(
     for(int i=0;i<`VLENW;i++) begin
       op_i[i] = {src3[i*`WORD_WIDTH+:`WORD_WIDTH], src2[i*`WORD_WIDTH+:`WORD_WIDTH], src1[i*`WORD_WIDTH+:`WORD_WIDTH]};
     end
-    rnd_mod_i = rnd_mod_dec;
+    rnd_mod_i = fpnew_pkg::roundmode_e'(falu_uop.frm);
     op_type   = fpnew_pkg::FMADD;
     op_mod    = 1'b0;
     src_fmt   = fpnew_pkg::FP32;
@@ -240,7 +241,7 @@ module rvv_backend_fma_wrapper(
     
     case(1'b1)
       addmul_vld: begin//ADDMUL
-        case(fma_uop.uop_funct6.ari_funct6)
+        case(falu_uop.uop_funct6.ari_funct6)
           VFADD: begin
             op_type   = fpnew_pkg::ADD;
             for(int i=0;i<`VLENW;i++) begin
@@ -315,7 +316,7 @@ module rvv_backend_fma_wrapper(
         endcase
       end
       allcmp_vld: begin//CMP
-        case(fma_uop.uop_funct6.ari_funct6)
+        case(falu_uop.uop_funct6.ari_funct6)
           VMFEQ: begin
             op_type   = fpnew_pkg::CMP;
             rnd_mod_i = fpnew_pkg::RDN;
@@ -381,7 +382,7 @@ module rvv_backend_fma_wrapper(
         endcase
       end
       cvt_vld: begin//CVT
-        case(fma_uop.vs1)
+        case(falu_uop.vs1)
           VFCVT_XUFV: begin
             op_type   = fpnew_pkg::F2I; 
             op_mod    = 1'b1;
@@ -405,6 +406,35 @@ module rvv_backend_fma_wrapper(
             op_type   = fpnew_pkg::F2I; 
             rnd_mod_i = fpnew_pkg::RTZ; 
           end
+          VFWCVTFXU: begin
+            op_type   = fpnew_pkg::I2F;
+            op_mod    = 1'b1;
+            int_fmt   = fpnew_pkg::INT16;
+          end
+          VFWCVTFX: begin
+            op_type   = fpnew_pkg::I2F;
+            int_fmt   = fpnew_pkg::INT16;
+          end
+          VFNCVTXUF: begin
+            op_type   = fpnew_pkg::F2I;
+            op_mod    = 1'b1;
+            int_fmt   = fpnew_pkg::INT16;
+          end
+          VFNCVTXF: begin
+            op_type   = fpnew_pkg::F2I;
+            int_fmt   = fpnew_pkg::INT16;
+          end
+          VFNCVTRTZXUF: begin
+            op_type   = fpnew_pkg::F2I;
+            op_mod    = 1'b1;
+            int_fmt   = fpnew_pkg::INT16;
+            rnd_mod_i = fpnew_pkg::RTZ;
+          end
+          VFNCVTRTZXF: begin
+            op_type   = fpnew_pkg::F2I;
+            int_fmt   = fpnew_pkg::INT16;
+            rnd_mod_i = fpnew_pkg::RTZ;
+          end
         `ifdef ZVFBFWMA_ON
           VFNCVTBF16: begin
             op_type   = fpnew_pkg::F2F;
@@ -424,20 +454,20 @@ module rvv_backend_fma_wrapper(
 
   // tag
 `ifdef TB_SUPPORT
-  assign tag_fma.uop_pc             = fma_uop.uop_pc;
-  assign tag_fcmp.com_tag.uop_pc    = fma_uop.uop_pc;
-  assign tag_fcvt.com_tag.uop_pc    = fma_uop.uop_pc;
-  assign tag_ftbl.uop_pc            = fma_uop.uop_pc;
+  assign tag_fma.uop_pc             = falu_uop.uop_pc;
+  assign tag_fcmp.com_tag.uop_pc    = falu_uop.uop_pc;
+  assign tag_fcvt.com_tag.uop_pc    = falu_uop.uop_pc;
+  assign tag_ftbl.uop_pc            = falu_uop.uop_pc;
 `endif
-  assign tag_fma.rob_entry          = fma_uop.rob_entry;
-  assign tag_fcmp.com_tag.rob_entry = fma_uop.rob_entry;
-  assign tag_fcmp.is_fcmp           = fma_uop.uop_exe_unit==FCMP;
-  assign tag_fcmp.uop_index         = fma_uop.uop_index;
-  assign tag_fcmp.last_uop_valid    = fma_uop.last_uop_valid;
-  assign tag_fcvt.com_tag.rob_entry = fma_uop.rob_entry;
+  assign tag_fma.rob_entry          = falu_uop.rob_entry;
+  assign tag_fcmp.com_tag.rob_entry = falu_uop.rob_entry;
+  assign tag_fcmp.is_fcmp           = falu_uop.uop_exe_unit==FCMP;
+  assign tag_fcmp.uop_index         = falu_uop.uop_index;
+  assign tag_fcmp.last_uop_valid    = falu_uop.last_uop_valid;
+  assign tag_fcvt.com_tag.rob_entry = falu_uop.rob_entry;
   assign tag_fcvt.eew_vd            = vd_eew;
-  assign tag_fcvt.uop_index         = fma_uop.uop_index[0];
-  assign tag_ftbl.rob_entry         = fma_uop.rob_entry;
+  assign tag_fcvt.uop_index         = falu_uop.uop_index[0];
+  assign tag_ftbl.rob_entry         = falu_uop.rob_entry;
 
   // execution units
   generate
@@ -469,7 +499,7 @@ module rvv_backend_fma_wrapper(
       .aux_i              ('0),
       // Input Handshake
       .in_valid_i         (addmul_vld),
-      .in_ready_o         (fma_uop_addmul_rdy),
+      .in_ready_o         (falu_uop_addmul_rdy),
       .flush_i            (trap_flush_rvv),
       // Output signals
       .result_o           (addmul_result[0+:`WORD_WIDTH]), 
@@ -509,7 +539,7 @@ module rvv_backend_fma_wrapper(
       .aux_i              ('0),
       // Input Handshake
       .in_valid_i         (allcmp_vld),
-      .in_ready_o         (fma_uop_cmp_rdy),
+      .in_ready_o         (falu_uop_cmp_rdy),
       .flush_i            (trap_flush_rvv),
       // Output signals
       .result_o           (allcmp_unit_res[0+:`WORD_WIDTH]),
@@ -559,7 +589,7 @@ module rvv_backend_fma_wrapper(
       .aux_i              ('0),
       // Input Handshake
       .in_valid_i         (cvt_vld),
-      .in_ready_o         (fma_uop_cvt_rdy),
+      .in_ready_o         (falu_uop_cvt_rdy),
       .flush_i            (trap_flush_rvv),
       // Output signals
       .result_o           (cvt_result[0+:`WORD_WIDTH]),
@@ -587,12 +617,12 @@ module rvv_backend_fma_wrapper(
       .rst_n              (rst_n),
       // Input signals
       .operand_i          (src2[0+:`WORD_WIDTH]), // 1 operand
-      .vs1_i              (fma_uop.vs1),
-      .rnd_mode_i         (fma_uop.frm),
+      .vs1_i              (falu_uop.vs1),
+      .rnd_mode_i         (falu_uop.frm),
       .tag_i              (tag_ftbl),         
       // Input Handshake
       .in_valid_i         (tbl_vld),
-      .in_ready_o         (fma_uop_tbl_rdy),
+      .in_ready_o         (falu_uop_tbl_rdy),
       .flush_i            (trap_flush_rvv),
       // Output signals
       .result_o           (tbl_result[0+:`WORD_WIDTH]),   
@@ -746,8 +776,8 @@ module rvv_backend_fma_wrapper(
         .rst_n              (rst_n),
         // Input signals
         .operand_i          (src2[i*`WORD_WIDTH+:`WORD_WIDTH]), // 1 operand
-        .vs1_i              (fma_uop.vs1),
-        .rnd_mode_i         (fma_uop.frm),
+        .vs1_i              (falu_uop.vs1),
+        .rnd_mode_i         (falu_uop.frm),
         .tag_i              ('0),
         // Input Handshake
         .in_valid_i         (tbl_vld),
@@ -765,14 +795,14 @@ module rvv_backend_fma_wrapper(
   endgenerate
 
   // register some extra information for FCMP instructions.
-  assign info_vld[0][0]     = fma_uop_vld&(fma_uop.uop_exe_unit==FCMP);
-  assign info_vld[0][1]     = fma_uop_vld&(fma_uop.uop_exe_unit==FNCMP);
+  assign info_vld[0][0]     = falu_uop_vld&(falu_uop.uop_exe_unit==FCMP);
+  assign info_vld[0][1]     = falu_uop_vld&(falu_uop.uop_exe_unit==FNCMP);
   assign info_rdy[PIPEREGS] = allcmp_result_rdy_tmp; 
-  assign cmp_info[0].vstart = fma_uop.vstart;
-  assign cmp_info[0].vl     = fma_uop.vl;   
-  assign cmp_info[0].vm     = fma_uop.vm;
-  assign cmp_info[0].v0     = fma_uop.v0_data_valid ? fma_uop.v0_data : '1;
-  assign cmp_info[0].vd     = fma_uop.vs3_data;
+  assign cmp_info[0].vstart = falu_uop.vstart;
+  assign cmp_info[0].vl     = falu_uop.vl;
+  assign cmp_info[0].vm     = falu_uop.vm;
+  assign cmp_info[0].v0     = falu_uop.v0_data_valid ? falu_uop.v0_data : '1;
+  assign cmp_info[0].vd     = falu_uop.vs3_data;
   
   // info pipeline
   generate
@@ -914,84 +944,79 @@ module rvv_backend_fma_wrapper(
 
   // commit result
   arb_round_robin #(.REQ_NUM(4)) arb2rob (.clk(clk), .rst_n(rst_n), .req(result_vld), .grant(arb_rdy));
-  assign result_vld         = fma_result_rdy ? {tbl_result_vld, cvt_result_vld, allcmp_result_vld, addmul_result_vld} : 'b0;
-  assign fma_result_vld     = |result_vld;
+  assign result_vld         = falu_result_rdy ? {tbl_result_vld, cvt_result_vld, allcmp_result_vld, addmul_result_vld} : 'b0;
+  assign falu_result_vld     = |result_vld;
   assign addmul_result_rdy  = arb_rdy[0];
   assign allcmp_result_rdy  = arb_rdy[1];
   assign cvt_result_rdy     = arb_rdy[2];
   assign tbl_result_rdy     = arb_rdy[3];
 
   always_comb begin
-    fma_result = 'b0;
+    falu_result = 'b0;
 
     case(1'b1)
       arb_rdy[3]: begin//choose look-up table results
       `ifdef TB_SUPPORT
-        fma_result.uop_pc     = tbl_tag_o.uop_pc;
+        falu_result.uop_pc     = tbl_tag_o.uop_pc;
       `endif
-        fma_result.rob_entry  = tbl_tag_o.rob_entry;
-        fma_result.w_valid    = 'b1;
-        fma_result.vsaturate  = 'b0;
-        fma_result.w_data     = tbl_result;
+        falu_result.rob_entry  = tbl_tag_o.rob_entry;
+        falu_result.w_valid    = 'b1;
+        falu_result.vsaturate  = 'b0;
+        falu_result.w_data     = tbl_result;
         for(int i=0;i<`VLENW;i++) begin
-          fma_result.fpexp[4*i+:4]  = {4{tbl_status_o[i]}};
+          falu_result.fpexp[4*i+:4]  = {4{tbl_status_o[i]}};
         end
       end
       arb_rdy[2]: begin//choose cvt results
       `ifdef TB_SUPPORT
-        fma_result.uop_pc     = cvt_tag_o.com_tag.uop_pc;
+        falu_result.uop_pc     = cvt_tag_o.com_tag.uop_pc;
       `endif
-        fma_result.rob_entry  = cvt_tag_o.com_tag.rob_entry;
-        fma_result.w_valid    = 'b1;
-        fma_result.vsaturate  = 'b0;
+        falu_result.rob_entry  = cvt_tag_o.com_tag.rob_entry;
+        falu_result.w_valid    = 'b1;
+        falu_result.vsaturate  = 'b0;
         for(int i=0;i<`VLENW;i++) begin
-        `ifdef ZVFBFWMA_ON
           case(cvt_tag_o.eew_vd) 
             EEW16: begin
               if(cvt_tag_o.uop_index) begin  
-                fma_result.w_data[`VLEN/2+i*`HWORD_WIDTH+:`HWORD_WIDTH] = cvt_result[i*`WORD_WIDTH+:`HWORD_WIDTH];
-                fma_result.w_data[        i*`HWORD_WIDTH+:`HWORD_WIDTH] = 'b0;
-                fma_result.fpexp[`VLENB/2+2*i+:2]                       = {2{cvt_status_o[i]}};
-                fma_result.fpexp[         2*i+:2]                       = 'b0;
+                falu_result.w_data[`VLEN/2+i*`HWORD_WIDTH+:`HWORD_WIDTH] = cvt_result[i*`WORD_WIDTH+:`HWORD_WIDTH];
+                falu_result.w_data[        i*`HWORD_WIDTH+:`HWORD_WIDTH] = 'b0;
+                falu_result.fpexp[`VLENB/2+2*i+:2]                       = {2{cvt_status_o[i]}};
+                falu_result.fpexp[         2*i+:2]                       = 'b0;
               end
               else begin
-                fma_result.w_data[`VLEN/2+i*`HWORD_WIDTH+:`HWORD_WIDTH] = 'b0;
-                fma_result.w_data[        i*`HWORD_WIDTH+:`HWORD_WIDTH] = cvt_result[i*`WORD_WIDTH+:`HWORD_WIDTH];
-                fma_result.fpexp[`VLENB/2+2*i+:2]                       = 'b0;
-                fma_result.fpexp[         2*i+:2]                       = {2{cvt_status_o[i]}};
+                falu_result.w_data[`VLEN/2+i*`HWORD_WIDTH+:`HWORD_WIDTH] = 'b0;
+                falu_result.w_data[        i*`HWORD_WIDTH+:`HWORD_WIDTH] = cvt_result[i*`WORD_WIDTH+:`HWORD_WIDTH];
+                falu_result.fpexp[`VLENB/2+2*i+:2]                       = 'b0;
+                falu_result.fpexp[         2*i+:2]                       = {2{cvt_status_o[i]}};
               end
             end
             default: begin //EEW32
-              fma_result.w_data[i*`WORD_WIDTH+:`WORD_WIDTH] = cvt_result[i*`WORD_WIDTH+:`WORD_WIDTH];
-              fma_result.fpexp[4*i+:4]                      = {4{cvt_status_o[i]}};
+              falu_result.w_data[i*`WORD_WIDTH+:`WORD_WIDTH] = cvt_result[i*`WORD_WIDTH+:`WORD_WIDTH];
+              falu_result.fpexp[4*i+:4]                      = {4{cvt_status_o[i]}};
             end
           endcase
-        `else
-          fma_result.w_data[i*`WORD_WIDTH+:`WORD_WIDTH] = cvt_result[i*`WORD_WIDTH+:`WORD_WIDTH];
-          fma_result.fpexp[4*i+:4]                      = {4{cvt_status_o[i]}};
-        `endif
         end
       end
       arb_rdy[1]: begin //choose allcmp results
       `ifdef TB_SUPPORT
-        fma_result.uop_pc     = allcmp_tag_o.com_tag.uop_pc;
+        falu_result.uop_pc     = allcmp_tag_o.com_tag.uop_pc;
       `endif
-        fma_result.rob_entry  = allcmp_tag_o.com_tag.rob_entry;
-        fma_result.w_valid    = 'b1;
-        fma_result.vsaturate  = 'b0;
-        fma_result.w_data     = allcmp_result;
-        fma_result.fpexp      = allcmp_fexp;
+        falu_result.rob_entry  = allcmp_tag_o.com_tag.rob_entry;
+        falu_result.w_valid    = 'b1;
+        falu_result.vsaturate  = 'b0;
+        falu_result.w_data     = allcmp_result;
+        falu_result.fpexp      = allcmp_fexp;
       end
       arb_rdy[0]: begin // addmul results
       `ifdef TB_SUPPORT
-        fma_result.uop_pc     = addmul_tag_o.uop_pc;
+        falu_result.uop_pc     = addmul_tag_o.uop_pc;
       `endif
-        fma_result.rob_entry  = addmul_tag_o.rob_entry;
-        fma_result.w_valid    = 'b1;
-        fma_result.vsaturate  = 'b0;
-        fma_result.w_data     = addmul_result;
+        falu_result.rob_entry  = addmul_tag_o.rob_entry;
+        falu_result.w_valid    = 'b1;
+        falu_result.vsaturate  = 'b0;
+        falu_result.w_data     = addmul_result;
         for(int i=0;i<`VLENW;i++) begin
-          fma_result.fpexp[4*i+:4]  = {4{addmul_status_o[i]}};
+          falu_result.fpexp[4*i+:4]  = {4{addmul_status_o[i]}};
         end
       end
     endcase

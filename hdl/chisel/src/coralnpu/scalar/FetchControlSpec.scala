@@ -18,7 +18,6 @@ import chisel3._
 import chisel3.simulator.scalatest.ChiselSim
 import org.scalatest.freespec.AnyFreeSpec
 
-
 class FetchControlSpec extends AnyFreeSpec with ChiselSim {
   val p = new Parameters
 
@@ -45,7 +44,7 @@ class FetchControlSpec extends AnyFreeSpec with ChiselSim {
 
   "Branch" in {
     simulate(new FetchControl(p)) { dut =>
-      dut.clock.step()  // Clear reset.
+      dut.clock.step() // Clear reset.
       dut.io.bufferRequest.nReady.poke(8.U)
       dut.io.branch.valid.poke(true.B)
       dut.io.branch.bits.poke(0x30000000.U)
@@ -94,7 +93,7 @@ class FetchControlSpec extends AnyFreeSpec with ChiselSim {
 
   "FetchWithBranch" in {
     simulate(new FetchControl(p)) { dut =>
-      dut.clock.step()  // Clear reset.
+      dut.clock.step() // Clear reset.
       dut.io.bufferRequest.nReady.poke(8.U)
       dut.io.fetchData.valid.poke(true.B)
       dut.io.fetchData.bits.addr.poke(0x20000000)
@@ -103,7 +102,7 @@ class FetchControlSpec extends AnyFreeSpec with ChiselSim {
       }
       dut.io.fetchData.bits.inst(3).poke("x0000006f".U)
       dut.io.bufferRequest.nValid.expect(4.U)
-      dut.clock.step()  // Temporary
+      dut.clock.step() // Temporary
 
       dut.io.fetchData.valid.poke(false.B)
       dut.io.fetchAddr.valid.expect(1)
@@ -113,7 +112,7 @@ class FetchControlSpec extends AnyFreeSpec with ChiselSim {
 
   "FetchJump" in {
     simulate(new FetchControl(p)) { dut =>
-      dut.clock.step()  // Clear reset.
+      dut.clock.step() // Clear reset.
       dut.io.bufferRequest.nReady.poke(8.U)
       dut.io.fetchData.valid.poke(true.B)
       dut.io.fetchData.bits.addr.poke(0x20000000)
@@ -121,7 +120,7 @@ class FetchControlSpec extends AnyFreeSpec with ChiselSim {
         dut.io.fetchData.bits.inst(i).poke(i.U)
       }
       dut.io.fetchData.bits.inst(3).poke("x0200006f".U) // JAL opcode (offset +32)
-      dut.io.bufferRequest.nValid.expect(4.U) // JAL is predicted, 4 valid
+      dut.io.bufferRequest.nValid.expect(4.U)           // JAL is predicted, 4 valid
       dut.io.flushTx.expect(true.B)
       dut.clock.step()
 

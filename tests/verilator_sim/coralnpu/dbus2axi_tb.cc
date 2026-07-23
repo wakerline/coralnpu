@@ -15,7 +15,27 @@
 #include "VDBus2AxiV2.h"
 #include "tests/verilator_sim/sysc_tb.h"
 
+template <typename T>
+struct get_port_width;
+
+template <typename T>
+struct get_port_width<T&> : get_port_width<T> {};
+
+template <int W>
+struct get_port_width<sc_core::sc_in<sc_dt::sc_bv<W>>> {
+  static const int value = W;
+};
+
+template <int W>
+struct get_port_width<sc_core::sc_out<sc_dt::sc_bv<W>>> {
+  static const int value = W;
+};
+
 struct DBus2Axi_tb : Sysc_tb {
+  static const int ADDR_WIDTH = get_port_width<decltype(VDBus2AxiV2::io_dbus_addr)>::value;
+  static const int FAULT_ADDR_WIDTH = get_port_width<decltype(VDBus2AxiV2::io_fault_bits_addr)>::value;
+  static const int FAULT_EPC_WIDTH = get_port_width<decltype(VDBus2AxiV2::io_fault_bits_epc)>::value;
+
   sc_out<bool> io_dbus_valid;
   sc_in<bool> io_dbus_ready;
   sc_out<bool> io_dbus_write;
@@ -29,8 +49,8 @@ struct DBus2Axi_tb : Sysc_tb {
   sc_in<bool> io_axi_read_addr_valid;
   sc_in<bool> io_axi_read_data_ready;
   sc_out<bool> io_axi_read_data_valid;
-  sc_out<sc_bv<32> > io_dbus_addr;
-  sc_out<sc_bv<32> > io_dbus_adrx;
+  sc_out<sc_bv<ADDR_WIDTH> > io_dbus_addr;
+  sc_out<sc_bv<ADDR_WIDTH> > io_dbus_adrx;
   sc_out<sc_bv<6> > io_dbus_size;
   sc_out<sc_bv<256> > io_dbus_wdata;
   sc_out<sc_bv<32> > io_dbus_wmask;
@@ -38,8 +58,8 @@ struct DBus2Axi_tb : Sysc_tb {
   sc_in<sc_bv<32> > io_dbus_pc;
   sc_in<bool> io_fault_valid;
   sc_in<bool> io_fault_bits_write;
-  sc_in<sc_bv<32> > io_fault_bits_addr;
-  sc_in<sc_bv<32>> io_fault_bits_epc;
+  sc_in<sc_bv<FAULT_ADDR_WIDTH> > io_fault_bits_addr;
+  sc_in<sc_bv<FAULT_EPC_WIDTH>> io_fault_bits_epc;
   sc_in<sc_bv<32> > io_axi_write_addr_bits_addr;
   sc_in<sc_bv<6> > io_axi_write_addr_bits_id;
   sc_in<sc_bv<4> > io_axi_write_addr_bits_region;
@@ -358,8 +378,8 @@ static void DBus2Axi_test(char* name, int loops, bool trace) {
   sc_signal<bool> io_axi_read_addr_valid;
   sc_signal<bool> io_axi_read_data_ready;
   sc_signal<bool> io_axi_read_data_valid;
-  sc_signal<sc_bv<32> > io_dbus_addr;
-  sc_signal<sc_bv<32> > io_dbus_adrx;
+  sc_signal<sc_bv<DBus2Axi_tb::ADDR_WIDTH> > io_dbus_addr;
+  sc_signal<sc_bv<DBus2Axi_tb::ADDR_WIDTH> > io_dbus_adrx;
   sc_signal<sc_bv<6> > io_dbus_size;
   sc_signal<sc_bv<256> > io_dbus_wdata;
   sc_signal<sc_bv<32> > io_dbus_wmask;
@@ -367,8 +387,8 @@ static void DBus2Axi_test(char* name, int loops, bool trace) {
   sc_signal<sc_bv<32> > io_dbus_pc;
   sc_signal<bool> io_fault_valid;
   sc_signal<bool> io_fault_bits_write;
-  sc_signal<sc_bv<32> > io_fault_bits_addr;
-  sc_signal<sc_bv<32> > io_fault_bits_epc;
+  sc_signal<sc_bv<DBus2Axi_tb::FAULT_ADDR_WIDTH> > io_fault_bits_addr;
+  sc_signal<sc_bv<DBus2Axi_tb::FAULT_EPC_WIDTH> > io_fault_bits_epc;
   sc_signal<sc_bv<32> > io_axi_write_addr_bits_addr;
   sc_signal<sc_bv<6> > io_axi_write_addr_bits_id;
   sc_signal<sc_bv<4> > io_axi_write_addr_bits_region;

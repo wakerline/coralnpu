@@ -56,20 +56,18 @@ package coralnpu_tlul_pkg_128;
     logic a_ready;
   } tl_d2h_t;
 
-  localparam logic [top_pkg::TL_DW - 1 : 0] BlankedAData = {
-                                                top_pkg::TL_DW{1'b1}};
+  localparam logic [top_pkg::TL_DW - 1 : 0] BlankedAData = {top_pkg::TL_DW{1'b1}};
 
   // return inverted integrity for command payload
-  function automatic logic [H2DCmdIntgWidth - 1 : 0] get_bad_cmd_intg
-      (tl_h2d_t tl);
+  function automatic logic [H2DCmdIntgWidth - 1 : 0] get_bad_cmd_intg(tl_h2d_t tl);
     logic [H2DCmdIntgWidth - 1 : 0] cmd_intg;
     cmd_intg = get_cmd_intg(tl);
     return ~cmd_intg;
   endfunction  // get_bad_cmd_intg
 
   // return inverted integrity for data payload
-  function automatic logic [H2DCmdIntgWidth - 1 : 0] get_bad_data_intg
-      (logic [top_pkg::TL_DW - 1 : 0] data);
+  function automatic logic [H2DCmdIntgWidth - 1 : 0] get_bad_data_intg(
+      logic [top_pkg::TL_DW - 1 : 0] data);
     logic [H2DCmdIntgWidth - 1 : 0] data_intg;
     data_intg = get_data_intg(data);
     return ~data_intg;

@@ -39,28 +39,66 @@ async def reset_dut(dut):
     dut.io_axi_write_data_valid.value = 0
     dut.io_axi_write_resp_ready.value = 0
     dut.io_axi_read_data_ready.value = 0
+
+    # Initialize write address signals
+    dut.io_axi_write_addr_bits_addr.value = 0
+    dut.io_axi_write_addr_bits_id.value = 0
+    dut.io_axi_write_addr_bits_size.value = 0
+    dut.io_axi_write_addr_bits_len.value = 0
+    dut.io_axi_write_addr_bits_burst.value = 0
+    dut.io_axi_write_addr_bits_lock.value = 0
+    dut.io_axi_write_addr_bits_cache.value = 0
+    dut.io_axi_write_addr_bits_qos.value = 0
+    dut.io_axi_write_addr_bits_region.value = 0
+    dut.io_axi_write_addr_bits_prot.value = 0
+
+    # Initialize read address signals
+    dut.io_axi_read_addr_bits_addr.value = 0
+    dut.io_axi_read_addr_bits_id.value = 0
+    dut.io_axi_read_addr_bits_size.value = 0
+    dut.io_axi_read_addr_bits_len.value = 0
+    dut.io_axi_read_addr_bits_burst.value = 0
+    dut.io_axi_read_addr_bits_lock.value = 0
+    dut.io_axi_read_addr_bits_cache.value = 0
+    dut.io_axi_read_addr_bits_qos.value = 0
+    dut.io_axi_read_addr_bits_region.value = 0
+    dut.io_axi_read_addr_bits_prot.value = 0
+
+    # Initialize write data signals
+    dut.io_axi_write_data_bits_data.value = 0
+    dut.io_axi_write_data_bits_strb.value = 0
+    dut.io_axi_write_data_bits_last.value = 0
+
     await ClockCycles(dut.clock, 2)
     dut.reset.value = 0
     await ClockCycles(dut.clock, 2)
 
 
-async def axi_send_write(dut, address, source, size, data, strb, timeout_cycles=1000):
+async def axi_send_write(
+    dut, address, source, size, data, strb, timeout_cycles=1000
+):
     """Sends an AXI write transaction."""
     dut.io_axi_write_addr_valid.value = 1
     dut.io_axi_write_addr_bits_addr.value = address
     dut.io_axi_write_addr_bits_id.value = source
     dut.io_axi_write_addr_bits_size.value = size
+    dut.io_axi_write_addr_bits_len.value = 0
+    dut.io_axi_write_addr_bits_burst.value = 1
+    dut.io_axi_write_addr_bits_lock.value = 0
+    dut.io_axi_write_addr_bits_cache.value = 0
+    dut.io_axi_write_addr_bits_qos.value = 0
+    dut.io_axi_write_addr_bits_region.value = 0
+    dut.io_axi_write_addr_bits_prot.value = 0
 
     dut.io_axi_write_data_valid.value = 1
     dut.io_axi_write_data_bits_data.value = data
     dut.io_axi_write_data_bits_strb.value = strb
+    dut.io_axi_write_data_bits_last.value = 1
 
     for _ in range(timeout_cycles):
         await RisingEdge(dut.clock)
-        if (
-            dut.io_axi_write_addr_ready.value == 1
-            and dut.io_axi_write_data_ready.value == 1
-        ):
+        if (dut.io_axi_write_addr_ready.value == 1
+                and dut.io_axi_write_data_ready.value == 1):
             break
     else:
         raise RuntimeError(f"Timeout waiting for AXI write ready")
@@ -75,6 +113,13 @@ async def axi_send_read(dut, address, source, size, timeout_cycles=1000):
     dut.io_axi_read_addr_bits_addr.value = address
     dut.io_axi_read_addr_bits_id.value = source
     dut.io_axi_read_addr_bits_size.value = size
+    dut.io_axi_read_addr_bits_len.value = 0
+    dut.io_axi_read_addr_bits_burst.value = 1
+    dut.io_axi_read_addr_bits_lock.value = 0
+    dut.io_axi_read_addr_bits_cache.value = 0
+    dut.io_axi_read_addr_bits_qos.value = 0
+    dut.io_axi_read_addr_bits_region.value = 0
+    dut.io_axi_read_addr_bits_prot.value = 0
 
     for _ in range(timeout_cycles):
         await RisingEdge(dut.clock)
@@ -108,7 +153,7 @@ async def test_write_request(dut):
 
     test_addr = random.randint(0, (2**addr_width) - 1)
     test_source = random.randint(0, (2**source_width) - 1)
-    test_data = random.randint(0, (2 ** (data_width_bytes * 8)) - 1)
+    test_data = random.randint(0, (2**(data_width_bytes * 8)) - 1)
     test_strb = (1 << num_bytes) - 1
 
     await axi_send_write(
@@ -126,8 +171,7 @@ async def test_write_request(dut):
     full_mask = (1 << data_width_bytes) - 1
     expected_opcode = (
         TLUL_OpcodeA.PutFullData
-        if test_strb == full_mask
-        else TLUL_OpcodeA.PutPartialData
+        if test_strb == full_mask else TLUL_OpcodeA.PutPartialData
     )
     assert dut.io_tl_a_bits_opcode.value == expected_opcode, (
         f"TL A_OPCODE should be {expected_opcode}"
@@ -146,6 +190,11 @@ async def test_write_request(dut):
     dut.io_tl_d_valid.value = 1
     dut.io_tl_d_bits_opcode.value = TLUL_OpcodeD.AccessAck
     dut.io_tl_d_bits_source.value = test_source
+    dut.io_tl_d_bits_param.value = 0
+    dut.io_tl_d_bits_size.value = test_size
+    dut.io_tl_d_bits_sink.value = 0
+    dut.io_tl_d_bits_data.value = 0
+    dut.io_tl_d_bits_error.value = 0
 
     for _ in range(timeout_cycles):
         await RisingEdge(dut.clock)
@@ -187,7 +236,7 @@ async def test_read_request(dut):
 
     test_addr = random.randint(0, (2**addr_width) - 1)
     test_source = random.randint(0, (2**source_width) - 1)
-    test_data = random.randint(0, (2 ** (data_width_bytes * 8)) - 1)
+    test_data = random.randint(0, (2**(data_width_bytes * 8)) - 1)
 
     await axi_send_read(
         dut,
@@ -262,7 +311,7 @@ async def test_read_error(dut):
 
     test_addr = random.randint(0, (2**addr_width) - 1)
     test_source = random.randint(0, (2**source_width) - 1)
-    test_data = random.randint(0, (2 ** (data_width_bytes * 8)) - 1)
+    test_data = random.randint(0, (2**(data_width_bytes * 8)) - 1)
 
     await axi_send_read(
         dut,
@@ -340,6 +389,11 @@ async def test_write_burst(dut):
         dut.io_axi_write_addr_bits_size.value = test_size
         dut.io_axi_write_addr_bits_len.value = test_len
         dut.io_axi_write_addr_bits_burst.value = 1  # INCR
+        dut.io_axi_write_addr_bits_lock.value = 0
+        dut.io_axi_write_addr_bits_cache.value = 0
+        dut.io_axi_write_addr_bits_qos.value = 0
+        dut.io_axi_write_addr_bits_region.value = 0
+        dut.io_axi_write_addr_bits_prot.value = 0
         while True:
             await ReadOnly()
             if dut.io_axi_write_addr_ready.value == 1:
@@ -372,7 +426,9 @@ async def test_write_burst(dut):
         while True:
             if dut.io_tl_a_valid.value:
                 assert dut.io_tl_a_bits_opcode.value == TLUL_OpcodeA.PutFullData
-                assert int(dut.io_tl_a_bits_address.value) == test_addr + (beat * 32)
+                assert int(dut.io_tl_a_bits_address.value) == test_addr + (
+                    beat * 32
+                )
                 assert dut.io_tl_a_bits_source.value == test_source
                 break
             await RisingEdge(dut.clock)
@@ -389,6 +445,11 @@ async def test_write_burst(dut):
         dut.io_tl_d_valid.value = 1
         dut.io_tl_d_bits_opcode.value = TLUL_OpcodeD.AccessAck
         dut.io_tl_d_bits_source.value = test_source
+        dut.io_tl_d_bits_param.value = 0
+        dut.io_tl_d_bits_size.value = test_size
+        dut.io_tl_d_bits_sink.value = 0
+        dut.io_tl_d_bits_data.value = 0
+        dut.io_tl_d_bits_error.value = 0
 
         await RisingEdge(dut.clock)
         while True:
@@ -429,6 +490,11 @@ async def test_read_burst(dut):
         dut.io_axi_read_addr_bits_size.value = test_size
         dut.io_axi_read_addr_bits_len.value = test_len
         dut.io_axi_read_addr_bits_burst.value = 1  # INCR
+        dut.io_axi_read_addr_bits_lock.value = 0
+        dut.io_axi_read_addr_bits_cache.value = 0
+        dut.io_axi_read_addr_bits_qos.value = 0
+        dut.io_axi_read_addr_bits_region.value = 0
+        dut.io_axi_read_addr_bits_prot.value = 0
         while True:
             await ReadOnly()
             if dut.io_axi_read_addr_ready.value == 1:
@@ -445,7 +511,9 @@ async def test_read_burst(dut):
         while True:
             if dut.io_tl_a_valid.value:
                 assert dut.io_tl_a_bits_opcode.value == TLUL_OpcodeA.Get
-                assert int(dut.io_tl_a_bits_address.value) == test_addr + (beat * 32)
+                assert int(dut.io_tl_a_bits_address.value) == test_addr + (
+                    beat * 32
+                )
                 assert dut.io_tl_a_bits_source.value == test_source
                 break
             await RisingEdge(dut.clock)
@@ -461,6 +529,10 @@ async def test_read_burst(dut):
         dut.io_tl_d_bits_opcode.value = TLUL_OpcodeD.AccessAckData
         dut.io_tl_d_bits_source.value = test_source
         dut.io_tl_d_bits_data.value = 0x11223344 + beat
+        dut.io_tl_d_bits_param.value = 0
+        dut.io_tl_d_bits_size.value = test_size
+        dut.io_tl_d_bits_sink.value = 0
+        dut.io_tl_d_bits_error.value = 0
 
         await RisingEdge(dut.clock)
         while True:

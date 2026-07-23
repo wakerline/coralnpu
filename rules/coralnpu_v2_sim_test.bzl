@@ -16,7 +16,6 @@
 
 load("//rules:coralnpu_v2.bzl", "coralnpu_v2_binary")
 
-
 def _sim_test_impl(ctx):
     runner_target = ctx.attr._runner_highmem if ctx.attr.highmem else ctx.attr._runner
     runner = runner_target[DefaultInfo].files_to_run.executable
@@ -36,48 +35,47 @@ def _sim_test_impl(ctx):
     # Generate a wrapper script that invokes the test runner with the ELF path.
     script = ctx.actions.declare_file(ctx.label.name + "_run.sh")
     ctx.actions.write(
-        output=script,
-        content="""\
+        output = script,
+        content = """\
 #!/bin/bash
 exec {runner} {elf} --sim_timeout {timeout} {trace_arg} {highmem_arg} \
     --itcm_size_kbytes {itcm_size} --dtcm_size_kbytes {dtcm_size} {loader_arg}
 """.format(
-            runner=runner.short_path,
-            elf=elf.short_path,
-            timeout=sim_timeout,
-            trace_arg=trace_arg,
-            highmem_arg=highmem_arg,
-            itcm_size=ctx.attr.itcm_size_kbytes,
-            dtcm_size=ctx.attr.dtcm_size_kbytes,
-            loader_arg=loader_arg,
+            runner = runner.short_path,
+            elf = elf.short_path,
+            timeout = sim_timeout,
+            trace_arg = trace_arg,
+            highmem_arg = highmem_arg,
+            itcm_size = ctx.attr.itcm_size_kbytes,
+            dtcm_size = ctx.attr.dtcm_size_kbytes,
+            loader_arg = loader_arg,
         ),
-        is_executable=True,
+        is_executable = True,
     )
 
-    runfiles = ctx.runfiles(files=[elf])
+    runfiles = ctx.runfiles(files = [elf])
     runfiles = runfiles.merge(runner_target[DefaultInfo].default_runfiles)
 
     return [
         DefaultInfo(
-            executable=script,
-            runfiles=runfiles,
-        )
+            executable = script,
+            runfiles = runfiles,
+        ),
     ]
 
-
 _sim_test = rule(
-    implementation=_sim_test_impl,
-    test=True,
-    attrs={
+    implementation = _sim_test_impl,
+    test = True,
+    attrs = {
         "elf": attr.label(
-            allow_single_file=[".elf"],
-            mandatory=True,
+            allow_single_file = [".elf"],
+            mandatory = True,
         ),
-        "sim_timeout": attr.int(default=30),
-        "trace": attr.bool(default=False),
-        "highmem": attr.bool(default=False),
-        "itcm_size_kbytes": attr.int(default=8),
-        "dtcm_size_kbytes": attr.int(default=32),
+        "sim_timeout": attr.int(default = 30),
+        "trace": attr.bool(default = False),
+        "highmem": attr.bool(default = False),
+        "itcm_size_kbytes": attr.int(default = 8),
+        "dtcm_size_kbytes": attr.int(default = 32),
         "loader": attr.string(
             default = "backdoor",
             values = ["backdoor", "spi"],
@@ -88,30 +86,28 @@ _sim_test = rule(
             ),
         ),
         "_runner": attr.label(
-            default="//utils/coralnpu_soc_loader:sim_test_runner",
-            executable=True,
-            cfg="target",
+            default = "//utils/coralnpu_soc_loader:sim_test_runner",
+            executable = True,
+            cfg = "target",
         ),
         "_runner_highmem": attr.label(
-            default="//utils/coralnpu_soc_loader:sim_test_runner_highmem",
-            executable=True,
-            cfg="target",
+            default = "//utils/coralnpu_soc_loader:sim_test_runner_highmem",
+            executable = True,
+            cfg = "target",
         ),
     },
 )
 
-
 def coralnpu_v2_sim_test(
-    name,
-    srcs,
-    sim_timeout=30,
-    trace=False,
-    highmem=False,
-    loader="backdoor",
-    size="large",
-    tags=[],
-    **kwargs,
-):
+        name,
+        srcs,
+        sim_timeout = 30,
+        trace = False,
+        highmem = False,
+        loader = "backdoor",
+        size = "large",
+        tags = [],
+        **kwargs):
     """Builds a coralnpu_v2_binary and runs it on the Verilator SoC simulation.
 
     The test passes if the binary prints a line matching PASS/TEST PASSED
@@ -138,18 +134,18 @@ def coralnpu_v2_sim_test(
         if "dtcm_size_kbytes" not in kwargs:
             kwargs["dtcm_size_kbytes"] = 1024
 
-    coralnpu_v2_binary(name=binary_name, srcs=srcs, tags=tags + ["manual"], **kwargs)
+    coralnpu_v2_binary(name = binary_name, srcs = srcs, tags = tags + ["manual"], **kwargs)
 
     _sim_test(
-        name=name,
-        elf=":{}.elf".format(binary_name),
-        sim_timeout=sim_timeout,
-        trace=trace,
-        highmem=highmem,
-        loader=loader,
-        itcm_size_kbytes=kwargs.get("itcm_size_kbytes", 1024 if highmem else 8),
-        dtcm_size_kbytes=kwargs.get("dtcm_size_kbytes", 1024 if highmem else 32),
-        size=size,
-        tags=tags + ["exclusive"],
-        timeout="long",
+        name = name,
+        elf = ":{}.elf".format(binary_name),
+        sim_timeout = sim_timeout,
+        trace = trace,
+        highmem = highmem,
+        loader = loader,
+        itcm_size_kbytes = kwargs.get("itcm_size_kbytes", 1024 if highmem else 8),
+        dtcm_size_kbytes = kwargs.get("dtcm_size_kbytes", 1024 if highmem else 32),
+        size = size,
+        tags = tags + ["exclusive"],
+        timeout = "long",
     )

@@ -29,24 +29,24 @@ object Regfile {
   }
 }
 
-class RegfileReadAddrIO extends Bundle {
+class RegfileReadAddrIO(p: Parameters) extends Bundle {
   val valid = Input(Bool())
-  val addr  = Input(UInt(5.W))
+  val addr  = Input(UInt(log2Ceil(p.scalarRegCount).W))
 }
 
-class RegfileReadSetIO extends Bundle {
+class RegfileReadSetIO(p: Parameters) extends Bundle {
   val valid = Input(Bool())
-  val value = Input(UInt(32.W))
+  val value = Input(UInt(p.xlen.W))
 }
 
-class RegfileBusAddrIO extends Bundle {
+class RegfileBusAddrIO(p: Parameters) extends Bundle {
   val valid = Input(Bool())
   val immen = Input(Bool())
-  val immed = Input(UInt(32.W))
+  val immed = Input(UInt(p.lsuAddrBits.W))
 }
 
-class RegfileBranchTargetIO extends Bundle {
-  val data = Output(UInt(32.W))
+class RegfileBranchTargetIO(p: Parameters) extends Bundle {
+  val data = Output(UInt(p.programCounterBits.W))
 }
 
 class Regfile(p: Parameters) extends Module {
@@ -54,57 +54,62 @@ class Regfile(p: Parameters) extends Module {
   // Additionally, there are two more write ports to service
   // the MLU/DVU, and the LSU, as they may take more cycles.
   val extraWritePorts = 2
-  val io = IO(new Bundle {
+  val io              = IO(new Bundle {
     // Decode cycle.
-    val readAddr = Vec(p.instructionLanes * 2, new RegfileReadAddrIO)
-    val readSet  = Vec(p.instructionLanes * 2, new RegfileReadSetIO)
-    val writeAddr = Vec(p.instructionLanes, new RegfileWriteAddrIO)
-    val busAddr = Vec(p.instructionLanes, Input(new RegfileBusAddrIO))
-    val target = Vec(p.instructionLanes, new RegfileBranchTargetIO)
-    val linkPort = new RegfileLinkPortIO
-    val busPort = new RegfileBusPortIO(p)
+    val readAddr     = Vec(p.instructionLanes * 2, new RegfileReadAddrIO(p))
+    val readSet      = Vec(p.instructionLanes * 2, new RegfileReadSetIO(p))
+    val writeAddr    = Vec(p.instructionLanes, new RegfileWriteAddrIO(p))
+    val busAddr      = Vec(p.instructionLanes, Input(new RegfileBusAddrIO(p)))
+    val target       = Vec(p.instructionLanes, new RegfileBranchTargetIO(p))
+    val linkPort     = new RegfileLinkPortIO(p)
+    val busPort      = new RegfileBusPortIO(p)
     val debugBusPort = new Bundle {
-      val idx = Input(UInt(5.W))
-      val data = Output(UInt(32.W))
+      val idx  = Input(UInt(log2Ceil(p.scalarRegCount).W))
+      val data = Output(UInt(p.xlen.W))
     }
     val debugWriteValid = Input(Bool())
 
     // Execute cycle.
-    val readData = Vec(p.instructionLanes * 2, new RegfileReadDataIO)
-    val writeData = Vec(p.instructionLanes + extraWritePorts, new Bundle {
-      val valid = Input(Bool())
-      val bits = new RegfileWriteDataIO
-    })
-    val writeMask = Vec(p.instructionLanes + extraWritePorts, new Bundle {val valid = Input(Bool())})
+    val readData  = Vec(p.instructionLanes * 2, new RegfileReadDataIO(p))
+    val writeData = Vec(
+      p.instructionLanes + extraWritePorts,
+      new Bundle {
+        val valid = Input(Bool())
+        val bits  = new RegfileWriteDataIO(p)
+      }
+    )
+    val writeMask =
+      Vec(p.instructionLanes + extraWritePorts, new Bundle { val valid = Input(Bool()) })
     val scoreboard = new Bundle {
-      val regd = Output(UInt(32.W))
-      val comb = Output(UInt(32.W))
+      val regd = Output(UInt(p.scalarRegCount.W))
+      val comb = Output(UInt(p.scalarRegCount.W))
     }
   })
 
-
   // The scalar registers.
-  val regfile = RegInit(VecInit.fill(32)(0.U(32.W)))
+  val regfile = RegInit(VecInit.fill(p.scalarRegCount)(0.U(p.xlen.W)))
 
   // ***************************************************************************
   // The scoreboard.
   // ***************************************************************************
-  val scoreboard = RegInit(0.U(32.W))
+  val scoreboard = RegInit(0.U(p.scalarRegCount.W))
 
   // The write Addr:Data contract is against speculated opcodes. If an opcode
   // is in the shadow of a taken branch it will still Set:Clr the scoreboard,
   // but the actual write will be Masked.
   val scoreboard_set = io.writeAddr
-      .map(x => MuxOR(x.valid, UIntToOH(x.addr, 32))).reduce(_|_)
+    .map(x => MuxOR(x.valid, UIntToOH(x.addr, p.scalarRegCount)))
+    .reduce(_ | _)
 
   val scoreboard_clr0 = io.writeData
-      .map(x => MuxOR(x.valid, UIntToOH(x.bits.addr, 32))).reduce(_|_)
+    .map(x => MuxOR(x.valid, UIntToOH(x.bits.addr, p.scalarRegCount)))
+    .reduce(_ | _)
 
-  val scoreboard_clr = Cat(scoreboard_clr0(31,1), 0.U(1.W))
+  val scoreboard_clr = Cat(scoreboard_clr0(p.scalarRegCount - 1, 1), 0.U(1.W))
 
-  when (scoreboard_set =/= 0.U || scoreboard_clr =/= 0.U) {
+  when(scoreboard_set =/= 0.U || scoreboard_clr =/= 0.U) {
     val nxtScoreboard = (scoreboard & ~scoreboard_clr) | scoreboard_set
-    scoreboard := Cat(nxtScoreboard(31,1), 0.U(1.W))
+    scoreboard := Cat(nxtScoreboard(p.scalarRegCount - 1, 1), 0.U(1.W))
   }
 
   io.scoreboard.regd := scoreboard
@@ -113,9 +118,9 @@ class Regfile(p: Parameters) extends Module {
   // ***************************************************************************
   // The read port response.
   // ***************************************************************************
-  val readDataReady = RegInit(VecInit(Seq.fill(p.instructionLanes * 2){false.B}))
-  val readDataBits  = RegInit(VecInit.fill(p.instructionLanes * 2)(0.U(32.W)))
-  val nxtReadDataBits = Wire(Vec(p.instructionLanes * 2, UInt(32.W)))
+  val readDataReady   = RegInit(VecInit(Seq.fill(p.instructionLanes * 2) { false.B }))
+  val readDataBits    = RegInit(VecInit.fill(p.instructionLanes * 2)(0.U(p.xlen.W)))
+  val nxtReadDataBits = Wire(Vec(p.instructionLanes * 2, UInt(p.xlen.W)))
 
   for (i <- 0 until (p.instructionLanes * 2)) {
     io.readData(i).valid := readDataReady(i)
@@ -125,19 +130,21 @@ class Regfile(p: Parameters) extends Module {
   // ***************************************************************************
   // One hot write ports.
   // ***************************************************************************
-  val writeValid = Wire(Vec(32, Bool()))
-  val writeData  = Wire(Vec(32, UInt(32.W)))
+  val writeValid = Wire(Vec(p.scalarRegCount, Bool()))
+  val writeData  = Wire(Vec(p.scalarRegCount, UInt(p.xlen.W)))
 
-  writeValid(0) := true.B  // do not require special casing of indices
-  writeData(0)  := 0.U     // regfile(0) is optimized away
+  writeValid(0) := true.B // do not require special casing of indices
+  writeData(0)  := 0.U    // regfile(0) is optimized away
 
-  for (i <- 1 until 32) {
+  for (i <- 1 until p.scalarRegCount) {
     val valid = (0 until p.instructionLanes + extraWritePorts).map(j => {
-        val addrValid = (io.writeData(j).bits.addr === i.U)
-        (io.writeData(j).valid && addrValid && !io.writeMask(j).valid)})
+      val addrValid = (io.writeData(j).bits.addr === i.U)
+      (io.writeData(j).valid && addrValid && !io.writeMask(j).valid)
+    })
 
-    val data = (0 until p.instructionLanes + extraWritePorts).map(
-        x => MuxOR(valid(x), io.writeData(x).bits.data)).reduce(_|_)
+    val data = (0 until p.instructionLanes + extraWritePorts)
+      .map(x => MuxOR(valid(x), io.writeData(x).bits.data))
+      .reduce(_ | _)
 
     writeValid(i) := Cat(valid) =/= 0.U
     writeData(i)  := data
@@ -145,8 +152,8 @@ class Regfile(p: Parameters) extends Module {
     assert(PopCount(valid) <= 1.U)
   }
 
-  for (i <- 0 until 32) {
-    when (writeValid(i)) {
+  for (i <- 0 until p.scalarRegCount) {
+    when(writeValid(i)) {
       regfile(i) := writeData(i)
     }
   }
@@ -154,43 +161,45 @@ class Regfile(p: Parameters) extends Module {
   // We care if someone tried to write x0 (e.g. nop is encoded this way), but want
   // it separate for above mentioned optimization.
   val x0 = (0 until p.instructionLanes).map(x =>
-      io.writeData(x).valid &&
+    io.writeData(x).valid &&
       io.writeData(x).bits.addr === 0.U &&
-      !io.writeMask(x).valid)
+      !io.writeMask(x).valid
+  )
 
   // ***************************************************************************
   // Read ports with write forwarding.
   // ***************************************************************************
-  val rdata = Wire(Vec((p.instructionLanes * 2), UInt(32.W)))
-  val wdata = Wire(Vec((p.instructionLanes * 2), UInt(32.W)))
-  val rwdata = Wire(Vec((p.instructionLanes * 2), UInt(32.W)))
+  val rdata  = Wire(Vec((p.instructionLanes * 2), UInt(p.xlen.W)))
+  val wdata  = Wire(Vec((p.instructionLanes * 2), UInt(p.xlen.W)))
+  val rwdata = Wire(Vec((p.instructionLanes * 2), UInt(p.xlen.W)))
   for (i <- 0 until (p.instructionLanes * 2)) {
-    val idx = io.readAddr(i).addr
+    val idx   = io.readAddr(i).addr
     val write = VecAt(writeValid, idx)
-    rdata(i) := VecAt(regfile, idx)
-    wdata(i) := VecAt(writeData, idx)
+    rdata(i)  := VecAt(regfile, idx)
+    wdata(i)  := VecAt(writeData, idx)
     rwdata(i) := Mux(write, wdata(i), rdata(i))
   }
   io.debugBusPort.data := VecAt(regfile, io.debugBusPort.idx)
 
   for (i <- 0 until (p.instructionLanes * 2)) {
-    nxtReadDataBits(i) := Mux(
-        io.readSet(i).valid, io.readSet(i).value, rwdata(i))
+    nxtReadDataBits(i) := Mux(io.readSet(i).valid, io.readSet(i).value, rwdata(i))
 
     readDataReady(i) := io.readAddr(i).valid || io.readSet(i).valid
-    readDataBits(i) := MuxCase(readDataBits(i), Seq(
-        io.readSet(i).valid -> io.readSet(i).value,
+    readDataBits(i)  := MuxCase(
+      readDataBits(i),
+      Seq(
+        io.readSet(i).valid  -> io.readSet(i).value,
         io.readAddr(i).valid -> rwdata(i)
-    ))
+      )
+    )
   }
 
   // Bus port priority encoded address.
-  val busAddr = Wire(Vec(p.instructionLanes, UInt(32.W)))
+  val busAddr  = Wire(Vec(p.instructionLanes, UInt(p.lsuAddrBits.W)))
   val busValid = Cat((0 until p.instructionLanes).reverse.map(x => io.busAddr(x).valid))
 
   for (i <- 0 until p.instructionLanes) {
-    busAddr(i) := Mux(io.busAddr(i).immen, rdata(2 * i) + io.busAddr(i).immed,
-                      rdata(2 * i))
+    busAddr(i) := Mux(io.busAddr(i).immen, rdata(2 * i) + io.busAddr(i).immed, rdata(2 * i))
   }
 
   for (i <- 0 until p.instructionLanes) {
@@ -221,14 +230,14 @@ class Regfile(p: Parameters) extends Module {
       // Delay the failure a cycle for debugging purposes.
       val write_fail = RegInit(false.B)
       write_fail := io.writeData(i).valid && io.writeData(j).valid &&
-                    io.writeData(i).bits.addr === io.writeData(j).bits.addr &&
-                    io.writeData(i).bits.addr =/= 0.U
+        io.writeData(i).bits.addr === io.writeData(j).bits.addr &&
+        io.writeData(i).bits.addr =/= 0.U
       assert(!write_fail)
     }
   }
 
   val scoreboard_error = RegInit(false.B)
-  val dm_write_valid = io.debugWriteValid
+  val dm_write_valid   = io.debugWriteValid
   scoreboard_error := ((scoreboard & scoreboard_clr) =/= scoreboard_clr) && !dm_write_valid
   assert(!scoreboard_error)
 }

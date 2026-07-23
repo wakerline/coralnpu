@@ -20,8 +20,7 @@ package top_racl_pkg;
   parameter int unsigned NrRaclPolicies = 1;
 
   // RACL Policy selector bits
-  parameter int unsigned RaclPolicySelLen =
-                             prim_util_pkg::vbits(NrRaclPolicies);
+  parameter int unsigned RaclPolicySelLen = prim_util_pkg::vbits(NrRaclPolicies);
 
   // Number of RACL bits transferred
   parameter int unsigned NrRaclBits = 1;
@@ -29,26 +28,26 @@ package top_racl_pkg;
   // Number of CTN UID bits transferred
   parameter int unsigned NrCtnUidBits = 1;
   // CTN UID assigned the bus originator
-  typedef logic[NrCtnUidBits - 1 : 0] ctn_uid_t;
+  typedef logic [NrCtnUidBits - 1 : 0] ctn_uid_t;
 
   // RACL Policy selector type
-  typedef logic[RaclPolicySelLen - 1 : 0] racl_policy_sel_t;
+  typedef logic [RaclPolicySelLen - 1 : 0] racl_policy_sel_t;
 
   // RACL role type binary encoded
-  typedef logic[NrRaclBits - 1 : 0] racl_role_t;
+  typedef logic [NrRaclBits - 1 : 0] racl_role_t;
   // RACL permission: A one-hot encoded role vector
-  typedef logic[(2 ** NrRaclBits) - 1 : 0] racl_role_vec_t;
+  typedef logic [(2 ** NrRaclBits) - 1 : 0] racl_role_vec_t;
 
   // RACL policy containing a read and write permission
   typedef struct packed {
     racl_role_vec_t write_perm;  // Write permission (upper bits)
     racl_role_vec_t read_perm;   // Read permission (lower bits)
   } racl_policy_t;
-  typedef racl_policy_t[NrRaclPolicies - 1 : 0] racl_policy_vec_t;
+  typedef racl_policy_t [NrRaclPolicies - 1 : 0] racl_policy_vec_t;
 
   // RACL information logged in case of a denial
   typedef struct packed {
-    logic valid;     // Error information is valid
+    logic valid;  // Error information is valid
     logic overflow;  // Error overflow, More than 1 RACL error at a time
     racl_role_t racl_role;
     ctn_uid_t ctn_uid;
@@ -59,30 +58,25 @@ package top_racl_pkg;
   // RACL range used to protect a range of addresses with a RACL policy (e.g.,
   // for sram).
   typedef struct packed {
-    logic [top_pkg::TL_AW - 1 : 0] base;   // Start address of range
-    logic [top_pkg::TL_AW - 1 : 0] limit;  // End address of range (inclusive)
-    racl_policy_sel_t policy_sel;          // Policy selector
-    logic enable;  // 0: Range is disabled, 1: Range is enabled
+    logic [top_pkg::TL_AW - 1 : 0] base;        // Start address of range
+    logic [top_pkg::TL_AW - 1 : 0] limit;       // End address of range (inclusive)
+    racl_policy_sel_t              policy_sel;  // Policy selector
+    logic                          enable;      // 0: Range is disabled, 1: Range is enabled
   } racl_range_t;
 
-  function automatic racl_role_t tlul_extract_racl_role_bits
-      (logic [tlul_pkg::RsvdWidth - 1 : 0] rsvd);
+  function automatic racl_role_t tlul_extract_racl_role_bits(
+      logic [tlul_pkg::RsvdWidth - 1 : 0] rsvd);
     // Waive unused bits
     logic unused_rsvd_bits;
-    unused_rsvd_bits = ^{
-      rsvd
-    };
+    unused_rsvd_bits = ^{rsvd};
 
     return racl_role_t'(rsvd[0 : 0]);
   endfunction
 
-  function automatic ctn_uid_t tlul_extract_ctn_uid_bits
-      (logic [tlul_pkg::RsvdWidth - 1 : 0] rsvd);
+  function automatic ctn_uid_t tlul_extract_ctn_uid_bits(logic [tlul_pkg::RsvdWidth - 1 : 0] rsvd);
     // Waive unused bits
     logic unused_rsvd_bits;
-    unused_rsvd_bits = ^{
-      rsvd
-    };
+    unused_rsvd_bits = ^{rsvd};
 
     return ctn_uid_t'(rsvd[0 : 0]);
   endfunction

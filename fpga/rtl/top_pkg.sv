@@ -26,11 +26,9 @@ package top_pkg;
   localparam int TL_SZW = $clog2($clog2(TL_DBW) + 1);
   localparam int NrRaclBits = 1;
 
-  typedef logic[NrRaclBits - 1 : 0] ctn_uid_t;
+  typedef logic [NrRaclBits - 1 : 0] ctn_uid_t;
 
-  typedef struct packed {
-    logic cio_rx;
-  } uart_sideband_i_t;
+  typedef struct packed {logic cio_rx;} uart_sideband_i_t;
 
   typedef struct packed {
     logic cio_tx;

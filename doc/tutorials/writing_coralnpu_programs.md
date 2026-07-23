@@ -126,7 +126,6 @@ Before we start the program, let's also write inputs into DTCM. We can
 determine the location of a buffer using `lookup_symbol` and write to DTCM with
 `write`:
 
-
 ```diff
 @cocotb.test()
 async def core_mini_axi_tutorial(dut):

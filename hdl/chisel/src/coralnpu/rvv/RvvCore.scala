@@ -16,7 +16,7 @@ package coralnpu.rvv
 
 import chisel3._
 import chisel3.util._
-import coralnpu.{Parameters,RegfileReadDataIO,RegfileWriteDataIO}
+import coralnpu.{Parameters, RegfileReadDataIO, RegfileWriteDataIO}
 
 object RvvCore {
   def apply(p: Parameters): RvvCoreShim = {
@@ -25,7 +25,7 @@ object RvvCore {
 }
 
 object GenerateCoreShimSource {
-  def apply(instructionLanes: Integer, vlen: Integer): String = {
+  def apply(instructionLanes: Integer, vlen: Integer, enableVme: Boolean = false): String = {
     var moduleInterface = """module RvvCoreWrapper(
         |    input clk,
         |    input rstn,
@@ -37,7 +37,7 @@ object GenerateCoreShimSource {
 
     // Add instruction interface inputs
     for (i <- 0 until instructionLanes) {
-        moduleInterface += """    input inst_GENI_valid,
+      moduleInterface += """    input inst_GENI_valid,
             |    input [31:0] inst_GENI_bits_pc,
             |    input [1:0] inst_GENI_bits_opcode,
             |    input [24:0] inst_GENI_bits_bits,
@@ -45,27 +45,26 @@ object GenerateCoreShimSource {
     }
 
     // Add regfile read interface inputs
-    for (i <- 0 until 2*instructionLanes) {
-        moduleInterface += """    input rs_GENI_valid,
+    for (i <- 0 until 2 * instructionLanes) {
+      moduleInterface += """    input rs_GENI_valid,
             |    input [31:0] rs_GENI_data,
             |""".stripMargin.replaceAll("GENI", i.toString)
     }
 
     // Add float regfile read interface inputs
     for (i <- 0 until instructionLanes) {
-        moduleInterface += """    input [31:0] frs_GENI,
+      moduleInterface += """    input [31:0] frs_GENI,
             |""".stripMargin.replaceAll("GENI", i.toString)
     }
 
     // Add instruction interface outputs (backpressure)
     for (i <- 0 until instructionLanes) {
-        moduleInterface += "    output inst_GENI_ready,\n".replaceAll(
-            "GENI", i.toString)
+      moduleInterface += "    output inst_GENI_ready,\n".replaceAll("GENI", i.toString)
     }
 
     // Add regfile write interface outputs
     for (i <- 0 until instructionLanes) {
-        moduleInterface += """    output rd_GENI_valid,
+      moduleInterface += """    output rd_GENI_valid,
             |    output [4:0] rd_GENI_bits_addr,
             |    output [31:0] rd_GENI_bits_data,
             |""".stripMargin.replaceAll("GENI", i.toString)
@@ -83,7 +82,7 @@ object GenerateCoreShimSource {
 
     // RVV to LSU
     for (i <- 0 until 2) {
-        moduleInterface += """    output rvv2lsu_GENI_valid,
+      moduleInterface += """    output rvv2lsu_GENI_valid,
             |    output rvv2lsu_GENI_bits_idx_valid,
             |    output [4:0] rvv2lsu_GENI_bits_idx_bits_addr,
             |    output [VLEN-1:0] rvv2lsu_GENI_bits_idx_bits_data,
@@ -93,19 +92,17 @@ object GenerateCoreShimSource {
             |    output rvv2lsu_GENI_bits_mask_valid,
             |    output [(VLEN/8)-1:0] rvv2lsu_GENI_bits_mask_bits,
             |    input rvv2lsu_GENI_ready,
-            |""".stripMargin.replaceAll("GENI", i.toString).replaceAll(
-                "VLEN", vlen.toString)
+            |""".stripMargin.replaceAll("GENI", i.toString).replaceAll("VLEN", vlen.toString)
     }
 
     // LSU to RVV
     for (i <- 0 until 2) {
-        moduleInterface += """    input lsu2rvv_GENI_valid,
+      moduleInterface += """    input lsu2rvv_GENI_valid,
             |    input [4:0] lsu2rvv_GENI_bits_addr,
             |    input [VLEN-1:0] lsu2rvv_GENI_bits_data,
             |    input  lsu2rvv_GENI_bits_last,
             |    output lsu2rvv_GENI_ready,
-            |""".stripMargin.replaceAll("GENI", i.toString).replaceAll(
-                "VLEN", vlen.toString)
+            |""".stripMargin.replaceAll("GENI", i.toString).replaceAll("VLEN", vlen.toString)
     }
 
     // Add CSR output
@@ -127,13 +124,14 @@ object GenerateCoreShimSource {
         |    output [2:0] configLmul,
         |    output [2:0] configLmulOrig,
         |    output configVill,
+        |    output [31:0] configMtype,
         |    output logic rvv_idle,
         |    output logic [3:0] queue_capacity,
         |""".stripMargin.replaceAll("VSTART_LEN", (log2Ceil(vlen) - 1).toString)
 
     // Add rd_rob2rt_o interface outputs
     for (i <- 0 until instructionLanes) {
-        moduleInterface += """
+      moduleInterface += """
             |    output rd_rob2rt_o_GENI_valid,
             |    output rd_rob2rt_o_GENI_w_valid,
             |    output [4:0] rd_rob2rt_o_GENI_w_index,
@@ -150,7 +148,15 @@ object GenerateCoreShimSource {
             |    output rd_rob2rt_o_GENI_vector_csr_lmul,
             |    output rd_rob2rt_o_GENI_vector_csr_lmul_orig,
             |    output rd_rob2rt_o_GENI_vector_csr_vill,
-            |    output [15:0] rd_rob2rt_o_GENI_vxsaturate,
+            |""".stripMargin.replaceAll("GENI", i.toString)
+      if (enableVme) {
+        moduleInterface += """    output [31:0] rd_rob2rt_o_GENI_vector_csr_mtype,
+            |    output [1:0]  rd_rob2rt_o_GENI_vector_csr_mtwiden,
+            |    output [13:0] rd_rob2rt_o_GENI_vector_csr_tm,
+            |    output [1:0]  rd_rob2rt_o_GENI_vector_csr_tk,
+            |""".stripMargin.replaceAll("GENI", i.toString)
+      }
+      moduleInterface += """    output [15:0] rd_rob2rt_o_GENI_vxsaturate,
             |    output [31:0] rd_rob2rt_o_GENI_uop_pc,
             |    output rd_rob2rt_o_GENI_last_uop_valid,
             """.stripMargin.replaceAll("GENI", i.toString)
@@ -172,49 +178,71 @@ object GenerateCoreShimSource {
     moduleInterface = moduleInterface.dropRight(1)
     moduleInterface += "\n);\n"
 
-    var coreInstantiation = "  logic [GENN-1:0] inst_valid;\n".replaceAll(
-            "GENN", instructionLanes.toString)
+    var coreInstantiation =
+      "  logic [GENN-1:0] inst_valid;\n".replaceAll("GENN", instructionLanes.toString)
     for (i <- 0 until instructionLanes) {
       coreInstantiation += "  assign inst_valid[GENI] = inst_GENI_valid;\n".replaceAll(
-          "GENI", i.toString)
+        "GENI",
+        i.toString
+      )
     }
 
     // Inst data
     coreInstantiation += "  RVVInstruction [GENN-1:0] inst_data;\n".replaceAll(
-            "GENN", instructionLanes.toString)
+      "GENN",
+      instructionLanes.toString
+    )
     for (i <- 0 until instructionLanes) {
       coreInstantiation += "  assign inst_data[GENI].pc = inst_GENI_bits_pc;\n".replaceAll(
-          "GENI", i.toString)
-      coreInstantiation += "  assign inst_data[GENI].opcode = RVVOpCode'(inst_GENI_bits_opcode);\n".replaceAll(
-          "GENI", i.toString)
+        "GENI",
+        i.toString
+      )
+      coreInstantiation += "  assign inst_data[GENI].opcode = RVVOpCode'(inst_GENI_bits_opcode);\n"
+        .replaceAll("GENI", i.toString)
       coreInstantiation += "  assign inst_data[GENI].bits = inst_GENI_bits_bits;\n".replaceAll(
-          "GENI", i.toString)
+        "GENI",
+        i.toString
+      )
     }
 
     // Inst ready temp output
     coreInstantiation += "  logic [GENN-1:0] inst_ready;\n".replaceAll(
-        "GENN", instructionLanes.toString)
+      "GENN",
+      instructionLanes.toString
+    )
 
     // Scalar regfile read
     coreInstantiation += "  logic [2*GENN-1:0] reg_read_valid;\n".replaceAll(
-            "GENN", instructionLanes.toString)
-    for (i <- 0 until 2*instructionLanes) {
+      "GENN",
+      instructionLanes.toString
+    )
+    for (i <- 0 until 2 * instructionLanes) {
       coreInstantiation += "  assign reg_read_valid[GENI] = rs_GENI_valid;\n".replaceAll(
-          "GENI", i.toString)
+        "GENI",
+        i.toString
+      )
     }
     coreInstantiation += "  logic [2*GENN-1:0][31:0] reg_read_data;\n".replaceAll(
-            "GENN", instructionLanes.toString)
-    for (i <- 0 until 2*instructionLanes) {
+      "GENN",
+      instructionLanes.toString
+    )
+    for (i <- 0 until 2 * instructionLanes) {
       coreInstantiation += "  assign reg_read_data[GENI] = rs_GENI_data;\n".replaceAll(
-          "GENI", i.toString)
+        "GENI",
+        i.toString
+      )
     }
 
     // Float regfile read
     coreInstantiation += "  logic [GENN-1:0][31:0] freg_read_data;\n".replaceAll(
-            "GENN", instructionLanes.toString)
+      "GENN",
+      instructionLanes.toString
+    )
     for (i <- 0 until instructionLanes) {
       coreInstantiation += "  assign freg_read_data[GENI] = frs_GENI;\n".replaceAll(
-          "GENI", i.toString)
+        "GENI",
+        i.toString
+      )
     }
 
     // RVV2LSU
@@ -227,8 +255,7 @@ object GenerateCoreShimSource {
       |  logic [2-1:0][VLEN-1:0] uop_lsu_vregfile_data_rvv2lsu;
       |  logic [2-1:0] uop_lsu_v0_valid_rvv2lsu;
       |  logic [2-1:0][(VLEN/8)-1:0] uop_lsu_v0_data_rvv2lsu;
-      |  logic [2-1:0] uop_lsu_ready_lsu2rvv;""".stripMargin.replaceAll(
-          "VLEN", vlen.toString)
+      |  logic [2-1:0] uop_lsu_ready_lsu2rvv;""".stripMargin.replaceAll("VLEN", vlen.toString)
     for (i <- 0 until 2) {
       coreInstantiation += """
           |  assign rvv2lsu_GENI_valid = uop_lsu_valid_rvv2lsu[GENI];
@@ -244,14 +271,12 @@ object GenerateCoreShimSource {
           |""".stripMargin.replaceAll("GENI", i.toString)
     }
 
-
     // LSU2RVV
     coreInstantiation += """  logic [2-1:0] uop_lsu_valid_lsu2rvv;
       |  logic  [2-1:0][4:0]  uop_lsu_addr_lsu2rvv;
       |  logic  [2-1:0][VLEN-1:0] uop_lsu_wdata_lsu2rvv;
       |  logic  [2-1:0] uop_lsu_last_lsu2rvv;
-      |  logic  [2-1:0] uop_lsu_ready_rvv2lsu;""".stripMargin.replaceAll(
-          "VLEN", vlen.toString)
+      |  logic  [2-1:0] uop_lsu_ready_rvv2lsu;""".stripMargin.replaceAll("VLEN", vlen.toString)
     for (i <- 0 until 2) {
       coreInstantiation += """
           |  assign uop_lsu_valid_lsu2rvv[GENI] = lsu2rvv_GENI_valid;
@@ -363,13 +388,24 @@ object GenerateCoreShimSource {
       |  assign rd_rob2rt_o_GENI_last_uop_valid = 1'b0;
       |`endif
       |""".stripMargin.replaceAll("GENI", i.toString)
+      if (enableVme) {
+        // Rob2Rt does not carry the VME mtype state; tie off to 0.
+        coreInstantiation +=
+          ("  assign rd_rob2rt_o_GENI_vector_csr_mtype   = 32'd0;\n" +
+            "  assign rd_rob2rt_o_GENI_vector_csr_mtwiden = 2'd0;\n" +
+            "  assign rd_rob2rt_o_GENI_vector_csr_tm     = 14'd0;\n" +
+            "  assign rd_rob2rt_o_GENI_vector_csr_tk     = 2'd0;\n").replaceAll("GENI", i.toString)
+      }
     }
     coreInstantiation += """  assign trap_bits_pc = trap_data.pc;
       |  assign trap_bits_opcode = trap_data.opcode;
       |  assign trap_bits_bits = trap_data.bits;
       |""".stripMargin
     for (i <- 0 until instructionLanes) {
-      coreInstantiation += "  assign inst_GENI_ready = inst_ready[GENI];\n".replaceAll("GENI", i.toString)
+      coreInstantiation += "  assign inst_GENI_ready = inst_ready[GENI];\n".replaceAll(
+        "GENI",
+        i.toString
+      )
     }
     for (i <- 0 until instructionLanes) {
       coreInstantiation += """  assign rd_GENI_valid = reg_write_valid[GENI];
@@ -387,45 +423,88 @@ object GenerateCoreShimSource {
     coreInstantiation += "  assign configLmulOrig = config_state.lmul_orig;\n"
     coreInstantiation += "  assign configVill = config_state.vill;\n"
 
+    // VME (Zvt) packed mtype CSR view assembled from {tm, tk, mtwiden} per
+    // spec §15.1.1.2. Tied to 0 when ZVT_ON is not defined.
+    // Note: We use 2'd0 spacer before tk (instead of 3'd0) because tk is 3 bits
+    // (occupying 7:5 instead of spec's 6:5) to resolve spec discrepancy.
+    coreInstantiation +=
+      "`ifdef ZVT_ON\n" +
+        "  assign configMtype = {8'd0, config_state.tm, 2'd0, config_state.tk, 3'd0, config_state.mtwiden};\n" +
+        "`else\n" +
+        "  assign configMtype = 32'd0;\n" +
+        "`endif\n"
+
     moduleInterface + coreInstantiation + "endmodule\n"
+  }
+}
+
+object GenerateBackendConfig {
+  def apply(p: Parameters): String = {
+    var config = """`ifndef RVV_CONFIG_SVH
+        |`define RVV_CONFIG_SVH
+        |
+        |// config for multi-dispatch
+        |`define DISPATCH3
+        |//`define DISPATCH2
+        |
+        |// FP ISA
+        |//`define ZVE32F_ON
+        |""".stripMargin
+    if (p.enableVectorBf16) {
+      config += "`define ZVFBFWMA_ON\n"
+    } else {
+      config += "//`define ZVFBFWMA_ON\n"
+    }
+    config += """
+        |// LSU interaction
+        |// Disable until scalar side supports NOHANDSHAKE
+        |// `define UNMK_USCS_LOAD_NOHANDSHAKE
+        |
+        |// ARBITER
+        |`define ARBITER_ON
+        |
+        |`endif // RVV_CONFIG_SVH
+        |""".stripMargin
+    config
   }
 }
 
 // Shim class for RVVCore, which invokes the RVV SV interface with the correct
 // parameters.
-class RvvCoreWrapper(p: Parameters) extends BlackBox with HasBlackBoxInline
-                                                     with HasBlackBoxResource {
+class RvvCoreWrapper(p: Parameters)
+    extends BlackBox
+    with HasBlackBoxInline
+    with HasBlackBoxResource {
   val io = IO(new Bundle {
     val clk  = Input(Clock())
     val rstn = Input(AsyncReset())
 
     val vstart = Input(UInt(log2Ceil(p.rvvVlen).W))
-    val vxrm = Input(UInt(2.W))
-    val vxsat = Input(UInt(1.W))
-    val frm = Input(UInt(3.W))
+    val vxrm   = Input(UInt(2.W))
+    val vxsat  = Input(UInt(1.W))
+    val frm    = Input(UInt(3.W))
 
-    val inst = Vec(p.instructionLanes,
-        Flipped(Decoupled(new RvvCompressedInstruction)))
+    val inst = Vec(p.instructionLanes, Flipped(Decoupled(new RvvCompressedInstruction(p))))
 
-    val rs = Vec(p.instructionLanes * 2, Flipped(new RegfileReadDataIO))
-    val rd = Vec(p.instructionLanes, Valid(new RegfileWriteDataIO))
+    val rs  = Vec(p.instructionLanes * 2, Flipped(new RegfileReadDataIO(p)))
+    val rd  = Vec(p.instructionLanes, Valid(new RegfileWriteDataIO(p)))
     val frs = Vec(p.instructionLanes, Input(UInt(32.W)))
 
-    val async_rd = Decoupled(new RegfileWriteDataIO)
-    val async_frd = Decoupled(new RegfileWriteDataIO)
+    val async_rd  = Decoupled(new RegfileWriteDataIO(p))
+    val async_frd = Decoupled(new RegfileWriteDataIO(p))
 
     val rd_rob2rt_o = Vec(4, new Rob2Rt(p))
-    val trap = Output(Valid(new RvvCompressedInstruction))
+    val trap        = Output(Valid(new RvvCompressedInstruction(p)))
 
-    val vcsr_valid = Output(Bool())
+    val vcsr_valid  = Output(Bool())
     val vcsr_vstart = Output(UInt(7.W))
-    val vcsr_xrm = Output(UInt(2.W))
-    val vcsr_vxsat = Output(Bool())
-    val vcsr_ready = Input(Bool())
+    val vcsr_xrm    = Output(UInt(2.W))
+    val vcsr_vxsat  = Output(Bool())
+    val vcsr_ready  = Input(Bool())
 
     // VXSAT update from backend
     val wr_vxsat_valid_o = Output(Bool())
-    val wr_vxsat_o = Output(Bool())
+    val wr_vxsat_o       = Output(Bool())
 
     // TODO(derekjchow): Parameterize
     val rvv2lsu = Vec(2, Decoupled(new Rvv2Lsu(p)))
@@ -433,44 +512,50 @@ class RvvCoreWrapper(p: Parameters) extends BlackBox with HasBlackBoxInline
 
     // Config state
     val configStateValid = Output(Bool())
-    val configVl = Output(UInt(8.W))
-    val configVstart = Output(UInt(7.W))
-    val configMa = Output(Bool())
-    val configTa = Output(Bool())
-    val configXrm = Output(UInt(2.W))
-    val configSew = Output(UInt(3.W))
+    val configVl         = Output(UInt(8.W))
+    val configVstart     = Output(UInt(7.W))
+    val configMa         = Output(Bool())
+    val configTa         = Output(Bool())
+    val configXrm        = Output(UInt(2.W))
+    val configSew        = Output(UInt(3.W))
     // This may be reduced according to vl.
     val configLmul = Output(UInt(3.W))
     // This is the original one set in vset(i)vl(i)
     val configLmulOrig = Output(UInt(3.W))
-    val configVill = Output(Bool())
-    val rvv_idle = Output(Bool())
+
+    val configVill  = Output(Bool())
+    val configMtype = Output(UInt(32.W))
+    val rvv_idle    = Output(Bool())
+
     val queue_capacity = Output(UInt(4.W))
   })
   dontTouch(io.rd_rob2rt_o)
 
   // Resources must be sorted topologically by dependency DAG
-  addResource("hdl/verilog/rvv/inc/rvv_backend_config.svh")
+  setInline("rvv_backend_config.svh", GenerateBackendConfig(p))
   addResource("hdl/verilog/rvv/inc/rvv_backend_define.svh")
+  addResource("hdl/verilog/rvv/inc/rvv_backend_opcode.svh")
   addResource("hdl/verilog/rvv/inc/rvv_backend.svh")
+  addResource("hdl/verilog/rvv/inc/rvv_backend_falu.svh")
   addResource("hdl/verilog/rvv/inc/rvv_backend_sva.svh")
   addResource("hdl/verilog/rvv/inc/rvv_backend_alu.svh")
   addResource("hdl/verilog/rvv/inc/rvv_backend_dispatch.svh")
   addResource("hdl/verilog/rvv/inc/rvv_backend_div.svh")
-  addResource("hdl/verilog/rvv/inc/rvv_backend_fma.svh")
   addResource("hdl/verilog/rvv/inc/rvv_backend_pmtrdt.svh")
-  addResource("hdl/verilog/rvv/common/adder.sv") // New
+  addResource("hdl/verilog/rvv/common/adder.sv")           // New
   addResource("hdl/verilog/rvv/common/arb_round_robin.sv") // New
   addResource("hdl/verilog/rvv/common/barrel_shifter.sv")  // New
-  addResource("hdl/verilog/rvv/common/handshake_ff.sv")  // New
-  addResource("hdl/verilog/rvv/common/handshake_multi_fifo.sv")  // New
+  addResource("hdl/verilog/rvv/common/handshake_ff.sv")    // New
+  addResource("hdl/verilog/rvv/common/handshake_multistage_ctrl.sv")
+  addResource("hdl/verilog/rvv/common/handshake_multi_fifo.sv") // New
   addResource("hdl/verilog/rvv/common/cdffr.sv")
-  addResource("hdl/verilog/rvv/common/compressor_3_2.sv")
-  addResource("hdl/verilog/rvv/common/compressor_4_2.sv")
+  addResource("hdl/verilog/rvv/common/compressor_3to2.sv")
+  addResource("hdl/verilog/rvv/common/compressor_4to2.sv")
   addResource("hdl/verilog/rvv/common/dff.sv")
   addResource("hdl/verilog/rvv/common/edff.sv")
   addResource("hdl/verilog/rvv/common/edff_2d.sv")
   addResource("hdl/verilog/rvv/common/multi_fifo.sv")
+  addResource("hdl/verilog/rvv/common/intdivider.sv")
 
   // FPnew
   addResource("external/common_cells/include/common_cells/registers.svh")
@@ -483,11 +568,17 @@ class RvvCoreWrapper(p: Parameters) extends BlackBox with HasBlackBoxInline
   addResource("external/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/clk/rtl/gated_clk_cell.v")
   addResource("external/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_ctrl.v")
   addResource("external/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_ff1.v")
-  addResource("external/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_pack_single.v")
+  addResource(
+    "external/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_pack_single.v"
+  )
   addResource("external/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_prepare.v")
-  addResource("external/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_round_single.v")
+  addResource(
+    "external/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_round_single.v"
+  )
   addResource("external/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_special.v")
-  addResource("external/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_srt_single.v")
+  addResource(
+    "external/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_srt_single.v"
+  )
   addResource("external/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fdsu/rtl/pa_fdsu_top.v")
   addResource("external/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fpu/rtl/pa_fpu_dp.v")
   addResource("external/cvfpu/vendor/opene906/E906_RTL_FACTORY/gen_rtl/fpu/rtl/pa_fpu_frbus.v")
@@ -496,12 +587,20 @@ class RvvCoreWrapper(p: Parameters) extends BlackBox with HasBlackBoxInline
   addResource("external/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_ff1.v")
   addResource("external/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_double.v")
   addResource("external/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_pack.v")
-  addResource("external/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_prepare.v")
+  addResource(
+    "external/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_prepare.v"
+  )
   addResource("external/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_round.v")
-  addResource("external/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_scalar_dp.v")
+  addResource(
+    "external/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_scalar_dp.v"
+  )
   addResource("external/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_srt.v")
-  addResource("external/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_srt_radix16_bound_table.v")
-  addResource("external/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_srt_radix16_with_sqrt.v")
+  addResource(
+    "external/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_srt_radix16_bound_table.v"
+  )
+  addResource(
+    "external/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_srt_radix16_with_sqrt.v"
+  )
   addResource("external/cvfpu/vendor/openc910/C910_RTL_FACTORY/gen_rtl/vfdsu/rtl/ct_vfdsu_top.v")
   addResource("external/cvfpu/src/fpnew_divsqrt_th_32.sv")
   addResource("external/cvfpu/src/fpnew_divsqrt_th_64_multi.sv")
@@ -533,16 +632,16 @@ class RvvCoreWrapper(p: Parameters) extends BlackBox with HasBlackBoxInline
   addResource("hdl/verilog/rvv/design/rvv_backend_alu_unit_shift.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_alu_unit.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_alu.sv")
-  addResource("hdl/verilog/rvv/design/rvv_backend_arb.sv")  // New
+  addResource("hdl/verilog/rvv/design/rvv_backend_arb.sv") // New
   addResource("hdl/verilog/rvv/design/rvv_backend_decode_unit.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_decode_unit_ari.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_decode_unit_lsu.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_decode_ctrl.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_decode.sv")
-  addResource("hdl/verilog/rvv/design/rvv_backend_decode_unit_ari_de2.sv")  // New
-  addResource("hdl/verilog/rvv/design/rvv_backend_decode_unit_lsu_de2.sv")  // New
-  addResource("hdl/verilog/rvv/design/rvv_backend_decode_unit_de2.sv")  // New
-  addResource("hdl/verilog/rvv/design/rvv_backend_decode_de2.sv")  // New
+  addResource("hdl/verilog/rvv/design/rvv_backend_decode_unit_ari_de2.sv") // New
+  addResource("hdl/verilog/rvv/design/rvv_backend_decode_unit_lsu_de2.sv") // New
+  addResource("hdl/verilog/rvv/design/rvv_backend_decode_unit_de2.sv")     // New
+  addResource("hdl/verilog/rvv/design/rvv_backend_decode_de2.sv")          // New
   addResource("hdl/verilog/rvv/design/rvv_backend_dispatch_bypass.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_dispatch_ctrl.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_dispatch_operand.sv")
@@ -551,32 +650,52 @@ class RvvCoreWrapper(p: Parameters) extends BlackBox with HasBlackBoxInline
   addResource("hdl/verilog/rvv/design/rvv_backend_dispatch_raw_uop_uop.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_dispatch_structure_hazard.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_dispatch.sv")
-  addResource("hdl/verilog/rvv/design/rvv_backend_div_unit_divider.sv")
+  addResource("hdl/verilog/rvv/design/rvv_backend_fdiv_unit.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_div_unit.sv")
-  addResource("hdl/verilog/rvv/design/rvv_backend_fdiv_wrapper.sv")  // New
+  addResource("hdl/verilog/rvv/design/rvv_backend_fdiv_wrapper.sv") // New
   addResource("hdl/verilog/rvv/design/rvv_backend_div.sv")
-  addResource("hdl/verilog/rvv/design/rvv_backend_sqrt7_rec7.sv")  // New
-  addResource("hdl/verilog/rvv/design/rvv_backend_fma_wrapper.sv")  // New
-  addResource("hdl/verilog/rvv/design/rvv_backend_fma.sv")  // New
+  addResource("hdl/verilog/rvv/design/rvv_backend_sqrt7_rec7.sv") // New
   addResource("hdl/verilog/rvv/design/rvv_backend_lsu_remap.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_mul_unit_mul8.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_mac_unit.sv")
 //   addResource("hdl/verilog/rvv/design/rvv_backend_mul_unit.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_mulmac.sv")
-  addResource("hdl/verilog/rvv/design/rvv_backend_freduction.sv")  // New
-  addResource("hdl/verilog/rvv/design/rvv_backend_pmtrdt_unit_permutation.sv")  // New
-  addResource("hdl/verilog/rvv/design/rvv_backend_pmtrdt_unit_reduction_alu.sv")  // New
-  addResource("hdl/verilog/rvv/design/rvv_backend_pmtrdt_unit_reduction.sv")  // New
+  addResource("hdl/verilog/rvv/design/rvv_backend_freduction.sv")                // New
+  addResource("hdl/verilog/rvv/design/rvv_backend_pmtrdt_unit_permutation.sv")   // New
+  addResource("hdl/verilog/rvv/design/rvv_backend_pmtrdt_unit_reduction_alu.sv") // New
+  addResource("hdl/verilog/rvv/design/rvv_backend_pmtrdt_unit_reduction.sv")     // New
   addResource("hdl/verilog/rvv/design/rvv_backend_pmtrdt_unit.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_pmtrdt.sv")
-  addResource("hdl/verilog/rvv/design/rvv_backend_retire_waw.sv")  // New
+  addResource("hdl/verilog/rvv/design/rvv_backend_retire_waw.sv") // New
   addResource("hdl/verilog/rvv/design/rvv_backend_retire.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_rob.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_vrf_reg.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend_vrf.sv")
+  addResource("hdl/verilog/rvv/design/rvv_backend_falu_unit.sv")
+  addResource("hdl/verilog/rvv/design/rvv_backend_falu.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend.sv")
   addResource("hdl/verilog/rvv/design/RvvCore.sv")
-  setInline("RvvCoreWrapper.sv", GenerateCoreShimSource(p.instructionLanes, p.rvvVlen))
+  if (p.enableVme) {
+    addResource("hdl/verilog/rvv/design/Zvt/fp_absaddsub.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/fp_addfront.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/fp_align.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/fp_classifier.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/fp_mulfront.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/fp_rounding.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/zvt.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/zvt_acc.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/zvt_acc_reg.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/zvt_ctrl.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/zvt_pe_adder.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/zvt_pe_adder_fp_lane.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/zvt_pe_adder_int_lane.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/zvt_pe_array.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/zvt_pe_block.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/zvt_pe_mulbulk.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/zvt_pe_mulbulk_fp_lane.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/zvt_pe_mulbulk_int_lane.sv")
+  }
+  setInline("RvvCoreWrapper.sv", GenerateCoreShimSource(p.instructionLanes, p.rvvVlen, p.enableVme))
 }
 
 // Shim class for RVVCore, which translates the SV RVVCore interfaces with the
@@ -586,12 +705,12 @@ class RvvCoreShim(p: Parameters) extends Module {
   val io = IO(new RvvCoreIO(p))
 
   val vstart = RegInit(0.U(log2Ceil(p.rvvVlen).W))
-  val vxrm = RegInit(0.U(2.W))
-  val vxsat = RegInit(false.B)
+  val vxrm   = RegInit(0.U(2.W))
+  val vxsat  = RegInit(false.B)
 
-  val rstn = (!reset.asBool).asAsyncReset
+  val rstn           = (!reset.asBool).asAsyncReset
   val rvvCoreWrapper = Module(new RvvCoreWrapper(p))
-  rvvCoreWrapper.io.clk := clock
+  rvvCoreWrapper.io.clk  := clock
   rvvCoreWrapper.io.rstn := rstn
   rvvCoreWrapper.io.inst <> io.inst
   rvvCoreWrapper.io.rs <> io.rs
@@ -602,13 +721,10 @@ class RvvCoreShim(p: Parameters) extends Module {
   rvvCoreWrapper.io.rd_rob2rt_o <> io.rd_rob2rt_o
   io.trap := rvvCoreWrapper.io.trap
 
-  rvvCoreWrapper.io.vstart := Mux(
-      io.csr.vstart_write.valid, io.csr.vstart_write.bits, vstart)
-  rvvCoreWrapper.io.vxrm := Mux(
-      io.csr.vxrm_write.valid, io.csr.vxrm_write.bits, vxrm)
-  rvvCoreWrapper.io.vxsat := Mux(
-      io.csr.vxsat_write.valid, io.csr.vxsat_write.bits, vxsat)
-  rvvCoreWrapper.io.frm := io.csr.frm
+  rvvCoreWrapper.io.vstart     := Mux(io.csr.vstart_write.valid, io.csr.vstart_write.bits, vstart)
+  rvvCoreWrapper.io.vxrm       := Mux(io.csr.vxrm_write.valid, io.csr.vxrm_write.bits, vxrm)
+  rvvCoreWrapper.io.vxsat      := Mux(io.csr.vxsat_write.valid, io.csr.vxsat_write.bits, vxsat)
+  rvvCoreWrapper.io.frm        := io.csr.frm
   rvvCoreWrapper.io.vcsr_ready := true.B
 
   io.rvv2lsu <> rvvCoreWrapper.io.rvv2lsu
@@ -617,43 +733,58 @@ class RvvCoreShim(p: Parameters) extends Module {
   // Conservatively mark config state as invalid the cycle when CSR instruction
   // updates vstart, vxrm or vxsat.
   io.configState.valid := rvvCoreWrapper.io.configStateValid &&
-      !rvvCoreWrapper.io.vcsr_valid &&
-      !io.csr.vstart_write.valid &&
-      !io.csr.vxrm_write.valid &&
-      !io.csr.vxsat_write.valid
-  io.configState.bits.vl          := rvvCoreWrapper.io.configVl
-  io.configState.bits.vstart      := rvvCoreWrapper.io.configVstart
-  io.configState.bits.ma          := rvvCoreWrapper.io.configMa
-  io.configState.bits.ta          := rvvCoreWrapper.io.configTa
-  io.configState.bits.xrm         := rvvCoreWrapper.io.configXrm
-  io.configState.bits.sew         := rvvCoreWrapper.io.configSew
-  io.configState.bits.lmul        := rvvCoreWrapper.io.configLmul
-  io.configState.bits.lmul_orig   := rvvCoreWrapper.io.configLmulOrig
-  io.configState.bits.vill        := rvvCoreWrapper.io.configVill
-  io.rvv_idle                     := rvvCoreWrapper.io.rvv_idle
-  io.queue_capacity               := rvvCoreWrapper.io.queue_capacity
+    !rvvCoreWrapper.io.vcsr_valid &&
+    !io.csr.vstart_write.valid &&
+    !io.csr.vxrm_write.valid &&
+    !io.csr.vxsat_write.valid
+  io.configState.bits.vl        := rvvCoreWrapper.io.configVl
+  io.configState.bits.vstart    := rvvCoreWrapper.io.configVstart
+  io.configState.bits.ma        := rvvCoreWrapper.io.configMa
+  io.configState.bits.ta        := rvvCoreWrapper.io.configTa
+  io.configState.bits.xrm       := rvvCoreWrapper.io.configXrm
+  io.configState.bits.sew       := rvvCoreWrapper.io.configSew
+  io.configState.bits.lmul      := rvvCoreWrapper.io.configLmul
+  io.configState.bits.lmul_orig := rvvCoreWrapper.io.configLmulOrig
+  io.configState.bits.vill      := rvvCoreWrapper.io.configVill
+  if (p.enableVme) {
+    val mt = rvvCoreWrapper.io.configMtype
+    io.configState.bits.mtype.get   := mt
+    io.configState.bits.mtwiden.get := mt(1, 0)
+    io.configState.bits.tk.get      := mt(7, 5)
+    io.configState.bits.tm.get      := mt(23, 10)
+  }
+  io.rvv_idle       := rvvCoreWrapper.io.rvv_idle
+  io.queue_capacity := rvvCoreWrapper.io.queue_capacity
 
-  val vstart_wdata = MuxCase(vstart, Seq(
+  val vstart_wdata = MuxCase(
+    vstart,
+    Seq(
       rvvCoreWrapper.io.vcsr_valid -> rvvCoreWrapper.io.vcsr_vstart,
-      io.csr.vstart_write.valid -> io.csr.vstart_write.bits,
-  ))
+      io.csr.vstart_write.valid    -> io.csr.vstart_write.bits
+    )
+  )
   vstart := vstart_wdata
 
-  val vxrm_wdata = MuxCase(vxrm, Seq(
+  val vxrm_wdata = MuxCase(
+    vxrm,
+    Seq(
       rvvCoreWrapper.io.vcsr_valid -> rvvCoreWrapper.io.vcsr_xrm,
-      io.csr.vxrm_write.valid -> io.csr.vxrm_write.bits,
-  ))
+      io.csr.vxrm_write.valid      -> io.csr.vxrm_write.bits
+    )
+  )
   vxrm := vxrm_wdata
 
-  val vxsat_wdata = MuxCase(vxsat, Seq(
+  val vxsat_wdata = MuxCase(
+    vxsat,
+    Seq(
       rvvCoreWrapper.io.wr_vxsat_valid_o -> (vxsat | rvvCoreWrapper.io.wr_vxsat_o),
-      rvvCoreWrapper.io.vcsr_valid -> rvvCoreWrapper.io.vcsr_vxsat,
-      io.csr.vxsat_write.valid -> io.csr.vxsat_write.bits,
-  ))
+      rvvCoreWrapper.io.vcsr_valid       -> rvvCoreWrapper.io.vcsr_vxsat,
+      io.csr.vxsat_write.valid           -> io.csr.vxsat_write.bits
+    )
+  )
   vxsat := vxsat_wdata
 
   io.csr.vstart := vstart
-  io.csr.vxrm := vxrm
-  io.csr.vxsat := vxsat
+  io.csr.vxrm   := vxrm
+  io.csr.vxsat  := vxsat
 }
-

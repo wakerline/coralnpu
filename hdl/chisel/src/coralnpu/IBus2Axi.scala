@@ -28,19 +28,19 @@ object IBus2Axi {
 class IBus2Axi(p: Parameters, id: Int = 0) extends Module {
   val io = IO(new Bundle {
     val ibus = Flipped(new IBusIO(p))
-    val axi = new AxiMasterReadIO(p.axi2AddrBits, p.axi2DataBits, p.axi2IdBits)
+    val axi  = new AxiMasterReadIO(p.axi2AddrBits, p.axi2DataBits, p.axi2IdBits)
   })
   io.axi.defaults()
 
   val linebit = log2Ceil(p.lsuDataBits / 8)
 
   val sraddrActive = RegInit(false.B)
-  val saddrReg = RegInit(0.U(p.axi2AddrBits.W))
-  val sdata = RegInit(0.U(p.axi2DataBits.W))
-  val sresp = RegInit(0.U(2.W))
-  val sdataValid = RegInit(false.B)
+  val saddrReg     = RegInit(0.U(p.axi2AddrBits.W))
+  val sdata        = RegInit(0.U(p.axi2DataBits.W))
+  val sresp        = RegInit(0.U(2.W))
+  val sdataValid   = RegInit(false.B)
 
-  val saddr = Cat(io.ibus.addr(31, linebit), 0.U(linebit.W))
+  val saddr     = Cat(io.ibus.addr(p.fetchAddrBits - 1, linebit), 0.U(linebit.W))
   val addrMatch = saddr === saddrReg
 
   // Handshake logic: we are ready if AXI just responded or we have buffered data,
@@ -51,17 +51,21 @@ class IBus2Axi(p: Parameters, id: Int = 0) extends Module {
   // AXI Read Address Channel
   // Can start next fetch if not busy and (no valid data or address changed)
   val canStartNext = !sraddrActive && (!sdataValid || !addrMatch)
-  io.axi.addr.valid := io.ibus.valid && canStartNext
+  io.axi.addr.valid     := io.ibus.valid && canStartNext
   io.axi.addr.bits.addr := saddr
-  io.axi.addr.bits.id := id.U
+  io.axi.addr.bits.id   := id.U
   io.axi.addr.bits.prot := 2.U
 
   // State machine
   sraddrActive := Mux(io.axi.data.fire, false.B, Mux(io.axi.addr.fire, true.B, sraddrActive))
   sdata        := Mux(io.axi.data.fire, io.axi.data.bits.data, sdata)
   sresp        := Mux(io.axi.data.fire, io.axi.data.bits.resp, sresp)
-  sdataValid   := Mux(io.axi.data.fire, !io.ibus.ready, Mux((io.ibus.ready && io.ibus.valid) || io.axi.addr.fire, false.B, sdataValid))
-  saddrReg     := Mux(io.axi.addr.fire, io.axi.addr.bits.addr, saddrReg)
+  sdataValid   := Mux(
+    io.axi.data.fire,
+    !io.ibus.ready,
+    Mux((io.ibus.ready && io.ibus.valid) || io.axi.addr.fire, false.B, sdataValid)
+  )
+  saddrReg := Mux(io.axi.addr.fire, io.axi.addr.bits.addr, saddrReg)
 
   assert(!io.axi.data.fire || sraddrActive)
 
@@ -69,8 +73,12 @@ class IBus2Axi(p: Parameters, id: Int = 0) extends Module {
   io.axi.data.ready := true.B
 
   // Fault reporting
-  io.ibus.fault.valid := io.ibus.ready && (Mux(io.axi.data.valid, io.axi.data.bits.resp, sresp) =/= 0.U)
+  io.ibus.fault.valid := io.ibus.ready && (Mux(
+    io.axi.data.valid,
+    io.axi.data.bits.resp,
+    sresp
+  ) =/= 0.U)
   io.ibus.fault.bits.write := false.B
-  io.ibus.fault.bits.addr := saddrReg
-  io.ibus.fault.bits.epc := io.ibus.addr
+  io.ibus.fault.bits.addr  := saddrReg
+  io.ibus.fault.bits.epc   := io.ibus.addr
 }

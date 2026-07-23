@@ -16,11 +16,14 @@
 // Interface: coralnpu_irq_if
 // Description: Simple interface for misc control/status signals
 //----------------------------------------------------------------------------
-interface coralnpu_irq_if (input logic clk, input logic resetn);
+interface coralnpu_irq_if (
+    input logic clk,
+    input logic resetn
+);
 
   // Control Inputs to DUT
   logic irq;
-  logic te; // Test Enable
+  logic te;  // Test Enable
 
   // Status Outputs from DUT
   logic halted;
@@ -32,19 +35,15 @@ interface coralnpu_irq_if (input logic clk, input logic resetn);
     default input #1step output #2ns;
     output irq;
     output te;
-    input halted; // Can be sampled by driver/test if needed
+    input halted;  // Can be sampled by driver/test if needed
     input fault;
     input wfi;
   endclocking : tb_ctrl_cb
 
   // Modport for Testbench Driver/Controller
-  modport TB_IRQ_DRIVER (clocking tb_ctrl_cb, input clk, input resetn);
+  modport TB_IRQ_DRIVER(clocking tb_ctrl_cb, input clk, input resetn);
 
   // Modport for DUT connection
-  modport DUT_IRQ_PORT (
-    input clk, resetn,
-    input irq, te,
-    output halted, fault, wfi
-  );
+  modport DUT_IRQ_PORT(input clk, resetn, input irq, te, output halted, fault, wfi);
 
-endinterface: coralnpu_irq_if
+endinterface : coralnpu_irq_if

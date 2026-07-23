@@ -23,7 +23,7 @@ RM_VALS = {
     "rtz": "1",
     "rdn": "2",
     "rup": "3",
-    "rmm": "4"
+    "rmm": "4",
 }
 
 MATH_OPS = [
@@ -224,7 +224,6 @@ template_rule(
     },
 )
 
-
 template_rule(
     rvv_arithmetic_test,
     {
@@ -249,14 +248,17 @@ template_rule(
                 "#define TEST_UNARY" if op in ["fsqrt"] else "",
                 "#define TEST_FLOAT",
                 "#define SIGN_f 2",
-                "#define TEST_RM {}".format(RM_VALS[rm])
+                "#define TEST_RM {}".format(RM_VALS[rm]),
             ]),
             "in_data_size": "16",
             "out_data_size": "16",
         }
         for (op, sew, sign, dtype, vl) in FLOAT_MATH_OP_TYPE_PAIRS
         for rm in RM_VALS.keys()
-        if not (op in ["frsub", "frdiv"])
+        if not (op in [
+            "frsub",
+            "frdiv",
+        ])
     },
 )
 
@@ -316,7 +318,6 @@ template_rule(
     },
 )
 
-
 template_rule(
     coralnpu_v2_binary,
     {
@@ -325,7 +326,10 @@ template_rule(
         }
         for (op, _, sign, dtype, _) in FLOAT_MATH_OP_TYPE_PAIRS
         for rm in RM_VALS.keys()
-        if not (op in ["frsub", "frdiv"])
+        if not (op in [
+            "frsub",
+            "frdiv",
+        ])
     },
 )
 
@@ -530,42 +534,66 @@ SAME_TYPE_TERNARY_VX_CASES = [
     (
         "vfmacc_vf_test",
         "Vfmacc",
-        ["TEST_FLOAT", "TEST_TERNARY"],
+        [
+            "TEST_FLOAT",
+            "TEST_TERNARY",
+        ],
     ),
     (
         "vfnmacc_vf_test",
         "Vfnmacc",
-        ["TEST_FLOAT", "TEST_TERNARY"],
+        [
+            "TEST_FLOAT",
+            "TEST_TERNARY",
+        ],
     ),
     (
         "vfmadd_vf_test",
         "Vfmadd",
-        ["TEST_FLOAT", "TEST_TERNARY"],
+        [
+            "TEST_FLOAT",
+            "TEST_TERNARY",
+        ],
     ),
     (
         "vfnmadd_vf_test",
         "Vfnmadd",
-        ["TEST_FLOAT", "TEST_TERNARY"],
+        [
+            "TEST_FLOAT",
+            "TEST_TERNARY",
+        ],
     ),
     (
         "vfmsac_vf_test",
         "Vfmsac",
-        ["TEST_FLOAT", "TEST_TERNARY"],
+        [
+            "TEST_FLOAT",
+            "TEST_TERNARY",
+        ],
     ),
     (
         "vfnmsac_vf_test",
         "Vfnmsac",
-        ["TEST_FLOAT", "TEST_TERNARY"],
+        [
+            "TEST_FLOAT",
+            "TEST_TERNARY",
+        ],
     ),
     (
         "vfmsub_vf_test",
         "Vfmsub",
-        ["TEST_FLOAT", "TEST_TERNARY"],
+        [
+            "TEST_FLOAT",
+            "TEST_TERNARY",
+        ],
     ),
     (
         "vfnmsub_vf_test",
         "Vfnmsub",
-        ["TEST_FLOAT", "TEST_TERNARY"],
+        [
+            "TEST_FLOAT",
+            "TEST_TERNARY",
+        ],
     ),
 ]
 
@@ -1335,10 +1363,10 @@ filegroup(
         SAME_TYPE_BINARY_VX_CASES +
         SAME_TYPE_TERNARY_VX_CASES +
         WIDENING_BINARY_VX_CASES
-    ) for rm in (RM_VALS.keys() if "TEST_FLOAT" in extra_defines else [""])] +     ["{}_{}.elf".format(name, rm) for name, _, extra_defines in (
+    ) for rm in (RM_VALS.keys() if "TEST_FLOAT" in extra_defines else [""])] + ["{}_{}.elf".format(name, rm) for name, _, extra_defines in (
         FLOAT_MISC_CASES +
         FLOAT_CONVERT_CASES
-    ) for rm in RM_VALS.keys()] +     ["{}.elf".format(name) for name, _, extra_defines in (
+    ) for rm in RM_VALS.keys()] + ["{}.elf".format(name) for name, _, extra_defines in (
         SAME_TYPE_IMMEDIATE_VX_CASES +
         WIDENING_BINARY_WV_CASES +
         WIDENING_BINARY_WX_CASES +
@@ -1425,7 +1453,10 @@ filegroup(
         ":rvv_{}_{}_{}_m1.elf".format(op, dtype, rm)
         for (op, _, sign, dtype, _) in FLOAT_MATH_OP_TYPE_PAIRS
         for rm in RM_VALS.keys()
-        if not (op in ["frsub", "frdiv"])
+        if not (op in [
+            "frsub",
+            "frdiv",
+        ])
     ] + [
         "rvv_widen_{}_{}_{}.elf".format(op, in_dtype, out_dtype)
         for (op, _, in_dtype, out_dtype, _, _, _, _) in MATH_WIDEN_OP_TYPE_PAIRS

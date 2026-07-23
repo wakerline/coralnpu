@@ -41,7 +41,7 @@ class FRegfileSpec extends AnyFreeSpec with ChiselSim {
         dut.io.write_ports(0).valid.poke(true.B)
         dut.io.write_ports(0).addr.poke(i)
         dut.io.write_ports(0).data.sign.poke(0)
-        dut.io.write_ports(0).data.exponent.poke(i+127)
+        dut.io.write_ports(0).data.exponent.poke(i + 127)
         dut.io.write_ports(0).data.mantissa.poke(0)
         dut.clock.step()
       }
@@ -50,7 +50,7 @@ class FRegfileSpec extends AnyFreeSpec with ChiselSim {
         dut.io.read_ports(0).valid.poke(true.B)
         dut.io.read_ports(0).addr.poke(i)
         dut.io.read_ports(0).data.sign.expect(0)
-        dut.io.read_ports(0).data.exponent.expect(i+127)
+        dut.io.read_ports(0).data.exponent.expect(i + 127)
         dut.io.read_ports(0).data.mantissa.expect(0)
       }
     }
@@ -64,7 +64,7 @@ class FRegfileSpec extends AnyFreeSpec with ChiselSim {
         dut.io.write_ports(0).valid.poke(true.B)
         dut.io.write_ports(0).addr.poke(i)
         dut.io.write_ports(0).data.sign.poke(0)
-        dut.io.write_ports(0).data.exponent.poke(i+127)
+        dut.io.write_ports(0).data.exponent.poke(i + 127)
         dut.io.write_ports(0).data.mantissa.poke(0)
         dut.clock.step()
       }

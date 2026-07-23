@@ -34,7 +34,7 @@ def _scm_info_src(ctx):
     )
 
     return [
-        DefaultInfo(files = depset([out_source]))
+        DefaultInfo(files = depset([out_source])),
     ]
 
 autogen_scm_info_src = rule(
@@ -45,7 +45,7 @@ autogen_scm_info_src = rule(
             executable = True,
             cfg = "exec",
         ),
-    }
+    },
 )
 
 def autogen_scm_info(name):

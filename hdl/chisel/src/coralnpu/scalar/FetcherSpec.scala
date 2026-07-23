@@ -18,7 +18,6 @@ import chisel3._
 import chisel3.simulator.scalatest.ChiselSim
 import org.scalatest.freespec.AnyFreeSpec
 
-
 class FetcherSpec extends AnyFreeSpec with ChiselSim {
   val p = new Parameters
 

@@ -16,12 +16,11 @@ package bus
 
 import chisel3._
 import chisel3.util._
-import common.{MakeValid, MakeInvalid, MuBi4}
-import coralnpu.Parameters
+import common.{MakeInvalid, MakeValid, MuBi4}
 
-class DmaEngine(hostParams: Parameters, deviceParams: Parameters) extends Module {
-  val hostTlulP   = new TLULParameters(hostParams)
-  val deviceTlulP = new TLULParameters(deviceParams)
+class DmaEngine(hostParams: TLULParameters, deviceParams: TLULParameters) extends Module {
+  val hostTlulP   = hostParams
+  val deviceTlulP = deviceParams
 
   val io = IO(new Bundle {
     val tl_host   = new OpenTitanTileLink.Host2Device(hostTlulP)
@@ -51,7 +50,7 @@ class DmaEngine(hostParams: Parameters, deviceParams: Parameters) extends Module
   // --- FSM States ---
   object State extends ChiselEnum {
     val sIdle, sFetchDesc0, sFetchDesc0Resp, sFetchDesc1, sFetchDesc1Resp, sPollCheck, sPollReq,
-        sPollResp, sXferReadReq, sXferReadResp, sXferWriteReq, sXferWriteResp, sDone = Value
+      sPollResp, sXferReadReq, sXferReadResp, sXferWriteReq, sXferWriteResp, sDone = Value
   }
   import State._
 

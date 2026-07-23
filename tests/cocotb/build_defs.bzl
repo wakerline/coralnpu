@@ -23,6 +23,7 @@ VERILATOR_BUILD_ARGS = [
     "-Wno-LATCH",
     "-Wno-SIDEEFFECT",
     "-Wno-MULTIDRIVEN",
+    "-Wno-SPLITVAR",
     "-Wno-UNOPTFLAT",
     "-Wno-BLKANDNBLK",
     "-Wno-CASEX",
@@ -39,6 +40,10 @@ VERILATOR_BUILD_ARGS = [
     "-LDFLAGS \"-rdynamic\"",
 ]
 
+# Note: SRAM backdoor compilation arguments (-CFLAGS, -I../hdl/verilog, and sram_backdoor.cc)
+# are dynamically injected in cocotb_test_suite (rules/coco_tb.bzl) for targets
+# whose hdl_toplevel is listed in rules/sram_backdoor.bzl.
+# Note: To enable FSDB wave dumping in VCS RTL simulations, add "+vcs+fsdbon" to VCS_BUILD_ARGS and VCS_TEST_ARGS.
 VCS_BUILD_ARGS = [
     "-timescale=1ns/1ps",
     "-Mcc=/home/wangyy/002_research/tools/noccache-bin/gcc",
@@ -58,9 +63,8 @@ VCS_BUILD_ARGS = [
     "-LDFLAGS",
     "-rdynamic",
     "+vcs+lic+wait",
-    "-CFLAGS",
-    "-I$EXECROOT/hdl/verilog",
-    "$EXECROOT/hdl/verilog/sram_backdoor.cc",
+    "-O3",
+    "-Xkeyopt=rtopt",
     # TODO(davidgao): enable this when ready
     # "-xprop=../tests/cocotb/xprop.cfg",
 ]
@@ -86,11 +90,9 @@ VCS_DEFINES = {
     "TSMC_NO_TESTPINS_DEFAULT_VALUE_CHECK": "",
 }
 
-VCS_NETLIST_BUILD_ARGS = [
-    arg
-    for arg in VCS_BUILD_ARGS
-    if arg not in ["-I$EXECROOT/hdl/verilog", "$EXECROOT/hdl/verilog/sram_backdoor.cc"]
-]
+VCS_NETLIST_BUILD_ARGS = list(VCS_BUILD_ARGS)
+
+VCS_NETLIST_TEST_ARGS = list(VCS_TEST_ARGS)
 
 VCS_NETLIST_DEFINES = {
     k: v
@@ -133,24 +135,24 @@ def rvv_core_mini_axi_netlist_test_suite(
             "waves": False,
             "seed": "42",
             "tags": ["vcs", "manual"],
-            "test_module": ["//tests/cocotb:core_mini_axi_sim.py"],
+            "test_module": ["@coralnpu_hw//tests/cocotb:core_mini_axi_sim.py"],
             "deps": [
-                "//coralnpu_test_utils:core_mini_axi_sim_interface",
-                "//coralnpu_test_utils:sim_test_fixture",
+                "@coralnpu_hw//coralnpu_test_utils:core_mini_axi_sim_interface",
+                "@coralnpu_hw//coralnpu_test_utils:sim_test_fixture",
                 requirement("tqdm"),
                 "@bazel_tools//tools/python/runfiles",
             ],
-            "data": ["//tests/cocotb:cocotb_test_binary_targets"],
+            "data": ["@coralnpu_hw//tests/cocotb:cocotb_test_binary_targets"],
             "size": "enormous",
         },
         vcs_netlist_build_args = VCS_NETLIST_BUILD_ARGS + vcs_build_args_extra,
         vcs_netlist_data = [
-            "//tests/cocotb:cocotb_test_binary_targets",
-            "//tests/cocotb:coverage_exclude.cfg",
-            "//tests/cocotb:xprop.cfg",
+            "@coralnpu_hw//tests/cocotb:cocotb_test_binary_targets",
+            "@coralnpu_hw//tests/cocotb:xprop.cfg",
         ] + vcs_data_extra,
         vcs_netlist_defines = vcs_netlist_defines,
-        vcs_netlist_test_args = VCS_TEST_ARGS,
+        vcs_netlist_split_build_test = True,
+        vcs_netlist_test_args = VCS_NETLIST_TEST_ARGS,
         vcs_netlist_verilog_sources = vcs_verilog_sources,
         **kwargs
     )

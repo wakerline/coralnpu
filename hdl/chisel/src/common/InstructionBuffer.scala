@@ -18,13 +18,13 @@ import chisel3._
 import chisel3.util._
 import common.CircularBufferMulti
 
-/** An interface which encapsulates up-to n DecoupledIO interfaces. The
-  * convention is that the first nValid interfaces are considered valid.
+/** An interface which encapsulates up-to n DecoupledIO interfaces. The convention is that the first
+  * nValid interfaces are considered valid.
   */
 class DecoupledVectorIO[T <: Data](gen: T, n: Int) extends Bundle {
-  val nReady = Input(UInt(log2Up(n+1).W))
-  val nValid = Output(UInt(log2Up(n+1).W))
-  val bits = Output(Vec(n, gen))
+  val nReady = Input(UInt(log2Up(n + 1).W))
+  val nValid = Output(UInt(log2Up(n + 1).W))
+  val bits   = Output(Vec(n, gen))
 }
 
 object DecoupledVectorIO {
@@ -33,18 +33,16 @@ object DecoupledVectorIO {
 
 // Note any instruction will be available to dequeu one full cycle follong enqueuing.
 // This must be accounted for when using the instruction buffer as there is no backpressure.
-class InstructionBuffer[T <: Data](val gen: T,
-                                   val n: Int,
-                                   val window: Int) extends Module {
+class InstructionBuffer[T <: Data](val gen: T, val n: Int, val window: Int) extends Module {
   assert(window % n == 0)
 
   val io = IO(new Bundle {
     val feedIn = Flipped(DecoupledVectorIO(gen, n))
-    val out = Vec(n, Decoupled(gen))
-    val flush = Input(Bool())
+    val out    = Vec(n, Decoupled(gen))
+    val flush  = Input(Bool())
 
     val nEnqueued = Output(UInt(log2Ceil(window + 1).W))
-    val nSpace = Output(UInt(log2Ceil(window + 1).W))
+    val nSpace    = Output(UInt(log2Ceil(window + 1).W))
   })
   dontTouch(io)
 
@@ -52,9 +50,9 @@ class InstructionBuffer[T <: Data](val gen: T,
 
   // Enqueue Logic
   val feedInReady = Mux(circularBuffer.io.nSpace < n.U, circularBuffer.io.nSpace, n.U)
-  io.feedIn.nReady := feedInReady
+  io.feedIn.nReady           := feedInReady
   circularBuffer.io.enqValid := io.feedIn.nValid
-  circularBuffer.io.enqData := io.feedIn.bits
+  circularBuffer.io.enqData  := io.feedIn.bits
 
   circularBuffer.io.flush := io.flush
 
@@ -62,14 +60,17 @@ class InstructionBuffer[T <: Data](val gen: T,
   // Don't show data is valid if flushing
   for (nIndex <- 0 until n) {
     io.out(nIndex).valid := (nIndex.U < circularBuffer.io.nEnqueued) && !io.flush
-    io.out(nIndex).bits := circularBuffer.io.dataOut(nIndex)
+    io.out(nIndex).bits  := circularBuffer.io.dataOut(nIndex)
   }
 
   // Confirm ready signals are contiguous with assert (ex only ready(0) and ready(2) set should fail)
-  assert(OneHotInOrder(io.out.map(_.fire)), p"OneHotInOrder - Instructions not dispatched in order.")
+  assert(
+    OneHotInOrder(io.out.map(_.fire)),
+    p"OneHotInOrder - Instructions not dispatched in order."
+  )
   val nReady = PopCount(io.out.map(_.fire))
   circularBuffer.io.deqReady := nReady
 
   io.nEnqueued := circularBuffer.io.nEnqueued
-  io.nSpace := circularBuffer.io.nSpace
+  io.nSpace    := circularBuffer.io.nSpace
 }

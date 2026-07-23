@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@rules_foreign_cc//foreign_cc:defs.bzl", "configure_make")
 load("@coralnpu_hw//rules:utils.bzl", "template_rule")
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "configure_make")
+
 package(default_visibility = ["//visibility:public"])
 
 COMMON_ARGS = [
@@ -29,6 +30,7 @@ cp isa/rv32{subset}-p-* ${{INSTALLDIR}}/isa
 """
 
 exports_files(glob(["**"]))
+
 filegroup(
     name = "all_srcs",
     srcs = [
@@ -76,13 +78,6 @@ template_rule(
             "postfix_script": POSTFIX_SCRIPT.format(subset = "uf"),
         },
     },
-    env = {
-        "PATH": "$$(dirname $(execpath //toolchain/wrappers:gcc)):$$PATH",
-        "RISCV_ENV_DIR": "$$(realpath $$(dirname $$(dirname $$(echo $(locations :shadow_riscv_env) | cut -d ' ' -f 1))))",
-    },
-    lib_source = ":all_srcs",
-    targets = ["isa"],
-    out_bin_dir = "isa",
     build_data = [
         "//toolchain/wrappers:all",
         "//toolchain/wrappers:gcc",
@@ -92,6 +87,13 @@ template_rule(
         ":all_srcs",
         ":shadow_riscv_env",
     ],
+    env = {
+        "PATH": "$$(dirname $(execpath //toolchain/wrappers:gcc)):$$PATH",
+        "RISCV_ENV_DIR": "$$(realpath $$(dirname $$(dirname $$(echo $(locations :shadow_riscv_env) | cut -d ' ' -f 1))))",
+    },
+    lib_source = ":all_srcs",
+    out_bin_dir = "isa",
+    targets = ["isa"],
 )
 
 genrule(
@@ -126,10 +128,10 @@ genrule(
 filegroup(
     name = "all_files",
     srcs = [
+        ":riscv_tests_rv32uf",
         ":riscv_tests_rv32ui",
         ":riscv_tests_rv32um",
         ":riscv_tests_rv32uzbb",
-        ":riscv_tests_rv32uf",
     ],
     output_group = "gen_dir",
 )

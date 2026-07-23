@@ -17,29 +17,29 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "crt",
     srcs = [
-        "crt.S",
         "coralnpu_exceptions.cc",
         "coralnpu_gloss.cc",
         "coralnpu_start.S",
+        "crt.S",
         "cxx_guards.cc",
     ],
     copts = ["-DSKIP_HTIF_SYMBOLS"],
-    alwayslink = True,
     target_compatible_with = [
-        "//platforms/cpu:coralnpu_v2"
+        "//platforms/cpu:coralnpu_v2",
     ],
+    alwayslink = True,
 )
 
 cc_library(
     name = "crt_semihosting",
     srcs = [
-        "crt.S",
         "coralnpu_exceptions.cc",
         "coralnpu_htif_gloss.cc",
         "coralnpu_start.S",
+        "crt.S",
+    ],
+    target_compatible_with = [
+        "//platforms/cpu:coralnpu_v2",
     ],
     alwayslink = True,
-    target_compatible_with = [
-        "//platforms/cpu:coralnpu_v2"
-    ],
 )

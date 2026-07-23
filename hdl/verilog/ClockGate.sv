@@ -17,11 +17,11 @@
 // Default: ASIC implementation
 // USE_GENERIC default: Verilator implementation (adapted from OpenTitan)
 // USE_GENERIC and FPGA_XILINX: UltraScale Plus specific clockgate.
-module ClockGate(
-  input         clk_i,
-  input         enable,  // '1' passthrough, '0' disable.
-  input         te,      // test enable
-  output        clk_o
+module ClockGate (
+    input  clk_i,
+    input  enable,  // '1' passthrough, '0' disable.
+    input  te,      // test enable
+    output clk_o
 );
 
 ///////////////////////////
@@ -36,41 +36,50 @@ module ClockGate(
   );
 `elsif USE_TSMC12FFC
   // TSMC12FFC Specific ClockGate
-  CKLNQD10BWP6T20P96CPDLVT u_cg(
-    .TE(te),
-    .E(enable),
-    .CP(clk_i),
-    .Q(clk_o)
+  CKLNQD10BWP6T20P96CPDLVT u_cg (
+      .TE(te),
+      .E (enable),
+      .CP(clk_i),
+      .Q (clk_o)
+  );
+`elsif USE_GF12LPP
+  // GF12 Specific Clockgate
+  // ICG_CELL must be defined at compile time (e.g. via -DICG_CELL=<cell_name>)
+  `ICG_CELL u_clkgate (
+      .ECK(clk_o),
+      .E  (enable),
+      .SE (te),
+      .CK (clk_i)
   );
 `elsif USE_GF22_116A
   // GF22 116A Specific ClockGate -- MUST BE BEFORE USE_GF22 (USE_GF22 must also be set for SRAMs)
   UDBSLT20_CKGTPLT_V5_8 u_cg (
-    .CK(clk_i),
-    .EN(enable),
-    .SE(te),
-    .Q(clk_o)
+      .CK(clk_i),
+      .EN(enable),
+      .SE(te),
+      .Q (clk_o)
   );
 `elsif USE_GF22
   // GF22 Specific ClockGate
   SC7P5T_CKGPRELATNX8_CSC36L u_cg (
-    .CLK(clk_i),
-    .E(enable),
-    .TE(te),
-    .Z(clk_o)
+      .CLK(clk_i),
+      .E  (enable),
+      .TE (te),
+      .Z  (clk_o)
   );
 
 `elsif FPGA_XILINX
   // Xilinx FPGA Specific ClockGate
   BUFGCE #(
-    .SIM_DEVICE("ULTRASCALE_PLUS")
+      .SIM_DEVICE("ULTRASCALE_PLUS")
   ) u_bufgce (
-    .I (clk_i),
-    .CE(enable | te),
-    .O (clk_o)
+      .I (clk_i),
+      .CE(enable | te),
+      .O (clk_o)
   );
 `else
   // Default: Verilator implementation
-  logic en_latch /* verilator clock_enable */;
+  logic en_latch  /* verilator clock_enable */;
   always_latch begin
     if (!clk_i) begin
       en_latch = enable | te;

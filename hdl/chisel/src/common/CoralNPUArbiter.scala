@@ -29,8 +29,12 @@ object CoralNPUArbiterCtrl {
   }
 }
 
-class InitedLockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: Option[T => Bool] = None)
-    extends LockingArbiterLike[T](gen, n, count, needsLock) {
+class InitedLockingRRArbiter[T <: Data](
+  gen: T,
+  n: Int,
+  count: Int,
+  needsLock: Option[T => Bool] = None
+) extends LockingArbiterLike[T](gen, n, count, needsLock) {
   lazy val lastGrant = RegInit(0.U(log2Ceil(n).W))
   lastGrant := Mux(io.out.fire, io.chosen, lastGrant)
 
@@ -49,6 +53,7 @@ class InitedLockingRRArbiter[T <: Data](gen: T, n: Int, count: Int, needsLock: O
     when(validMask(i)) { choice := i.asUInt }
 }
 
-class CoralNPURRArbiter[T <: Data](val gen: T, val n: Int, moduleName: Option[String] = None) extends InitedLockingRRArbiter[T](gen, n, 1) {
+class CoralNPURRArbiter[T <: Data](val gen: T, val n: Int, moduleName: Option[String] = None)
+    extends InitedLockingRRArbiter[T](gen, n, 1) {
   override val desiredName = moduleName.getOrElse(super.desiredName)
 }

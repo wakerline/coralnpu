@@ -16,14 +16,14 @@
 `define SPIKE_TRACE_SERVICE_SV
 
 typedef struct {
-  bit [31:0] pc;
-  bit [31:0] insn;
-  bit        is_valid;
-  bit        has_gpr_write;
-  bit        has_fpr_write;
-  bit        has_vpr_write;
-  int        rd; // 0-31
-  bit [31:0] wdata;
+  bit [31:0]  pc;
+  bit [31:0]  insn;
+  bit         is_valid;
+  bit         has_gpr_write;
+  bit         has_fpr_write;
+  bit         has_vpr_write;
+  int         rd;             // 0-31
+  bit [31:0]  wdata;
   bit [127:0] v_wdata;
 } spike_instr_txn_t;
 
@@ -53,7 +53,7 @@ class spike_trace_service extends uvm_object;
   // Opens the Spike log file for reading. Returns 1 on success, 0 on failure.
   function bit open_trace(string fname);
     if (is_open && fd != 0) begin
-       $fclose(fd);
+      $fclose(fd);
     end
     filename = fname;
     fd = $fopen(filename, "r");
@@ -68,16 +68,34 @@ class spike_trace_service extends uvm_object;
   // Function: pop_token
   // Helper function to extract the next whitespace-separated token from a string.
   function string pop_token(ref string s);
-     int i = 0;
-     string res;
-     // Skip whitespace
-     while (s.len() > 0 && (s.substr(0,0) == " " || s.substr(0,0) == "\t" || s.substr(0,0) == "\n" || s.substr(0,0) == "\r")) s = s.substr(1, s.len()-1);
-     if (s.len() == 0) return "";
-     // Find end of token
-     while (i < s.len() && s.substr(i,i) != " " && s.substr(i,i) != "\t" && s.substr(i,i) != "\n" && s.substr(i,i) != "\r") i++;
-     res = s.substr(0, i-1);
-     s = s.substr(i, s.len()-1);
-     return res;
+    int i = 0;
+    string res;
+    // Skip whitespace
+    while (s.len() > 0 && (s.substr(
+        0, 0
+    ) == " " || s.substr(
+        0, 0
+    ) == "\t" || s.substr(
+        0, 0
+    ) == "\n" || s.substr(
+        0, 0
+    ) == "\r"))
+    s = s.substr(1, s.len() - 1);
+    if (s.len() == 0) return "";
+    // Find end of token
+    while (i < s.len() && s.substr(
+        i, i
+    ) != " " && s.substr(
+        i, i
+    ) != "\t" && s.substr(
+        i, i
+    ) != "\n" && s.substr(
+        i, i
+    ) != "\r")
+    i++;
+    res = s.substr(0, i - 1);
+    s   = s.substr(i, s.len() - 1);
+    return res;
   endfunction
 
   // Function: process_commit_line
@@ -94,7 +112,8 @@ class spike_trace_service extends uvm_object;
     int num_writes = 0;
 
     // Match header: "core   %d: %d 0x%h (0x%h)"
-    if ($sscanf(line, "core   %d: %d 0x%h (0x%h)", core_id, priv_mode, pc_val, insn_val) != 4) return 0;
+    if ($sscanf(line, "core   %d: %d 0x%h (0x%h)", core_id, priv_mode, pc_val, insn_val) != 4)
+      return 0;
 
     base_txn.pc = pc_val;
     base_txn.insn = insn_val;
@@ -105,61 +124,68 @@ class spike_trace_service extends uvm_object;
 
     // Find end of header (after insn)
     pos = -1;
-    for (int j=0; j<line.len(); j++) begin
-       if (line.substr(j,j) == ")") begin
-          pos = j;
-          break;
-       end
+    for (int j = 0; j < line.len(); j++) begin
+      if (line.substr(j, j) == ")") begin
+        pos = j;
+        break;
+      end
     end
     if (pos == -1) return 0;
-    remainder = line.substr(pos + 1, line.len()-1);
+    remainder = line.substr(pos + 1, line.len() - 1);
 
     while (remainder.len() > 0) begin
-       token = pop_token(remainder);
-       if (token == "") break;
+      token = pop_token(remainder);
+      if (token == "") break;
 
-       if (token.len() >= 2 && (token.substr(0,0) == "x" || token.substr(0,0) == "f" || token.substr(0,0) == "v")) begin
-          string reg_type = token.substr(0,0);
-          string idx_str = token.substr(1, token.len()-1);
-          int reg_idx;
-          string val_str;
-          bit is_numeric = 1;
+      if (token.len() >= 2 && (token.substr(
+              0, 0
+          ) == "x" || token.substr(
+              0, 0
+          ) == "f" || token.substr(
+              0, 0
+          ) == "v")) begin
+        string reg_type = token.substr(0, 0);
+        string idx_str = token.substr(1, token.len() - 1);
+        int reg_idx;
+        string val_str;
+        bit is_numeric = 1;
 
-          for (int j=0; j<idx_str.len(); j++) if (idx_str[j] < "0" || idx_str[j] > "9") is_numeric = 0;
+        for (int j = 0; j < idx_str.len(); j++)
+        if (idx_str[j] < "0" || idx_str[j] > "9") is_numeric = 0;
 
-          if (is_numeric) begin
-             reg_idx = idx_str.atoi();
-             val_str = pop_token(remainder);
-             // Skip underscores in vector values if present
-             for (int j=0; j<val_str.len(); j++) begin
-                if (val_str[j] == "_") begin
-                   val_str = {val_str.substr(0, j-1), val_str.substr(j+1, val_str.len()-1)};
-                   j--;
-                end
-             end
-
-             if (val_str.len() >= 3 && val_str.substr(0,1) == "0x") begin
-                spike_instr_txn_t write_txn = base_txn;
-                write_txn.rd = reg_idx;
-                if (reg_type == "x") begin
-                   write_txn.has_gpr_write = 1;
-                   void'($sscanf(val_str, "0x%h", write_txn.wdata));
-                end else if (reg_type == "f") begin
-                   write_txn.has_fpr_write = 1;
-                   void'($sscanf(val_str, "0x%h", write_txn.wdata));
-                end else if (reg_type == "v") begin
-                   write_txn.has_vpr_write = 1;
-                   void'($sscanf(val_str, "0x%h", write_txn.v_wdata));
-                end
-                txn_q.push_back(write_txn);
-                num_writes++;
-             end
+        if (is_numeric) begin
+          reg_idx = idx_str.atoi();
+          val_str = pop_token(remainder);
+          // Skip underscores in vector values if present
+          for (int j = 0; j < val_str.len(); j++) begin
+            if (val_str[j] == "_") begin
+              val_str = {val_str.substr(0, j - 1), val_str.substr(j + 1, val_str.len() - 1)};
+              j--;
+            end
           end
-       end else if (token == "mem") begin
-          // Skip address and value for memory writes
-          void'(pop_token(remainder)); // addr
-          void'(pop_token(remainder)); // val
-       end
+
+          if (val_str.len() >= 3 && val_str.substr(0, 1) == "0x") begin
+            spike_instr_txn_t write_txn = base_txn;
+            write_txn.rd = reg_idx;
+            if (reg_type == "x") begin
+              write_txn.has_gpr_write = 1;
+              void'($sscanf(val_str, "0x%h", write_txn.wdata));
+            end else if (reg_type == "f") begin
+              write_txn.has_fpr_write = 1;
+              void'($sscanf(val_str, "0x%h", write_txn.wdata));
+            end else if (reg_type == "v") begin
+              write_txn.has_vpr_write = 1;
+              void'($sscanf(val_str, "0x%h", write_txn.v_wdata));
+            end
+            txn_q.push_back(write_txn);
+            num_writes++;
+          end
+        end
+      end else if (token == "mem") begin
+        // Skip address and value for memory writes
+        void'(pop_token(remainder));  // addr
+        void'(pop_token(remainder));  // val
+      end
     end
 
     if (num_writes == 0) txn_q.push_back(base_txn);
@@ -172,13 +198,13 @@ class spike_trace_service extends uvm_object;
     int core_id;
     bit [31:0] pc_val, insn_val;
     if ($sscanf(line, "core   %d: 0x%h (0x%h)", core_id, pc_val, insn_val) == 3) begin
-       txn.pc = pc_val;
-       txn.insn = insn_val;
-       txn.is_valid = 1;
-       txn.has_gpr_write = 0;
-       txn.has_fpr_write = 0;
-       txn.has_vpr_write = 0;
-       return 1;
+      txn.pc = pc_val;
+      txn.insn = insn_val;
+      txn.is_valid = 1;
+      txn.has_gpr_write = 0;
+      txn.has_fpr_write = 0;
+      txn.has_vpr_write = 0;
+      return 1;
     end
     return 0;
   endfunction
@@ -198,7 +224,7 @@ class spike_trace_service extends uvm_object;
 
     while (1) begin
       txn = get_next_instruction_internal();
-      if (!txn.is_valid) return 0; // EOF or error
+      if (!txn.is_valid) return 0;  // EOF or error
 
       if (txn.pc == target_pc) begin
         // Push back since get_next_instruction_internal popped it
@@ -232,41 +258,43 @@ class spike_trace_service extends uvm_object;
     if (txn_q.size() > 0) return txn_q.pop_front();
     if (!is_open) return txn;
 
-    while (!$feof(fd) || has_lookahead_line) begin
+    while (!$feof(
+        fd
+    ) || has_lookahead_line) begin
       if (has_lookahead_line) begin
-         line = lookahead_line;
-         has_lookahead_line = 0;
-         code = 1;
+        line = lookahead_line;
+        has_lookahead_line = 0;
+        code = 1;
       end else begin
-         code = $fgets(line, fd);
+        code = $fgets(line, fd);
       end
       if (code == 0) break;
 
       if (process_commit_line(line)) begin
-         if (txn_q.size() > 0) return txn_q.pop_front();
+        if (txn_q.size() > 0) return txn_q.pop_front();
       end else if (parse_fetch_line(line, txn)) begin
-            // It's a Fetch line. Check if next line is a Commit line for same PC.
-            if ($feof(fd)) return txn;
+        // It's a Fetch line. Check if next line is a Commit line for same PC.
+        if ($feof(fd)) return txn;
 
-            code = $fgets(next_line, fd);
-            if (code == 0) return txn;
+        code = $fgets(next_line, fd);
+        if (code == 0) return txn;
 
-            if (process_commit_line(next_line)) begin
-               if (txn_q.size() > 0 && txn_q[0].pc == txn.pc) begin
-                  return txn_q.pop_front();
-               end else begin
-                  // Commit line for a DIFFERENT pc? Unlikely.
-                  // But buffer the commit line.
-                  lookahead_line = next_line;
-                  has_lookahead_line = 1;
-                  return txn;
-               end
-            end else begin
-               // Next line is not a commit line.
-               lookahead_line = next_line;
-               has_lookahead_line = 1;
-               return txn;
-            end
+        if (process_commit_line(next_line)) begin
+          if (txn_q.size() > 0 && txn_q[0].pc == txn.pc) begin
+            return txn_q.pop_front();
+          end else begin
+            // Commit line for a DIFFERENT pc? Unlikely.
+            // But buffer the commit line.
+            lookahead_line = next_line;
+            has_lookahead_line = 1;
+            return txn;
+          end
+        end else begin
+          // Next line is not a commit line.
+          lookahead_line = next_line;
+          has_lookahead_line = 1;
+          return txn;
+        end
       end
     end
 
@@ -285,4 +313,4 @@ class spike_trace_service extends uvm_object;
 
 endclass
 
-`endif // SPIKE_TRACE_SERVICE_SV
+`endif  // SPIKE_TRACE_SERVICE_SV

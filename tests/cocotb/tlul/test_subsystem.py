@@ -29,14 +29,61 @@ from coralnpu_test_utils.spi_master import SPIMaster
 BUS_WIDTH_BITS = 128
 BUS_WIDTH_BYTES = 16
 
+
 async def setup_dut(dut, boot_addr=0):
     """Common setup logic for all tests."""
-    # Default all TL-UL input signals to a safe state
-    for dev in ["rom", "uart0", "uart1", "i2c_master"]:
-        getattr(dut, f"io_external_devices_{dev}_d_valid").value = 0
+    for signal in dir(dut):
+        if signal.startswith("io_external_devices_"):
+            if "_d_valid" in signal or "_d_bits_" in signal or "_a_ready" in signal:
+                try:
+                    getattr(dut, signal).value = 0
+                except Exception:
+                    pass
+        elif signal.startswith("io_external_hosts_"):
+            if "_a_valid" in signal or "_a_bits_" in signal or "_d_ready" in signal:
+                try:
+                    getattr(dut, signal).value = 0
+                except Exception:
+                    pass
 
-    getattr(dut, f"io_external_ports_dm_req_valid").value = 0 # DM req valid
-    getattr(dut, f"io_external_ports_dm_rsp_ready").value = 0 # DM rsp ready
+    # Initialize all async ports to 0 (clocks) or 1 (resets) except the test host domain
+    for signal in dir(dut):
+        if signal.startswith("io_async_ports_") and "hosts_test" not in signal:
+            try:
+                if "clock" in signal or "clk" in signal:
+                    getattr(dut, signal).value = 0
+                elif "reset" in signal or "rst" in signal:
+                    getattr(dut, signal).value = 1
+            except Exception:
+                pass
+
+    # Initialize input external ports to 0
+    input_external_ports = {
+        "io_external_ports_te",
+        "io_external_ports_dm_req_valid",
+        "io_external_ports_dm_req_bits_address",
+        "io_external_ports_dm_req_bits_data",
+        "io_external_ports_dm_req_bits_op",
+        "io_external_ports_dm_rsp_ready",
+        "io_external_ports_spi_clk",
+        "io_external_ports_spi_mosi",
+        "io_external_ports_spim_miso",
+        "io_external_ports_spim_clk_i",
+        "io_external_ports_gpio_i",
+        "io_external_ports_spim_flash_miso",
+        "io_external_ports_spim_flash_clk_i",
+        "io_external_ports_ext_intrs",
+    }
+    for signal in input_external_ports:
+        try:
+            getattr(dut, signal).value = 0
+        except Exception:
+            pass
+
+    # Initialize active-low chip select to 1
+    if hasattr(dut, "io_external_ports_spi_csb"):
+        dut.io_external_ports_spi_csb.value = 1
+
     dut.io_external_ports_boot_addr.value = boot_addr
 
     # Start the main clock
@@ -59,6 +106,7 @@ async def setup_dut(dut, boot_addr=0):
     await ClockCycles(dut.io_clk_i, 10)
 
     return clock
+
 
 async def load_elf(dut, elf_file, host_if=None, backdoor: bool = True):
     """Loads an ELF into DUT memory and returns the entry point.
@@ -102,13 +150,15 @@ async def load_elf_tlul_host(dut, elf_file, host_if):
         if segment.header.p_type == 'PT_LOAD':
             paddr = segment.header.p_paddr
             data = segment.data()
-            dut._log.info(f"Loading segment at 0x{paddr:08x}, size {len(data)} bytes")
+            dut._log.info(
+                f"Loading segment at 0x{paddr:08x}, size {len(data)} bytes"
+            )
 
             # Write segment data in bus-width chunks (128 bits)
             for i in range(0, len(data), BUS_WIDTH_BYTES):
                 line_addr = paddr + i
                 # Handle potentially short final line
-                line_data = data[i:i+BUS_WIDTH_BYTES]
+                line_data = data[i:i + BUS_WIDTH_BYTES]
                 current_len = len(line_data)
                 while len(line_data) < BUS_WIDTH_BYTES:
                     line_data += b'\x00'
@@ -124,30 +174,37 @@ async def load_elf_tlul_host(dut, elf_file, host_if):
                     address=line_addr,
                     data=int_data,
                     mask=mask,
-                    width=BUS_WIDTH_BITS # 128
+                    width=BUS_WIDTH_BITS  # 128
                 )
                 if host_if.width == 32:
-                   for j in range(0, current_len, 4):
-                       word_addr = line_addr + j
-                       word_data = line_data[j:j+4]
-                       int_word = int.from_bytes(word_data, byteorder='little')
-                       mask = (1 << len(word_data)) - 1
-                       write_txn_32 = create_a_channel_req(
-                           address=word_addr,
-                           data=int_word,
-                           mask=mask,
-                           width=32
-                       )
-                       await host_if.host_put(write_txn_32)
-                       resp = await host_if.host_get_response()
-                       assert resp["error"] == 0, f"Error writing to 0x{word_addr:08x}"
+                    for j in range(0, current_len, 4):
+                        word_addr = line_addr + j
+                        word_data = line_data[j:j + 4]
+                        int_word = int.from_bytes(
+                            word_data, byteorder='little'
+                        )
+                        mask = (1 << len(word_data)) - 1
+                        write_txn_32 = create_a_channel_req(
+                            address=word_addr,
+                            data=int_word,
+                            mask=mask,
+                            width=32
+                        )
+                        await host_if.host_put(write_txn_32)
+                        resp = await host_if.host_get_response()
+                        assert resp[
+                            "error"
+                        ] == 0, f"Error writing to 0x{word_addr:08x}"
                 else:
                     await host_if.host_put(write_txn)
                     # Wait for the acknowledgment
                     resp = await host_if.host_get_response()
-                    assert resp["error"] == 0, f"Received error response while writing to 0x{line_addr:08x}"
+                    assert resp[
+                        "error"
+                    ] == 0, f"Received error response while writing to 0x{line_addr:08x}"
 
     return entry_point
+
 
 async def load_elf_via_spi(dut, elf_file, spi_master):
     """Parses an ELF file and loads its segments into memory via SPI."""
@@ -158,12 +215,14 @@ async def load_elf_via_spi(dut, elf_file, spi_master):
         if segment.header.p_type == 'PT_LOAD':
             paddr = segment.header.p_paddr
             data = segment.data()
-            dut._log.info(f"Loading segment at 0x{paddr:08x}, size {len(data)} bytes via SPI")
+            dut._log.info(
+                f"Loading segment at 0x{paddr:08x}, size {len(data)} bytes via SPI"
+            )
 
             # Load data line by line
             for i in range(0, len(data), BUS_WIDTH_BYTES):
                 line_addr = paddr + i
-                line_data = data[i:i+BUS_WIDTH_BYTES]
+                line_data = data[i:i + BUS_WIDTH_BYTES]
                 while len(line_data) < BUS_WIDTH_BYTES:
                     line_data += b'\x00'
                 int_data = int.from_bytes(line_data, byteorder='little')
@@ -214,10 +273,11 @@ async def write_word_via_spi(spi_master, address, data):
     shifted_data = data << (offset * 8)
     await update_line_via_spi(spi_master, line_addr, shifted_data, mask)
 
+
 @cocotb.test()
 async def test_tlul_passthrough(dut):
     """Drives a TL-UL transaction through an external host and device port."""
-    clock = await setup_dut(dut)
+    await setup_dut(dut)
 
     # Instantiate a TL-UL host to drive the first external host port (ibex_core_i)
     host_if = TileLinkULInterface(
@@ -225,7 +285,8 @@ async def test_tlul_passthrough(dut):
         host_if_name="io_external_hosts_test_host_32",
         clock_name="io_async_ports_hosts_test_clock",
         reset_name="io_async_ports_hosts_test_reset",
-        width=32)
+        width=32
+    )
 
     # Instantiate a TL-UL device to act as the first external device (rom)
     device_if = TileLinkULInterface(
@@ -233,7 +294,9 @@ async def test_tlul_passthrough(dut):
         device_if_name="io_external_devices_rom",
         clock_name="io_clk_i",
         reset_name="io_rst_ni",
-        width=32)
+        reset_active_low=True,
+        width=32
+    )
 
     # Initialize the interfaces
     await host_if.init()
@@ -250,9 +313,15 @@ async def test_tlul_passthrough(dut):
         req = await device_if.device_get_request()
 
         # Verify the incoming request
-        assert (req["opcode"] == 0) or (req["opcode"] == 1), f"Expected Put-type opcode (0 or 1), got {req['opcode']}"
-        assert req["address"] == ROM_BASE_ADDR, f"Expected address {ROM_BASE_ADDR:X}, got {req['address']:X}"
-        assert req["data"] == TEST_DATA, f"Expected data {TEST_DATA:X}, got {req['data']:X}"
+        assert (req["opcode"] == 0) or (
+            req["opcode"] == 1
+        ), f"Expected Put-type opcode (0 or 1), got {req['opcode']}"
+        assert req[
+            "address"
+        ] == ROM_BASE_ADDR, f"Expected address {ROM_BASE_ADDR:X}, got {req['address']:X}"
+        assert req[
+            "data"
+        ] == TEST_DATA, f"Expected data {TEST_DATA:X}, got {req['data']:X}"
 
         # Send an AccessAck response
         await device_if.device_respond(
@@ -272,7 +341,7 @@ async def test_tlul_passthrough(dut):
         address=ROM_BASE_ADDR,
         source=TEST_SOURCE_ID,
         data=TEST_DATA,
-        mask=0xF, # Full mask for 32 bits
+        mask=0xF,  # Full mask for 32 bits
         width=host_if.width
     )
     await host_if.host_put(write_txn)
@@ -280,11 +349,15 @@ async def test_tlul_passthrough(dut):
     # Wait for and verify the response.
     resp = await host_if.host_get_response()
     assert resp["error"] == 0, "Response indicated an error"
-    assert resp["source"] == TEST_SOURCE_ID, f"Expected source ID {TEST_SOURCE_ID}, got {resp['source']}"
-    assert resp["opcode"] == 0, f"Expected AccessAck opcode (0), got {resp['opcode']}"
+    assert resp[
+        "source"
+    ] == TEST_SOURCE_ID, f"Expected source ID {TEST_SOURCE_ID}, got {resp['source']}"
+    assert resp["opcode"
+                ] == 0, f"Expected AccessAck opcode (0), got {resp['opcode']}"
 
     # Ensure the responder task finished cleanly.
     await responder_task
+
 
 @cocotb.test()
 async def test_program_execution_via_host(dut):
@@ -294,7 +367,7 @@ async def test_program_execution_via_host(dut):
     test for `load_elf_tlul_host`. Other tests in this file silently use
     the backdoor default.
     """
-    clock = await setup_dut(dut)
+    await setup_dut(dut)
 
     # Instantiate a TL-UL host
     host_if = TileLinkULInterface(
@@ -302,14 +375,17 @@ async def test_program_execution_via_host(dut):
         host_if_name="io_external_hosts_test_host_32",
         clock_name="io_async_ports_hosts_test_clock",
         reset_name="io_async_ports_hosts_test_reset",
-        width=32)
+        width=32
+    )
 
     # Initialize the interface
     await host_if.init()
 
     # Find and load the ELF file
     r = runfiles.Create()
-    elf_path = r.Rlocation("coralnpu_hw/tests/cocotb/rvv/arithmetics/rvv_add_int32_m1.elf")
+    elf_path = r.Rlocation(
+        "coralnpu_hw/tests/cocotb/rvv/arithmetics/rvv_add_int32_m1.elf"
+    )
     assert elf_path, "Could not find ELF file"
 
     with open(elf_path, "rb") as f:
@@ -341,10 +417,7 @@ async def test_program_execution_via_host(dut):
     # Release clock gate
     dut._log.info("Releasing clock gate...")
     write_txn = create_a_channel_req(
-        address=coralnpu_reset_csr_addr,
-        data=1,
-        mask=0xF,
-        width=host_if.width
+        address=coralnpu_reset_csr_addr, data=1, mask=0xF, width=host_if.width
     )
     await host_if.host_put(write_txn)
     resp = await host_if.host_get_response()
@@ -355,10 +428,7 @@ async def test_program_execution_via_host(dut):
     # Release reset
     dut._log.info("Releasing reset...")
     write_txn = create_a_channel_req(
-        address=coralnpu_reset_csr_addr,
-        data=0,
-        mask=0xF,
-        width=host_if.width
+        address=coralnpu_reset_csr_addr, data=0, mask=0xF, width=host_if.width
     )
     await host_if.host_put(write_txn)
     resp = await host_if.host_get_response()
@@ -377,10 +447,11 @@ async def test_program_execution_via_host(dut):
     dut._log.info("Program halted.")
     assert dut.io_external_ports_fault.value == 0, "Program halted with fault!"
 
+
 @cocotb.test()
 async def test_program_execution_via_spi(dut):
     """Loads and executes a program via the SPI to TL-UL bridge."""
-    clock = await setup_dut(dut)
+    await setup_dut(dut)
 
     spi_master = SPIMaster(
         clk=dut.io_external_ports_spi_clk,
@@ -394,7 +465,9 @@ async def test_program_execution_via_spi(dut):
 
     # Find and load the ELF file
     r = runfiles.Create()
-    elf_path = r.Rlocation("coralnpu_hw/tests/cocotb/rvv/arithmetics/rvv_add_int32_m1.elf")
+    elf_path = r.Rlocation(
+        "coralnpu_hw/tests/cocotb/rvv/arithmetics/rvv_add_int32_m1.elf"
+    )
     assert elf_path, "Could not find ELF file"
 
     with open(elf_path, "rb") as f:
@@ -433,6 +506,7 @@ async def test_program_execution_via_spi(dut):
     dut._log.info("Program halted.")
     assert dut.io_external_ports_fault.value == 0, "Program halted with fault!"
 
+
 @cocotb.test()
 async def test_ddr_access(dut):
     """Tests TileLink transactions to the DDR domain."""
@@ -459,7 +533,8 @@ async def test_ddr_access(dut):
         host_if_name="io_external_hosts_test_host_32",
         clock_name="io_async_ports_hosts_test_clock",
         reset_name="io_async_ports_hosts_test_reset",
-        width=32)
+        width=32
+    )
     await host_if.init()
 
     # --- AXI Responder Models ---
@@ -467,8 +542,24 @@ async def test_ddr_access(dut):
     DDR_MEM_BASE = 0x80000000
     TEST_DATA = 0x12345678
 
-    ddr_ctrl_slave = AxiSlave(dut, "ddr_ctrl_axi", ddr_clk_signal, ddr_rst_signal, dut._log, has_memory=True, mem_base_addr=DDR_CTRL_BASE)
-    ddr_mem_slave = AxiSlave(dut, "ddr_mem_axi", ddr_clk_signal, ddr_rst_signal, dut._log, has_memory=True, mem_base_addr=DDR_MEM_BASE)
+    ddr_ctrl_slave = AxiSlave(
+        dut,
+        "ddr_ctrl_axi",
+        ddr_clk_signal,
+        ddr_rst_signal,
+        dut._log,
+        has_memory=True,
+        mem_base_addr=DDR_CTRL_BASE
+    )
+    ddr_mem_slave = AxiSlave(
+        dut,
+        "ddr_mem_axi",
+        ddr_clk_signal,
+        ddr_rst_signal,
+        dut._log,
+        has_memory=True,
+        mem_base_addr=DDR_MEM_BASE
+    )
     ddr_ctrl_slave.start()
     ddr_mem_slave.start()
 
@@ -478,7 +569,9 @@ async def test_ddr_access(dut):
     # --- Stimulus ---
     # Write to ddr_ctrl
     dut._log.info("Sending write to ddr_ctrl...")
-    write_txn = create_a_channel_req(address=DDR_CTRL_BASE, data=TEST_DATA, mask=0xF, width=host_if.width)
+    write_txn = create_a_channel_req(
+        address=DDR_CTRL_BASE, data=TEST_DATA, mask=0xF, width=host_if.width
+    )
     await host_if.host_put(write_txn)
     resp = await with_timeout(host_if.host_get_response(), 10000, "ns")
     assert resp["error"] == 0, "ddr_ctrl write response indicated an error"
@@ -486,21 +579,27 @@ async def test_ddr_access(dut):
 
     # Write to ddr_mem
     dut._log.info("Sending write to ddr_mem...")
-    write_txn = create_a_channel_req(address=DDR_MEM_BASE, data=TEST_DATA, mask=0xF, width=host_if.width)
+    write_txn = create_a_channel_req(
+        address=DDR_MEM_BASE, data=TEST_DATA, mask=0xF, width=host_if.width
+    )
     await host_if.host_put(write_txn)
     resp = await host_if.host_get_response()
     assert resp["error"] == 0, "ddr_mem write response indicated an error"
     dut._log.info("Write to ddr_mem successful.")
 
     dut._log.info("Sending read to ddr_ctrl...")
-    read_txn = create_a_channel_req(address=DDR_CTRL_BASE, width=host_if.width, is_read=True)
+    read_txn = create_a_channel_req(
+        address=DDR_CTRL_BASE, width=host_if.width, is_read=True
+    )
     await host_if.host_put(read_txn)
     resp = await with_timeout(host_if.host_get_response(), 10000, "ns")
     assert resp["error"] == 0, "ddr_ctrl read response had error"
     dut._log.info("Read from ddr_ctrl successful.")
 
     dut._log.info("Sending read to ddr_mem...")
-    read_txn = create_a_channel_req(address=DDR_MEM_BASE, width=host_if.width, is_read=True)
+    read_txn = create_a_channel_req(
+        address=DDR_MEM_BASE, width=host_if.width, is_read=True
+    )
     await host_if.host_put(read_txn)
     resp = await with_timeout(host_if.host_get_response(), 10000, "ns")
     assert resp["error"] == 0, "ddr_mem read response had error"
@@ -508,9 +607,10 @@ async def test_ddr_access(dut):
 
     await ClockCycles(dut.io_clk_i, 20)
 
+
 @cocotb.test()
 async def test_ddr_access_via_spi(dut):
-    clock = await setup_dut(dut)
+    await setup_dut(dut)
 
     spi_master = SPIMaster(
         clk=dut.io_external_ports_spi_clk,
@@ -539,12 +639,19 @@ async def test_ddr_access_via_spi(dut):
 
     # --- AXI Responder Models ---
     DDR_MEM_BASE = 0x80000000
-    ddr_mem_slave = AxiSlave(dut, "ddr_mem_axi", ddr_clk_signal, ddr_rst_signal, dut._log, has_memory=True, mem_base_addr=DDR_MEM_BASE)
+    ddr_mem_slave = AxiSlave(
+        dut,
+        "ddr_mem_axi",
+        ddr_clk_signal,
+        ddr_rst_signal,
+        dut._log,
+        has_memory=True,
+        mem_base_addr=DDR_MEM_BASE
+    )
     ddr_mem_slave.start()
 
     # Allow the AXI slave coroutines to start and initialize signals
     await RisingEdge(ddr_clk_signal)
-
 
     data0 = 0x00112233445566778899AABBCCDDEEFF
     data1 = 0xFFEEDDCCBBAA99887766554433221100
@@ -561,7 +668,7 @@ async def test_ddr_access_via_spi(dut):
 @cocotb.test()
 async def test_tlul_width_bridge_bug_reproduction(dut):
     """Reproduces the TlulWidthBridge bug by running a C++ program that performs 16-bit writes."""
-    clock = await setup_dut(dut)
+    await setup_dut(dut)
 
     # 1. Instantiate Host Interface (test_host_32)
     host_if = TileLinkULInterface(
@@ -569,16 +676,17 @@ async def test_tlul_width_bridge_bug_reproduction(dut):
         host_if_name="io_external_hosts_test_host_32",
         clock_name="io_async_ports_hosts_test_clock",
         reset_name="io_async_ports_hosts_test_reset",
-        width=32)
+        width=32
+    )
     await host_if.init()
 
-    # 2. Instantiate Device Interfaces
     # UART1 responder (port 3) for logging
     uart1_if = TileLinkULInterface(
         dut,
         device_if_name="io_external_devices_uart1",
         clock_name="io_clk_i",
         reset_name="io_rst_ni",
+        reset_active_low=True,
         width=32,
     )
     await uart1_if.init()
@@ -601,7 +709,11 @@ async def test_tlul_width_bridge_bug_reproduction(dut):
             elif int(req["opcode"]) == 4:
                 # Return status=0 (not full) for UART
                 await uart1_if.device_respond(
-                    opcode=1, param=0, size=req["size"], source=req["source"], data=0
+                    opcode=1,
+                    param=0,
+                    size=req["size"],
+                    source=req["source"],
+                    data=0
                 )
 
     cocotb.start_soon(uart1_responder())
@@ -664,34 +776,42 @@ async def test_tlul_width_bridge_bug_reproduction(dut):
 async def test_timer_interrupt(dut):
     """Loads and executes the timer interrupt test. Verifies CLINT mtime/mtimecmp
     triggers a machine timer interrupt that is handled via mtvec."""
-    clock = await setup_dut(dut)
+    await setup_dut(dut)
 
     host_if = TileLinkULInterface(
         dut,
         host_if_name="io_external_hosts_test_host_32",
         clock_name="io_async_ports_hosts_test_clock",
         reset_name="io_async_ports_hosts_test_reset",
-        width=32)
+        width=32
+    )
     await host_if.init()
 
     # --- Sanity check: read CLINT mtime via test host ---
     CLINT_MTIME_LO = 0x0200BFF8
     read_txn = create_a_channel_req(
-        address=CLINT_MTIME_LO, width=host_if.width, is_read=True)
+        address=CLINT_MTIME_LO, width=host_if.width, is_read=True
+    )
     await host_if.host_put(read_txn)
     resp = await host_if.host_get_response()
-    dut._log.info(f"CLINT mtime_lo read: data=0x{int(resp['data']):08x}, error={resp['error']}")
+    dut._log.info(
+        f"CLINT mtime_lo read: data=0x{int(resp['data']):08x}, error={resp['error']}"
+    )
     assert resp["error"] == 0, "CLINT mtime read failed"
     mtime_val1 = resp["data"]
 
     await ClockCycles(dut.io_clk_i, 10)
 
     read_txn = create_a_channel_req(
-        address=CLINT_MTIME_LO, width=host_if.width, is_read=True)
+        address=CLINT_MTIME_LO, width=host_if.width, is_read=True
+    )
     await host_if.host_put(read_txn)
     resp = await host_if.host_get_response()
-    dut._log.info(f"CLINT mtime_lo read (2nd): data=0x{int(resp['data']):08x}, error={resp['error']}")
-    assert int(resp["data"]) > int(mtime_val1), "CLINT mtime is not incrementing"
+    dut._log.info(
+        f"CLINT mtime_lo read (2nd): data=0x{int(resp['data']):08x}, error={resp['error']}"
+    )
+    assert int(resp["data"]
+               ) > int(mtime_val1), "CLINT mtime is not incrementing"
 
     r = runfiles.Create()
     elf_path = r.Rlocation("coralnpu_hw/tests/cocotb/timer_interrupt_test.elf")
@@ -700,20 +820,27 @@ async def test_timer_interrupt(dut):
     with open(elf_path, "rb") as f:
         entry_point = await load_elf(dut, f, host_if)
 
-    dut._log.info(f"Timer interrupt test loaded. Entry point: 0x{entry_point:08x}")
+    dut._log.info(
+        f"Timer interrupt test loaded. Entry point: 0x{entry_point:08x}"
+    )
 
     # Program start PC, release clock gate, release reset
     coralnpu_pc_csr_addr = 0x30004
     coralnpu_reset_csr_addr = 0x30000
 
     write_txn = create_a_channel_req(
-        address=coralnpu_pc_csr_addr, data=entry_point, mask=0xF, width=host_if.width)
+        address=coralnpu_pc_csr_addr,
+        data=entry_point,
+        mask=0xF,
+        width=host_if.width
+    )
     await host_if.host_put(write_txn)
     resp = await host_if.host_get_response()
     assert resp["error"] == 0
 
     write_txn = create_a_channel_req(
-        address=coralnpu_reset_csr_addr, data=1, mask=0xF, width=host_if.width)
+        address=coralnpu_reset_csr_addr, data=1, mask=0xF, width=host_if.width
+    )
     await host_if.host_put(write_txn)
     resp = await host_if.host_get_response()
     assert resp["error"] == 0
@@ -721,7 +848,8 @@ async def test_timer_interrupt(dut):
     await ClockCycles(dut.io_clk_i, 1)
 
     write_txn = create_a_channel_req(
-        address=coralnpu_reset_csr_addr, data=0, mask=0xF, width=host_if.width)
+        address=coralnpu_reset_csr_addr, data=0, mask=0xF, width=host_if.width
+    )
     await host_if.host_put(write_txn)
     resp = await host_if.host_get_response()
     assert resp["error"] == 0
@@ -745,37 +873,47 @@ async def test_timer_interrupt(dut):
 async def test_software_interrupt(dut):
     """Loads and executes the software interrupt test. Verifies CLINT msip
     triggers a machine software interrupt that is handled via mtvec."""
-    clock = await setup_dut(dut)
+    await setup_dut(dut)
 
     host_if = TileLinkULInterface(
         dut,
         host_if_name="io_external_hosts_test_host_32",
         clock_name="io_async_ports_hosts_test_clock",
         reset_name="io_async_ports_hosts_test_reset",
-        width=32)
+        width=32
+    )
     await host_if.init()
 
     r = runfiles.Create()
-    elf_path = r.Rlocation("coralnpu_hw/tests/cocotb/software_interrupt_test.elf")
+    elf_path = r.Rlocation(
+        "coralnpu_hw/tests/cocotb/software_interrupt_test.elf"
+    )
     assert elf_path, "Could not find software_interrupt_test.elf"
 
     with open(elf_path, "rb") as f:
         entry_point = await load_elf(dut, f, host_if)
 
-    dut._log.info(f"Software interrupt test loaded. Entry point: 0x{entry_point:08x}")
+    dut._log.info(
+        f"Software interrupt test loaded. Entry point: 0x{entry_point:08x}"
+    )
 
     # Program start PC, release clock gate, release reset
     coralnpu_pc_csr_addr = 0x30004
     coralnpu_reset_csr_addr = 0x30000
 
     write_txn = create_a_channel_req(
-        address=coralnpu_pc_csr_addr, data=entry_point, mask=0xF, width=host_if.width)
+        address=coralnpu_pc_csr_addr,
+        data=entry_point,
+        mask=0xF,
+        width=host_if.width
+    )
     await host_if.host_put(write_txn)
     resp = await host_if.host_get_response()
     assert resp["error"] == 0
 
     write_txn = create_a_channel_req(
-        address=coralnpu_reset_csr_addr, data=1, mask=0xF, width=host_if.width)
+        address=coralnpu_reset_csr_addr, data=1, mask=0xF, width=host_if.width
+    )
     await host_if.host_put(write_txn)
     resp = await host_if.host_get_response()
     assert resp["error"] == 0
@@ -783,7 +921,8 @@ async def test_software_interrupt(dut):
     await ClockCycles(dut.io_clk_i, 1)
 
     write_txn = create_a_channel_req(
-        address=coralnpu_reset_csr_addr, data=0, mask=0xF, width=host_if.width)
+        address=coralnpu_reset_csr_addr, data=0, mask=0xF, width=host_if.width
+    )
     await host_if.host_put(write_txn)
     resp = await host_if.host_get_response()
     assert resp["error"] == 0
@@ -795,7 +934,8 @@ async def test_software_interrupt(dut):
     CLINT_MSIP = 0x02000000
     dut._log.info("Triggering software interrupt via CLINT msip...")
     write_txn = create_a_channel_req(
-        address=CLINT_MSIP, data=1, mask=0xF, width=host_if.width)
+        address=CLINT_MSIP, data=1, mask=0xF, width=host_if.width
+    )
     await host_if.host_put(write_txn)
     resp = await host_if.host_get_response()
     assert resp["error"] == 0
@@ -819,14 +959,15 @@ async def test_software_interrupt(dut):
 async def test_plic(dut):
     """Loads and executes the PLIC test. Verifies PLIC can handle both level
     and edge triggered interrupts."""
-    clock = await setup_dut(dut)
+    await setup_dut(dut)
 
     host_if = TileLinkULInterface(
         dut,
         host_if_name="io_external_hosts_test_host_32",
         clock_name="io_async_ports_hosts_test_clock",
         reset_name="io_async_ports_hosts_test_reset",
-        width=32)
+        width=32
+    )
     await host_if.init()
 
     # UART1 responder for logging
@@ -835,6 +976,7 @@ async def test_plic(dut):
         device_if_name="io_external_devices_uart1",
         clock_name="io_clk_i",
         reset_name="io_rst_ni",
+        reset_active_low=True,
         width=32,
     )
     await uart1_if.init()
@@ -853,7 +995,11 @@ async def test_plic(dut):
                 )
             elif int(req["opcode"]) == 4:
                 await uart1_if.device_respond(
-                    opcode=1, param=0, size=req["size"], source=req["source"], data=0
+                    opcode=1,
+                    param=0,
+                    size=req["size"],
+                    source=req["source"],
+                    data=0
                 )
 
     cocotb.start_soon(uart1_responder())
@@ -872,19 +1018,25 @@ async def test_plic(dut):
     coralnpu_reset_csr_addr = 0x30000
 
     write_txn = create_a_channel_req(
-        address=coralnpu_pc_csr_addr, data=entry_point, mask=0xF, width=host_if.width)
+        address=coralnpu_pc_csr_addr,
+        data=entry_point,
+        mask=0xF,
+        width=host_if.width
+    )
     await host_if.host_put(write_txn)
     await host_if.host_get_response()
 
     write_txn = create_a_channel_req(
-        address=coralnpu_reset_csr_addr, data=1, mask=0xF, width=host_if.width)
+        address=coralnpu_reset_csr_addr, data=1, mask=0xF, width=host_if.width
+    )
     await host_if.host_put(write_txn)
     await host_if.host_get_response()
 
     await ClockCycles(dut.io_clk_i, 1)
 
     write_txn = create_a_channel_req(
-        address=coralnpu_reset_csr_addr, data=0, mask=0xF, width=host_if.width)
+        address=coralnpu_reset_csr_addr, data=0, mask=0xF, width=host_if.width
+    )
     await host_if.host_put(write_txn)
     await host_if.host_get_response()
 
@@ -899,9 +1051,9 @@ async def test_plic(dut):
 
     # --- Trigger Source 2 (Edge) ---
     dut._log.info("Triggering PLIC Source 2 (Edge)...")
-    dut.io_external_ports_ext_intrs.value = 3 # bits [1:0] high. source 2 is bit 1.
+    dut.io_external_ports_ext_intrs.value = 3  # bits [1:0] high. source 2 is bit 1.
     await ClockCycles(dut.io_clk_i, 10)
-    dut.io_external_ports_ext_intrs.value = 1 # pulse source 2
+    dut.io_external_ports_ext_intrs.value = 1  # pulse source 2
 
     # Clear all sources eventually
     await ClockCycles(dut.io_clk_i, 1000)
@@ -930,7 +1082,7 @@ async def test_ibus_fetch_from_sram(dut):
     to that address, and verifies the core can fetch and execute instructions
     via the ibus AXI path through the crossbar.
     """
-    clock = await setup_dut(dut)
+    await setup_dut(dut)
 
     # Host interface for programming CSRs and loading data
     host_if = TileLinkULInterface(
@@ -938,7 +1090,8 @@ async def test_ibus_fetch_from_sram(dut):
         host_if_name="io_external_hosts_test_host_32",
         clock_name="io_async_ports_hosts_test_clock",
         reset_name="io_async_ports_hosts_test_reset",
-        width=32)
+        width=32
+    )
     await host_if.init()
 
     # --- Load a small RISC-V program into SRAM ---
@@ -977,7 +1130,10 @@ async def test_ibus_fetch_from_sram(dut):
     # Program the start PC to SRAM base
     dut._log.info(f"Programming start PC to 0x{SRAM_BASE:08x}")
     write_txn = create_a_channel_req(
-        address=coralnpu_pc_csr_addr, data=SRAM_BASE, mask=0xF, width=host_if.width
+        address=coralnpu_pc_csr_addr,
+        data=SRAM_BASE,
+        mask=0xF,
+        width=host_if.width
     )
     await host_if.host_put(write_txn)
     resp = await host_if.host_get_response()
@@ -1032,7 +1188,9 @@ async def test_ibus_fetch_from_sram(dut):
     assert read_data == expected, \
         f"DTCM verification failed: got 0x{read_data:08x}, expected 0x{expected:08x}"
 
-    dut._log.info("Test passed: instruction fetch from SRAM via AXI bus works correctly.")
+    dut._log.info(
+        "Test passed: instruction fetch from SRAM via AXI bus works correctly."
+    )
 
 
 @cocotb.test()
@@ -1051,14 +1209,15 @@ async def test_boot_addr_sram(dut):
     DTCM_BASE = 0x00010000
 
     # Pass boot_addr to setup_dut so it's driven before reset
-    clock = await setup_dut(dut, boot_addr=SRAM_BASE)
+    await setup_dut(dut, boot_addr=SRAM_BASE)
 
     host_if = TileLinkULInterface(
         dut,
         host_if_name="io_external_hosts_test_host_32",
         clock_name="io_async_ports_hosts_test_clock",
         reset_name="io_async_ports_hosts_test_reset",
-        width=32)
+        width=32
+    )
     await host_if.init()
 
     # Load program into SRAM via test host (same program as test_ibus_fetch_from_sram)
@@ -1071,7 +1230,10 @@ async def test_boot_addr_sram(dut):
 
     for i, instr in enumerate(program):
         write_txn = create_a_channel_req(
-            address=SRAM_BASE + i * 4, data=instr, mask=0xF, width=host_if.width
+            address=SRAM_BASE + i * 4,
+            data=instr,
+            mask=0xF,
+            width=host_if.width
         )
         await host_if.host_put(write_txn)
         resp = await host_if.host_get_response()
@@ -1129,7 +1291,9 @@ async def test_boot_addr_sram(dut):
     assert read_data == expected, \
         f"DTCM verification failed: got 0x{read_data:08x}, expected 0x{expected:08x}"
 
-    dut._log.info("Test passed: boot_addr wire correctly sets pcStart on reset.")
+    dut._log.info(
+        "Test passed: boot_addr wire correctly sets pcStart on reset."
+    )
 
 
 @cocotb.test()
@@ -1145,14 +1309,15 @@ async def test_boot_addr_override(dut):
     DUMMY_ADDR = 0x12340000
 
     # Pass dummy boot_addr to setup_dut so it's captured on reset
-    clock = await setup_dut(dut, boot_addr=DUMMY_ADDR)
+    await setup_dut(dut, boot_addr=DUMMY_ADDR)
 
     host_if = TileLinkULInterface(
         dut,
         host_if_name="io_external_hosts_test_host_32",
         clock_name="io_async_ports_hosts_test_clock",
         reset_name="io_async_ports_hosts_test_reset",
-        width=32)
+        width=32
+    )
     await host_if.init()
 
     # Load program into SRAM via test host
@@ -1165,7 +1330,10 @@ async def test_boot_addr_override(dut):
 
     for i, instr in enumerate(program):
         write_txn = create_a_channel_req(
-            address=SRAM_BASE + i * 4, data=instr, mask=0xF, width=host_if.width
+            address=SRAM_BASE + i * 4,
+            data=instr,
+            mask=0xF,
+            width=host_if.width
         )
         await host_if.host_put(write_txn)
         resp = await host_if.host_get_response()
@@ -1179,7 +1347,10 @@ async def test_boot_addr_override(dut):
 
     dut._log.info(f"Overriding pcStartReg with 0x{SRAM_BASE:08x}...")
     write_txn = create_a_channel_req(
-        address=coralnpu_pc_csr_addr, data=SRAM_BASE, mask=0xF, width=host_if.width
+        address=coralnpu_pc_csr_addr,
+        data=SRAM_BASE,
+        mask=0xF,
+        width=host_if.width
     )
     await host_if.host_put(write_txn)
     resp = await host_if.host_get_response()
@@ -1235,10 +1406,11 @@ async def test_boot_addr_override(dut):
 
     dut._log.info("Test passed: pcStartReg CSR override works correctly.")
 
+
 @cocotb.test()
 async def test_ddr_burst_pattern_repro(dut):
     """Tests DDR burst patterns from the CPU's perspective."""
-    clock = await setup_dut(dut)
+    await setup_dut(dut)
 
     # 1. DDR Clock and Reset Setup
     ddr_clk_signal = dut.io_async_ports_devices_ddr_clock
@@ -1259,12 +1431,21 @@ async def test_ddr_burst_pattern_repro(dut):
         host_if_name="io_external_hosts_test_host_32",
         clock_name="io_async_ports_hosts_test_clock",
         reset_name="io_async_ports_hosts_test_reset",
-        width=32)
+        width=32
+    )
     await host_if.init()
 
     # 3. AXI Responder for DDR (0x80000000)
     DDR_MEM_BASE = 0x80000000
-    ddr_mem_slave = AxiSlave(dut, "ddr_mem_axi", ddr_clk_signal, ddr_rst_signal, dut._log, has_memory=True, mem_base_addr=DDR_MEM_BASE)
+    ddr_mem_slave = AxiSlave(
+        dut,
+        "ddr_mem_axi",
+        ddr_clk_signal,
+        ddr_rst_signal,
+        dut._log,
+        has_memory=True,
+        mem_base_addr=DDR_MEM_BASE
+    )
     ddr_mem_slave.start()
     await RisingEdge(ddr_clk_signal)
 
@@ -1281,14 +1462,26 @@ async def test_ddr_burst_pattern_repro(dut):
     coralnpu_reset_csr_addr = 0x30000
 
     # Program PC
-    await host_if.host_put(create_a_channel_req(address=coralnpu_pc_csr_addr, data=entry_point, mask=0xF, width=32))
+    await host_if.host_put(
+        create_a_channel_req(
+            address=coralnpu_pc_csr_addr, data=entry_point, mask=0xF, width=32
+        )
+    )
     await host_if.host_get_response()
     # Release clock gate
-    await host_if.host_put(create_a_channel_req(address=coralnpu_reset_csr_addr, data=1, mask=0xF, width=32))
+    await host_if.host_put(
+        create_a_channel_req(
+            address=coralnpu_reset_csr_addr, data=1, mask=0xF, width=32
+        )
+    )
     await host_if.host_get_response()
     await ClockCycles(dut.io_clk_i, 1)
     # Release reset
-    await host_if.host_put(create_a_channel_req(address=coralnpu_reset_csr_addr, data=0, mask=0xF, width=32))
+    await host_if.host_put(
+        create_a_channel_req(
+            address=coralnpu_reset_csr_addr, data=0, mask=0xF, width=32
+        )
+    )
     await host_if.host_get_response()
 
     # 6. Wait for Halt
@@ -1315,7 +1508,9 @@ async def test_ddr_burst_pattern_repro(dut):
         actual = int.from_bytes(read_bytes, byteorder='little')
 
         if actual != expected:
-            dut._log.error(f"DDR Mismatch at Offset {i*4:02x}: Expected {expected:08x}, Got {actual:08x}")
+            dut._log.error(
+                f"DDR Mismatch at Offset {i*4:02x}: Expected {expected:08x}, Got {actual:08x}"
+            )
         else:
             dut._log.info(f"DDR Match at Offset {i*4:02x}: {actual:08x}")
 

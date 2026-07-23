@@ -20,9 +20,9 @@ import chisel3.util._
 class FIFOState[T <: Data](val size: Int, gen: T) extends Bundle {
 
   // State of our FIFO object
-  val head = UInt(log2Ceil(size).W)
-  val tail = UInt(log2Ceil(size).W)
-  val count = UInt(log2Ceil(size + 1).W)
+  val head   = UInt(log2Ceil(size).W)
+  val tail   = UInt(log2Ceil(size).W)
+  val count  = UInt(log2Ceil(size + 1).W)
   val buffer = Vec(size, gen)
 
   // Helper methods
@@ -57,7 +57,8 @@ class FIFOState[T <: Data](val size: Int, gen: T) extends Bundle {
       } else {
         Mux(idx.U >= head, idx.U - head, idx.U +& size.U - head)
       }
-      val shouldWriteAtIndex = distanceFromHead < validCount // if greater, distance is farther from head than validCount (inline or wrapped around)
+      val shouldWriteAtIndex =
+        distanceFromHead < validCount // if greater, distance is farther from head than validCount (inline or wrapped around)
 
       nextBuffer(idx) := Mux(shouldWriteAtIndex, data(distanceFromHead), buffer(idx))
     }

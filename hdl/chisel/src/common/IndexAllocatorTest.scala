@@ -24,7 +24,7 @@ trait IndexAllocatorSpec extends ChiselSim { this: AnyFreeSpec =>
 
   def spec(capacity: Int) = {
     "Initialize" in {
-      simulate(makeDut()) {dut =>
+      simulate(makeDut()) { dut =>
         dut.io.alloc.valid.expect(true.B)
         dut.io.alloc.bits.expect(0.U)
         dut.io.free.ready.expect(false.B)
@@ -32,7 +32,7 @@ trait IndexAllocatorSpec extends ChiselSim { this: AnyFreeSpec =>
     }
 
     "Allocate all" in {
-      simulate(makeDut()) {dut =>
+      simulate(makeDut()) { dut =>
         dut.io.alloc.ready.poke(true.B)
         for (i <- (0 until capacity)) {
           dut.io.alloc.valid.expect(true.B)
@@ -44,14 +44,14 @@ trait IndexAllocatorSpec extends ChiselSim { this: AnyFreeSpec =>
     }
 
     "No pipe" in {
-      simulate(makeDut()) {dut =>
+      simulate(makeDut()) { dut =>
         dut.io.alloc.ready.poke(true.B)
         dut.io.free.ready.expect(false.B)
       }
     }
 
     "Flow" in {
-      simulate(makeDut()) {dut =>
+      simulate(makeDut()) { dut =>
         dut.io.alloc.ready.poke(true.B)
         for (i <- (0 until capacity)) {
           dut.clock.step()
@@ -64,7 +64,7 @@ trait IndexAllocatorSpec extends ChiselSim { this: AnyFreeSpec =>
     }
 
     "Out of order free" in {
-      simulate(makeDut()) {dut =>
+      simulate(makeDut()) { dut =>
         dut.io.alloc.ready.poke(true.B)
         for (i <- (0 until capacity)) {
           dut.clock.step()
@@ -88,7 +88,7 @@ trait IndexAllocatorSpec extends ChiselSim { this: AnyFreeSpec =>
     }
 
     "Alloc and free on same cycle" in {
-      simulate(makeDut()) {dut =>
+      simulate(makeDut()) { dut =>
         dut.io.alloc.ready.poke(true.B)
         dut.clock.step()
         // We allocated 0

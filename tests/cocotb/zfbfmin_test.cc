@@ -32,27 +32,19 @@ uint32_t num_fcvt_bf16_s_cases __attribute__((section(".data"))) = 0;
 void run_fcvt_s_bf16() {
   for (uint32_t i = 0; i < num_fcvt_s_bf16_cases; i++) {
     uint32_t in = fcvt_s_bf16_cases[i].input;
-    uint32_t rm = fcvt_s_bf16_cases[i].rounding_mode;
     uint32_t out;
     uint32_t flags;
 
     // Clear fflags
     asm volatile("csrw fflags, zero");
 
-    // TODO: remove .word once compiler supports Zfbfmin
-    // fcvt.s.bf16 fa0, fa1
-    // We use macros to insert the instruction with variable rounding mode
-    // Since we can't easily change the instruction's immediate RM field at
-    // runtime without self-modifying code, we'll use dynamic rounding mode (7)
-    // and set the FRM CSR.
     asm volatile(
-        "csrw frm, %[rm];"
         "fmv.w.x fa1, %[in];"
-        ".word 0x4485f553;"  // fcvt.s.bf16 fa0, fa1, dyn
+        "fcvt.s.bf16 fa0, fa1;"
         "fmv.x.w %[out], fa0;"
         "csrr %[flags], fflags;"
         : [out] "=r"(out), [flags] "=r"(flags)
-        : [in] "r"(in), [rm] "r"(rm)
+        : [in] "r"(in)
         : "fa0", "fa1");
 
     fcvt_s_bf16_cases[i].output = out;
@@ -69,11 +61,10 @@ void run_fcvt_bf16_s() {
 
     asm volatile("csrw fflags, zero");
 
-    // TODO: remove .word once compiler supports Zfbfmin
     asm volatile(
         "csrw frm, %[rm];"
         "fmv.w.x fa1, %[in];"
-        ".word 0x4495f553;"  // fcvt.bf16.s fa0, fa1, dyn
+        "fcvt.bf16.s fa0, fa1, dyn;"
         "fmv.x.w %[out], fa0;"
         "csrr %[flags], fflags;"
         : [out] "=r"(out), [flags] "=r"(flags)

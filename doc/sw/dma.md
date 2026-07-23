@@ -35,7 +35,7 @@ Base address: `0x40050000`
 Descriptors must be **32-byte aligned** and reside in memory accessible to the
 DMA (SRAM or DDR). Each descriptor is 32 bytes:
 
-```
+```text
 Offset  Field        Bits      Description
 0x00    src_addr     [31:0]    Source address
 0x04    dst_addr     [31:0]    Destination address

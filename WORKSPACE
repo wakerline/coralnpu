@@ -15,18 +15,17 @@
 workspace(name = "coralnpu_hw")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
+load("//rules:host_cpus.bzl", "host_cpus")
 load(
     "//rules:repos.bzl",
-    "cvfpu_repos",
-    "fpga_repos",
     "coralnpu_repos",
     "coralnpu_repos2",
+    "cvfpu_repos",
+    "fpga_repos",
+    "mpact_repos",
     "rvvi_repos",
     "tflite_repos",
-    "mpact_repos",
 )
-load("//rules:host_cpus.bzl", "host_cpus")
 
 host_cpus(name = "coralnpu_host_cpus")
 
@@ -47,31 +46,112 @@ register_toolchains(
 
 rules_cc_toolchains()
 
+http_archive(
+    name = "rules_java",
+    sha256 = "9de4e178c2c4f98d32aafe5194c3f2b717ae10405caa11bdcb460ac2a6f61516",
+    urls = ["https://github.com/bazelbuild/rules_java/releases/download/9.6.1/rules_java-9.6.1.tar.gz"],
+)
+
 coralnpu_repos()
+
+load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies")
+
+rules_proto_dependencies()
+
+# rules_java deps (needs bazel_features)
+http_archive(
+    name = "bazel_features",
+    sha256 = "07bd2b18764cdee1e0d6ff42c9c0a6111ffcbd0c17f0de38e7f44f1519d1c0cd",
+    strip_prefix = "bazel_features-1.32.0",
+    url = "https://github.com/bazel-contrib/bazel_features/releases/download/v1.32.0/bazel_features-v1.32.0.tar.gz",
+)
+
+http_archive(
+    name = "proto_bazel_features",
+    sha256 = "07bd2b18764cdee1e0d6ff42c9c0a6111ffcbd0c17f0de38e7f44f1519d1c0cd",
+    strip_prefix = "bazel_features-1.32.0",
+    url = "https://github.com/bazel-contrib/bazel_features/releases/download/v1.32.0/bazel_features-v1.32.0.tar.gz",
+)
+
+load("@bazel_features//:deps.bzl", "bazel_features_deps")
+
+bazel_features_deps()
+
+load("@rules_java//java:rules_java_deps.bzl", "compatibility_proxy_repo")
+
+compatibility_proxy_repo()
+
+http_archive(
+    name = "rules_jvm_external",
+    sha256 = "3afe5195069bd379373528899c03a3072f568d33bd96fe037bd43b1f590535e7",
+    strip_prefix = "rules_jvm_external-6.6",
+    url = "https://github.com/bazel-contrib/rules_jvm_external/releases/download/6.6/rules_jvm_external-6.6.tar.gz",
+)
+
+load("@rules_jvm_external//:repositories.bzl", "rules_jvm_external_deps")
+
+rules_jvm_external_deps()
+
+load("@rules_jvm_external//:setup.bzl", "rules_jvm_external_setup")
+
+rules_jvm_external_setup()
+
+load("@rules_jvm_external//:defs.bzl", "maven_install")
+
+maven_install(
+    name = "coralnpu_maven",
+    artifacts = [
+        "org.scala-lang:scala-reflect:2.13.18",
+        "com.thoughtworks.paranamer:paranamer:2.8",
+        "org.json4s:json4s-ast_2.13:4.0.6",
+        "org.json4s:json4s-scalap_2.13:4.0.6",
+        "org.json4s:json4s-core_2.13:4.0.6",
+        "org.json4s:json4s-native_2.13:4.0.6",
+        "org.apache.commons:commons-lang3:3.11",
+        "org.apache.commons:commons-text:1.10.0",
+        "com.github.scopt:scopt_2.13:3.7.1",
+        "net.jcazevedo:moultingyaml_2.13:0.4.2",
+        "io.github.alexarchambault:data-class_2.13:0.2.5",
+        "com.lihaoyi:os-lib_2.13:0.8.1",
+        "com.lihaoyi:geny_2.13:0.7.1",
+        "com.lihaoyi:upickle_2.13:2.0.0",
+        "org.chipsalliance:chisel_2.13:7.0.0-RC1",
+        "org.chipsalliance:chisel-plugin_2.13.6:7.0.0-RC1",
+        "org.chipsalliance:firtool-resolver_2.13:2.0.0",
+        "com.outr:moduload_2.13:1.1.7",
+        "com.outr:scribe_2.13:3.15.2",
+        "edu.berkeley.cs:firrtl_2.13:5.0.0",
+        "org.scalatest:scalatest_2.13:3.2.16",
+        "org.antlr:antlr4-runtime:4.13.1",
+        "net.java.dev.jna:jna:5.14.0",
+    ],
+    maven_install_json = "//third_party:maven_install.json",
+    repositories = [
+        "https://repo1.maven.org/maven2",
+    ],
+)
+
+load("@coralnpu_maven//:defs.bzl", coralnpu_maven_repositories = "pinned_maven_install")
+
+coralnpu_maven_repositories()
 
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 
 protobuf_deps()
 
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
+
 rules_pkg_dependencies()
 
-load("@rules_python//python:repositories.bzl", "py_repositories")
+load("@rules_python//python:repositories.bzl", "py_repositories", "python_register_toolchains")
 
 py_repositories()
-
-load("@rules_python//python:repositories.bzl", "python_register_toolchains")
 
 python_register_toolchains(
     name = "python311",
     python_version = "3.11.6",
 )
-load("@pybind11_bazel//:python_configure.bzl", "python_configure")
-python_configure(
-    name = "local_config_python",
-    python_version = "3",
-    python_interpreter_target = "@python311_x86_64-unknown-linux-gnu//:python",
-)
+
 coralnpu_repos2()
 
 # Scala setup
@@ -94,12 +174,6 @@ load("@io_bazel_rules_scala//testing:scalatest.bzl", "scalatest_repositories", "
 scalatest_repositories()
 
 scalatest_toolchain()
-
-load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies", "rules_proto_toolchains")
-
-rules_proto_dependencies()
-
-rules_proto_toolchains()
 
 load("//rules:deps.bzl", "coralnpu_deps")
 
@@ -162,10 +236,10 @@ filegroup(
     srcs = glob(["**"]),
 )
 """,
-    sha256 = "c9c85f8361e9d02d64474c51e3b3730ba09807cf4610d6d002c49a270458b49c",
-    strip_prefix = "toolchain_kelvin_v2",
+    sha256 = "de06690c2da5cd783d76b2998208bd4db4dcdc22dec146c7b0a5ee1af40d3db7",
+    strip_prefix = "toolchain_coralnpu_v2",
     urls = [
-        "https://storage.googleapis.com/shodan-public-artifacts/toolchain_kelvin_tar_files/toolchain_kelvin_v2-2025-09-11.tar.gz",
+        "https://storage.googleapis.com/shodan-public-artifacts/toolchain_coralnpu_v2-2026-06-29.tar.xz",
     ],
 )
 
@@ -190,30 +264,32 @@ load("@tflm_pip_deps//:requirements.bzl", "install_deps")
 
 install_deps()
 
-http_archive(
-    name = "bazel_features",
-    sha256 = "07bd2b18764cdee1e0d6ff42c9c0a6111ffcbd0c17f0de38e7f44f1519d1c0cd",
-    strip_prefix = "bazel_features-1.32.0",
-    url = "https://github.com/bazel-contrib/bazel_features/releases/download/v1.32.0/bazel_features-v1.32.0.tar.gz",
+pip_parse(
+    name = "gemma_deps",
+    python_interpreter_target = "@python311_x86_64-unknown-linux-gnu//:python",
+    requirements_lock = "//third_party:gemma_requirements.txt",
 )
 
-load("@bazel_features//:deps.bzl", "bazel_features_deps")
+load("@gemma_deps//:requirements.bzl", gemma_install_deps = "install_deps")
 
-bazel_features_deps()
+gemma_install_deps()
 
-load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
+load("@rules_cc//cc:extensions.bzl", cc_compatibility_proxy_repo = "compatibility_proxy_repo")
 
-compatibility_proxy_repo()
+cc_compatibility_proxy_repo()
 
 mpact_repos()
 
 load("@com_google_mpact-riscv//:repos.bzl", "mpact_riscv_repos")
+
 mpact_riscv_repos()
 
 load("@com_google_mpact-riscv//:dep_repos.bzl", "mpact_riscv_dep_repos")
+
 mpact_riscv_dep_repos()
 
 load("@com_google_mpact-riscv//:deps.bzl", "mpact_riscv_deps")
+
 mpact_riscv_deps()
 
 load("@coralnpu_hw//rules:check_folder.bzl", "check_folder")
@@ -228,6 +304,7 @@ load("@internal_check//:repositories.bzl", "synthesis_internal_repo")
 
 synthesis_internal_repo()
 
+# Note: Targets in @netlist_test must be executed from this workspace root.
 local_repository(
     name = "netlist_test",
     path = "internal/netlist_test",

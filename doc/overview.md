@@ -44,7 +44,6 @@ Registers        | Names         | Width
 Vector (64)      | v0..v63       | 256 bits (eg. int32 x8)
 Accumulator      | acc<8><8>     | 8x8x 32 bits
 
-
 ### MAC
 
 The central component of the design is a quantized outer product
