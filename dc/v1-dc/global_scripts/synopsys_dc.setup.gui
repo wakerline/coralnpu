@@ -1,11 +1,11 @@
 regexp {.*/(\S+?)/(\S+?)-(\S+)/\S+$} [pwd] tmp dc GUI_VERSION GUI_DIR
-set GUI_DESIGN_NAME			"CoreMiniAxi"
+set GUI_DESIGN_NAME			"VmeCoreMiniAxi"
 set GUI_WORK_DIR			"../../../dc/$GUI_VERSION-$GUI_DIR"
 set GUI_STD_LIBRARY			"BWP_LVT"
 set GUI_IP_LIBRARY			"SPSRAM128x128 SPSRAM512x128 SPSRAM2048x128"
 set GUI_RTL_FILE			""
 set GUI_RTL_ORDER_FILE			""
-set GUI_VCS_OPTION			"-f coralnpu_dc.f"
+set GUI_VCS_OPTION			"-f /home/wangyy/002_research/coralnpu/dc/v1-dc/run/coralnpu_dc.f"
 set GUI_SDC_FILE			"$GUI_WORK_DIR/local_scripts/common.sdc"
 set GUI_BLOCK_ABSTRACTION_DESIGNS	""
 set GUI_BLOCK_ABSTRACTION_DESIGNS1	""
