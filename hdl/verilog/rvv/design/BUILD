@@ -50,6 +50,35 @@ exports_files(
         "FPnew/fpu_div_sqrt_mvp/norm_div_sqrt_mvp.sv",  # New
         "FPnew/fpu_div_sqrt_mvp/nrbd_nrsc_mvp.sv",  # New
         "FPnew/fpu_div_sqrt_mvp/preprocess_mvp.sv",  # New
+        "Ime/ime.sv",
+        "Ime/ime_acc_bank.sv",
+        "Ime/ime_commit.sv",
+        "Ime/ime_ctrl.sv",
+        "Ime/ime_decode.sv",
+        "Ime/ime_fp_absaddsub.sv",
+        "Ime/ime_fp_addfront.sv",
+        "Ime/ime_fp_format_adapter.sv",
+        "Ime/ime_fp_mulfront.sv",
+        "Ime/ime_fp_rounding.sv",
+        "Ime/ime_geometry.sv",
+        "Ime/ime_fp_ordered_scheduler.sv",
+        "Ime/ime_int_operand_selector.sv",
+        "Ime/ime_int_to_fp32_adapter.sv",
+        "Ime/ime_mx_scale.sv",
+        "Ime/ime_operand_fetch.sv",
+        "Ime/ime_pe_adder.sv",
+        "Ime/ime_pe_adder_fp_lane.sv",
+        "Ime/ime_pe_adder_int_lane.sv",
+        "Ime/ime_pe_array.sv",
+        "Ime/ime_pe_block.sv",
+        "Ime/ime_pe_mulbulk.sv",
+        "Ime/ime_pe_mulbulk_fp_lane.sv",
+        "Ime/ime_pe_mulbulk_int_lane.sv",
+        "Ime/ime_pkg.sv",
+        "Ime/ime_result_packer.sv",
+        "Ime/ime_scheduler.sv",
+        "Ime/ime_subsystem.sv",
+        "Ime/ime_tls_decode.sv",
         "MultiFifo.sv",
         "RvvCore.sv",
         "RvvFrontEnd.sv",
@@ -131,6 +160,17 @@ verilog_library(
     name = "aligner",
     srcs = [
         "Aligner.sv",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+verilog_library(
+    name = "ime_decode",
+    # ime_pkg.sv defines preprocessor constants consumed by ime_decode.sv, so
+    # keep it in a separate leading list instead of relying on lexical sorting.
+    srcs = ["Ime/ime_pkg.sv"] + [
+        "Ime/ime_decode.sv",
+        "Ime/ime_geometry.sv",
     ],
     visibility = ["//visibility:public"],
 )

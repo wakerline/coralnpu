@@ -99,9 +99,102 @@ class Parameters(var m: Seq[MemoryRegion] = Seq(), val hartId: Int = 0, val xlen
   def rvvVlenb: Int = { rvvVlen / 8 }
   // indexing a single byte within one vector register
   def rvvByteIndexWidth: Int = log2Ceil(rvvVlenb)
+  // Number of retirement lanes from RVV core (4 in synthesis, 6 in verification with decoder retirement)
+  def rvvRetireLanes: Int = if (enableVerification) instructionLanes + 2 else instructionLanes
 
   // Enable VME (Zvt) non-tile state and mset* instructions. Requires enableRvv.
-  var enableVme = false
+  var enableVme  = false
+  val vmeTeRatio = 8
+  def vmeTe: Int = { rvvVlen / vmeTeRatio }
+
+  // Zvvm build options. Zvvmm is the common IME base in CoralNPU; the
+  // optional floating-point and tile-memory families may be selected
+  // independently on top of it. These build switches do not by themselves
+  // constitute an architectural extension declaration.
+  var enableZvvmm    = false
+  var enableZvvfmm   = false
+  var enableZvvmtls  = false
+  var enableZvvmttls = false
+  // Floating-point partial-sum model disclosed by the IME implementation.
+  // 0 selects exact partial-product reduction; 1 selects the separately
+  // specified non-exact partial-sum algorithm. The FP datapath consumes this
+  // parameter only when Zvvfmm is enabled.
+  var imeFpPsm = 0
+  // Physical IME execution profile. The architectural result is independent
+  // of these values.  The default is the minimum-area 1x1x1 baseline;
+  // supported accelerated profiles use 2x2x1 or 4x4x1 integer arrays.  FP/MX
+  // remains single-lane until a separately disclosed parallel reduction is
+  // available.
+  var imeMPar     = 1
+  var imeNPar     = 1
+  var imeKPar     = 1
+  // Select the ordinary-integer accumulator/result-path experiment.  Keep the
+  // correctness-first implementation as the default REF configuration; the
+  // switch does not alter FP/MX execution.
+  var imeIntOpt    = false
+  // Stage-2 ordinary-integer streaming experiment.  It builds on the
+  // Stage-1 lane-local accumulator/result path and remains independently
+  // selectable so REF, Stage-1 and Stage-2 are reproducible configurations.
+  var imeIntStream = false
+  // Stage-3 ordinary-integer operand-delivery experiment.  The optimized
+  // selector relies on the Stage-2 streaming geometry and remains separately
+  // selectable for an exact Stage-2/Stage-3 ablation.
+  var imeOdnOpt = false
+  // Stage-42 result-index experiment.  The optimized ODN already computes
+  // the architectural C element's physical index; carry that index with the
+  // PE packet so the direct result packer does not repeat the tile mapping.
+  // Keep a separate, default-off switch for an exact REF/OPT ablation.
+  var imeResultIndexOpt = false
+  // Stage-42 integer PE input experiment.  Share the runtime EEW/sign
+  // extension once per physical A row and B column instead of repeating it
+  // in every output lane.  The option preserves the existing mulbulk pipeline
+  // and is restricted to the already verified streaming integer profile.
+  var imeIntPreextendOpt = false
+  // Stage-42 shared-LSU Tile exact-data experiment.  Reuse the already
+  // elaborated lead-relative normal window for the at-most-four bytes of one
+  // SEW8/16/32 Tile element instead of rebuilding a 128-cell data mux.  This
+  // affects no address, request-count, fault, restart, or snapshot state.
+  var imeTileExactWindowOpt = false
+  // Stage-32 operand-snapshot turnaround.  When enabled, the IME consumes
+  // the current VRF response and issues the next tagged register request in
+  // the same cycle.  The default retains the Stage-31 one-request-at-a-time
+  // behavior and the option does not add an architectural state element.
+  var imeFetchPipeline = false
+  // CS-IME v2 ordered FP/FP-input-MX execution.  The option interleaves
+  // independent output cells from one already-snapshotted macro while keeping
+  // each cell's K reduction order unchanged.  Integer-input MX remains on the
+  // reference path.
+  var imeFpOrdered = false
+  def imeIntLanes: Int = imeMPar * imeNPar * imeKPar
+  // The verified FP/MX profile has one lane so its disclosed reduction order
+  // cannot be changed by an elaboration option.
+  def imeFpLanes: Int = 1
+
+  def validateFeatureDependencies(): Unit = {
+    require(!enableVme || enableRvv, "enableVme requires enableRvv")
+    require(!enableZvvmm || enableRvv, "enableZvvmm requires enableRvv")
+    require(!enableZvvfmm || enableZvvmm, "enableZvvfmm requires enableZvvmm")
+    require(!enableZvvfmm || enableFloat, "enableZvvfmm requires enableFloat")
+    require(!enableZvvmtls || enableZvvmm, "enableZvvmtls requires enableZvvmm")
+    require(!enableZvvmttls || enableZvvmm, "enableZvvmttls requires enableZvvmm")
+    require(imeFpPsm == 0 || imeFpPsm == 1, "imeFpPsm must be 0 or 1")
+    require(imeFpPsm == 0 || enableZvvfmm, "imeFpPsm=1 requires enableZvvfmm")
+    require(Seq(1, 2, 4).contains(imeMPar), "imeMPar must be 1, 2, or 4")
+    require(Seq(1, 2, 4).contains(imeNPar), "imeNPar must be 1, 2, or 4")
+    require(Seq(1, 2, 4).contains(imeKPar), "imeKPar must be 1, 2, or 4")
+    require(!imeIntOpt || enableZvvmm, "imeIntOpt requires enableZvvmm")
+    require(!imeIntStream || imeIntOpt, "imeIntStream requires imeIntOpt")
+    require(!imeOdnOpt || imeIntStream, "imeOdnOpt requires imeIntStream")
+    require(!imeResultIndexOpt || imeOdnOpt, "imeResultIndexOpt requires imeOdnOpt")
+    require(!imeIntPreextendOpt || imeIntStream, "imeIntPreextendOpt requires imeIntStream")
+    require(
+      !imeTileExactWindowOpt || enableZvvmtls || enableZvvmttls,
+      "imeTileExactWindowOpt requires enableZvvmtls or enableZvvmttls"
+    )
+    require(!imeFetchPipeline || enableZvvmm, "imeFetchPipeline requires enableZvvmm")
+    require(!imeFpOrdered || enableZvvfmm, "imeFpOrdered requires enableZvvfmm")
+    require(!(enableVme && enableZvvmm), "enableVme and enableZvvmm are mutually exclusive")
+  }
 
   def useRetirementBuffer: Boolean = { enableVerification }
 
@@ -121,7 +214,8 @@ class Parameters(var m: Seq[MemoryRegion] = Seq(), val hartId: Int = 0, val xlen
   val rvvRegfileBaseAddr            = 64
   val rvvRegCount                   = 32
   val rvvRegCountWidth              = log2Ceil(rvvRegCount)
-  val retirementBufferSize          = 8
+  val retirementBufferSize          = 16
+  val retirementLanes               = 8
   def retirementBufferIdxWidth: Int = {
     val activeFloatRegCount = (if (enableFloat) { floatRegCount }
                                else { 0 })
