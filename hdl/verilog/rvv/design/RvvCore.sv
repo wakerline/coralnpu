@@ -27,9 +27,6 @@ module RvvCore #(parameter N = 4,
   input logic [1:0] vxrm,
   input logic vxsat,
   input logic [2:0] frm,
-  input logic imeGlobalHeadValid,
-  input logic [3:0] imeGlobalHeadTag,
-  input logic flush,
 
   // Instruction input.
   input logic [N-1:0] inst_valid,
@@ -77,87 +74,43 @@ module RvvCore #(parameter N = 4,
   input  RegAddrT  [`NUM_LSU-1:0] uop_lsu_addr_lsu2rvv,
   input  VRegDataT [`NUM_LSU-1:0] uop_lsu_wdata_lsu2rvv,
   input  logic     [`NUM_LSU-1:0] uop_lsu_last_lsu2rvv,
-  input  logic     [`NUM_LSU-1:0][$clog2(`VLENB):0] uop_lsu_ff_tail_index_lsu2rvv,
   output logic     [`NUM_LSU-1:0] uop_lsu_ready_rvv2lsu,
 
-  // Vector CSR writeback. With IME_ON, RVVConfigState carries the independent
-  // ime_lambda/ime_bs/ime_altfmt_a/ime_altfmt_b and output ime_altfmt
-  // snapshot fields through this existing typed boundary; no parallel ZVT or
-  // scalar ports are reused.
+  // Vector CSR writeback
   output vcsr_valid,
   output RVVConfigState vector_csr,
   input vcsr_ready,
 
-  // Front-end architectural config state. The IME fields are maintained by
-  // RvvFrontEnd and returned to Chisel through this typed output.
+  // Config state
   output config_state_valid,
   output RVVConfigState config_state,
-  output logic vset_vstart_clear,
 
   // Idle
   output logic rvv_idle,
   output logic [$clog2(2*N + 1)-1:0] queue_capacity,
 
   // Writeback from reorder buffer
-`ifdef TB_SUPPORT
-  output ROB2RT_t [`NUM_RT_UOP+`NUM_DE_INST-1:0] rd_rob2rt_o,
-  output logic    [`NUM_RT_UOP+`NUM_DE_INST-1:0] rd_valid_rob2rt_o,
-`else
   output ROB2RT_t [`NUM_RT_UOP-1:0] rd_rob2rt_o,
   output logic    [`NUM_RT_UOP-1:0] rd_valid_rob2rt_o,
-`endif
 
   // Trap output
   output logic trap_valid_o,
   output RVVInstruction trap_data_o,
-`ifdef IME_ON
-  // Legal IME command accepted by the authoritative backend DE1 decoder.
-  output logic ime_legal_accept_o,
-`endif
 
   // VXSAT update from backend (fixes C3 bug: previously dead-end wires)
   output logic                            wr_vxsat_valid_o,
-  output logic    [`VCSR_VXSAT_WIDTH-1:0] wr_vxsat_o,
-
-  // Floating point fflags update from backend
-  output logic                            wr_fflags_valid_o,
-  output logic    [4:0]                   wr_fflags_o
-`ifdef ZVT_ON
-  ,
-  // VME to LSU (store data)
-  output logic uop_vme2lsu_valid,
-  output VRegDataT uop_vme2lsu_data,
-  input logic uop_vme2lsu_ready,
-
-  // LSU to VME (load data)
-  input logic uop_lsu2vme_valid,
-  input VRegDataT uop_lsu2vme_data,
-  output logic uop_lsu2vme_ready
-`endif
+  output logic    [`VCSR_VXSAT_WIDTH-1:0] wr_vxsat_o
 );
   logic [N-1:0] frontend_cmd_valid;
   RVVCmd [N-1:0] frontend_cmd_data;
-  logic frontend_trap_valid;
-  RVVInstruction frontend_trap_data;
-`ifdef IME_ON
-  logic backend_ime_illegal_trap_valid;
-  RVVInstruction backend_ime_illegal_trap_data;
-`endif
-  logic frontend_flush;
-`ifdef IME_ON
-  assign frontend_flush = flush | backend_ime_illegal_trap_valid;
-`else
-  assign frontend_flush = flush;
-`endif
   logic [$clog2(2*N + 1)-1:0] queue_capacity_internal;
-  RvvFrontEnd#(.N(N), .RegDataT(RegDataT), .RegAddrT(RegAddrT)) frontend(
+  RvvFrontEnd#(.N(N)) frontend(
       .clk(clk),
       .rstn(rstn),
       .vstart_i(vstart),
       .vxrm_i(vxrm),
       .vxsat_i(vxsat),
       .frm_i(frm),
-      .flush_i(frontend_flush),
       .inst_valid_i(inst_valid),
       .inst_data_i(inst_data),
       .inst_ready_o(inst_ready),
@@ -171,26 +124,16 @@ module RvvCore #(parameter N = 4,
       .cmd_data_o(frontend_cmd_data),
       .queue_capacity_i(queue_capacity_internal),
       .queue_capacity_o(queue_capacity),
-      .trap_valid_o(frontend_trap_valid),
-      .trap_data_o(frontend_trap_data),
+      .trap_valid_o(trap_valid_o),
+      .trap_data_o(trap_data_o),
       .config_state_valid(config_state_valid),
-      .config_state(config_state),
-      .vset_vstart_clear(vset_vstart_clear)
+      .config_state(config_state)
   );
 
   // Backpressure from backend fifo
   logic   [$clog2(`CQ_DEPTH):0] remaining_count_cq2rvs;
   // Back-pressure frontend
   always_comb begin
-`ifdef IME_ON
-    if (frontend_flush) begin
-      // The backend command queue reports zero capacity while flushing the
-      // illegal IME, including the later scalar trap-retirement flush edge.
-      // Preserve the FrontEnd capacity invariant while that same edge
-      // discards all younger buffered commands.
-      queue_capacity_internal = 2*N;
-    end else
-`endif
     if (remaining_count_cq2rvs > 2*N) begin
       queue_capacity_internal = 2*N;
     end else begin
@@ -224,7 +167,6 @@ module RvvCore #(parameter N = 4,
             uop_lsu_valid_lsu2rvv[i] && !uop_lsu_last_lsu2rvv[i]);
         uop_lsu_lsu2rvv[i].vregfile_write_addr = uop_lsu_addr_lsu2rvv[i];
         uop_lsu_lsu2rvv[i].vregfile_write_data = uop_lsu_wdata_lsu2rvv[i];
-        uop_lsu_lsu2rvv[i].ff_tail_index = uop_lsu_ff_tail_index_lsu2rvv[i];
         uop_lsu_lsu2rvv[i].lsu_vstore_last = (
             uop_lsu_valid_lsu2rvv[i] && uop_lsu_last_lsu2rvv[i]);
         `ifdef TB_SUPPORT
@@ -252,21 +194,13 @@ module RvvCore #(parameter N = 4,
   end
 
   // Floating point regfile write-back
-  // TODO(derekjchow): Properly arbitrate write-back tie-offs by extending
-  // interface. For time being, only accept from slot 0.
   logic [`NUM_RT_UOP-1:0]                           rvv2rvs_frd_valid;
-`ifdef TB_SUPPORT
-  logic [`NUM_RT_UOP-1:0][`PC_WIDTH-1:0]            rvv2rvs_frd_pc;
-`endif
-  logic [`NUM_RT_UOP-1:0][`ROB_TAG_WIDTH-1:0]       rvv2rvs_frd_rob_tag;
   logic [`NUM_RT_UOP-1:0][`REGFILE_INDEX_WIDTH-1:0] rvv2rvs_frd_addr;
   logic [`NUM_RT_UOP-1:0][`XLEN-1:0]                rvv2rvs_frd_data;
   logic [`NUM_RT_UOP-1:0]                           rvv2rvs_frd_ready;
   always_comb begin
     rvv2rvs_frd_ready[0] = async_frd_ready;
-    for (int i = 1; i < `NUM_RT_UOP; i++) begin
-      rvv2rvs_frd_ready[i] = 0;
-    end
+    rvv2rvs_frd_ready[1] = 0;
   end
   assign async_frd_valid = rvv2rvs_frd_valid[0];
   assign async_frd_addr = rvv2rvs_frd_addr[0];
@@ -283,45 +217,34 @@ module RvvCore #(parameter N = 4,
   logic                            wr_vxsat_valid;
   logic    [`VCSR_VXSAT_WIDTH-1:0] wr_vxsat;
 
-  // Floating point CSR update. Retire is always ready to publish the sticky
-  // exception update, matching the original RVV backend contract.
+  // Floating point CSR Update, unused for now
   logic    rt2fcsr_write_valid;
   RVFEXP_t rt2fcsr_write_data;
   logic    fcsr2rt_write_ready;
-  assign fcsr2rt_write_ready = 1'b1;
+  always_comb begin
+    // TODO(derekjchow): Actually accept and use
+    fcsr2rt_write_ready = 1;
+  end
 
-  // Trap handling
+  // Trap handling tie-off
   logic  trap_valid_rvs2rvv;
   logic  trap_ready_rvv2rvs;
-  assign trap_valid_rvs2rvv = flush;
+  always_comb begin
+    trap_valid_rvs2rvv = 0;
+  end
 
+  // Tie-off VME LSU interfaces
+  // TODO: Support these
 `ifdef ZVT_ON
-  logic                 uop_vme2lsu_vld;
-  UOP_VME2LSU_t         uop_vme2lsu;
-  logic                 uop_vme2lsu_rdy;
-  logic                 uop_lsu2vme_vld;
-  UOP_LSU2VME_t         uop_lsu2vme;
-  logic                 uop_lsu2vme_rdy;
-
-  assign uop_vme2lsu_valid = uop_vme2lsu_vld;
-  assign uop_vme2lsu_data  = uop_vme2lsu.r_data;
-  assign uop_vme2lsu_rdy   = uop_vme2lsu_ready;
-
-  assign uop_lsu2vme_vld    = uop_lsu2vme_valid;
-  assign uop_lsu2vme.w_data = uop_lsu2vme_data;
-`ifdef TB_SUPPORT
-  assign uop_lsu2vme.uop_pc    = 0;
-  assign uop_lsu2vme.uop_index = 0;
-`endif
-  assign uop_lsu2vme_ready = uop_lsu2vme_rdy;
+  logic                 uop_vme2lsu_vld_dummy;
+  UOP_VME2LSU_t         uop_vme2lsu_dummy;
+  logic                 uop_lsu2vme_rdy_dummy;
 `endif
 
   logic   [`ISSUE_LANE-1:0] insts_ready_cq2rvs;
   logic rvv_backend_idle;
   assign rvv_idle = rvv_backend_idle && (frontend_cmd_valid == 0);
   rvv_backend backend(
-      .imeGlobalHeadValid(imeGlobalHeadValid),
-      .imeGlobalHeadTag(imeGlobalHeadTag),
       .clk(clk),
       .rst_n(rstn),
       .insts_valid_rvs2cq(frontend_cmd_valid),
@@ -343,10 +266,6 @@ module RvvCore #(parameter N = 4,
 
 `ifdef ZVE32F_ON
       .async_frd_valid(rvv2rvs_frd_valid),
-`ifdef TB_SUPPORT
-      .async_frd_pc(rvv2rvs_frd_pc),
-`endif
-      .async_frd_rob_tag(rvv2rvs_frd_rob_tag),
       .async_frd_addr(rvv2rvs_frd_addr),
       .async_frd_data(rvv2rvs_frd_data),
       .async_frd_ready(rvv2rvs_frd_ready),
@@ -363,11 +282,6 @@ module RvvCore #(parameter N = 4,
 `endif
       .trap_valid_rvs2rvv(trap_valid_rvs2rvv),
       .trap_ready_rvv2rvs(trap_ready_rvv2rvs),
-`ifdef IME_ON
-      .ime_illegal_trap_valid_o(backend_ime_illegal_trap_valid),
-      .ime_illegal_trap_data_o(backend_ime_illegal_trap_data),
-      .ime_legal_accept_o(ime_legal_accept_o),
-`endif
       .vcsr_valid(vcsr_valid),
       .vector_csr(vector_csr),
       .vcsr_ready(vcsr_ready),
@@ -375,43 +289,17 @@ module RvvCore #(parameter N = 4,
       .rvv_idle(rvv_backend_idle),
       .rd_rob2rt_o(rd_rob2rt_o)
 `ifdef ZVT_ON
-      ,.uop_vme2lsu_vld(uop_vme2lsu_vld),
-      .uop_vme2lsu(uop_vme2lsu),
-      .uop_vme2lsu_rdy(uop_vme2lsu_rdy),
-      .uop_lsu2vme_vld(uop_lsu2vme_vld),
-      .uop_lsu2vme(uop_lsu2vme),
-      .uop_lsu2vme_rdy(uop_lsu2vme_rdy),
-      .vme_lsuflush_vld(1'b0),
-      .vme_lsuflush_rdy(),
-      .vmeRtVld(),
-      .vmeRt(),
-      .vmeRtRdy(1'b1)
+      ,.uop_vme2lsu_vld(uop_vme2lsu_vld_dummy),
+      .uop_vme2lsu(uop_vme2lsu_dummy),
+      .uop_vme2lsu_rdy(1'b0),
+      .uop_lsu2vme_vld(1'b0),
+      .uop_lsu2vme('0),
+      .uop_lsu2vme_rdy(uop_lsu2vme_rdy_dummy)
 `endif
   );
-
-`ifdef IME_ON
-  // A backend illegal token is necessarily older than any command still in
-  // the FrontEnd, so it wins the only possible simultaneous indication.
-  assign trap_valid_o = backend_ime_illegal_trap_valid |
-      frontend_trap_valid;
-  assign trap_data_o = backend_ime_illegal_trap_valid ?
-      backend_ime_illegal_trap_data : frontend_trap_data;
-`else
-  assign trap_valid_o = frontend_trap_valid;
-  assign trap_data_o = frontend_trap_data;
-`endif
 
   // Connect vxsat signals to outputs (fixes C3 bug)
   assign wr_vxsat_valid_o = wr_vxsat_valid;
   assign wr_vxsat_o = wr_vxsat;
-
-  // Connect fflags signals to outputs
-`ifdef ZVE32F_ON
-  assign wr_fflags_valid_o = rt2fcsr_write_valid;
-  assign wr_fflags_o = rt2fcsr_write_data;
-`else
-  assign wr_fflags_valid_o = 1'b0;
-  assign wr_fflags_o = 5'b0;
-`endif
 
 endmodule

@@ -75,20 +75,12 @@ class SCore(p: Parameters) extends Module {
   dispatch.io.retirement_buffer_empty        := rob_io.empty
   dispatch.io.retirement_buffer_trap_pending := rob_io.trapPending
   if (p.enableRvv) {
-    rob_io.isVector.get        := dispatch.io.isVector.get
     rob_io.writeAddrVector.get := dispatch.io.rvvRdMark.get
-    (0 until p.rvvRetireLanes).foreach(i => {
-      val retire = io.rvvcore.get.rd_rob2rt_o(i)
-      val imeTrapCompletion = if (p.enableZvvmm) {
-        retire.trap_flag && retire.is_ime.get
-      } else false.B
-      rob_io.writeDataVector.get(i).valid        := retire.valid && !imeTrapCompletion
-      rob_io.writeDataVector.get(i).bits.addr    := retire.w_index
-      rob_io.writeDataVector.get(i).bits.rob_tag := retire.rob_tag
-      if (p.enableVerification) {
-        rob_io.writeDataVector.get(i).bits.data.get   := io.rvvcore.get.rd_rob2rt_o(i).w_data.get
-        rob_io.writeDataVector.get(i).bits.uop_pc.get := io.rvvcore.get.rd_rob2rt_o(i).uop_pc.get
-      }
+    (0 until p.instructionLanes).foreach(i => {
+      rob_io.writeDataVector.get(i).valid               := io.rvvcore.get.rd_rob2rt_o(i).valid
+      rob_io.writeDataVector.get(i).bits.addr           := io.rvvcore.get.rd_rob2rt_o(i).w_index
+      rob_io.writeDataVector.get(i).bits.data           := io.rvvcore.get.rd_rob2rt_o(i).w_data
+      rob_io.writeDataVector.get(i).bits.uop_pc         := io.rvvcore.get.rd_rob2rt_o(i).uop_pc
       rob_io.writeDataVector.get(i).bits.last_uop_valid := io.rvvcore.get
         .rd_rob2rt_o(i)
         .last_uop_valid
@@ -165,12 +157,10 @@ class SCore(p: Parameters) extends Module {
   if (p.enableRvv) {
     fault_manager.io.in.rvv_fault.get.valid       := io.rvvcore.get.trap.valid
     fault_manager.io.in.rvv_fault.get.bits.mepc   := io.rvvcore.get.trap.bits.pc
-    fault_manager.io.in.rvv_fault.get.bits.mcause := 2.U
-    fault_manager.io.in.rvv_fault.get.bits.mtval  := io.rvvcore.get.trap.bits.originalEncoding()
+    fault_manager.io.in.rvv_fault.get.bits.mcause := 2.U(32.W)
+    fault_manager.io.in.rvv_fault.get.bits.mtval  :=
+      io.rvvcore.get.trap.bits.originalEncoding()
     fault_manager.io.in.rvv_fault.get.bits.decode := false.B
-    fault_manager.io.in.rvv_fault.get.bits.is_rvv.get := true.B
-    fault_manager.io.in.rvv_fault.get.bits.rob_tag.get := io.rvvcore.get.trap.bits.rob_tag
-    fault_manager.io.in.rvv_fault.get.bits.vstart.get  := MakeInvalid(0.U)
   }
   bru(0).io.fault_manager.get := fault_manager.io.out
 
@@ -191,7 +181,7 @@ class SCore(p: Parameters) extends Module {
     bru(i).io.target          := regfile.io.target(i)
     dispatch.io.jalrTarget(i) := regfile.io.target(i)
     rob_io.targets(i)         := dispatch.io.bruTarget(i)
-    rob_io.jalrTargets(i) := Cat(regfile.io.target(i).data(p.programCounterBits - 1, 1), 0.U(1.W))
+    rob_io.jalrTargets(i)     := regfile.io.target(i).data
   }
 
   bru(0).io.csr.get <> csr.io.bru
@@ -249,15 +239,10 @@ class SCore(p: Parameters) extends Module {
   // Load/Store Unit
   lsu.io.busPort := regfile.io.busPort
   lsu.io.req <> dispatch.io.lsu
-  lsu.io.pipelineFlush := rob_io.trapRetired
   if (p.enableRvv) {
     lsu.io.rvvState.get := io.rvvcore.get.configState
     lsu.io.lsu2rvv.get <> io.rvvcore.get.lsu2rvv
     io.rvvcore.get.rvv2lsu <> lsu.io.rvv2lsu.get
-    if (p.enableVme) {
-      lsu.io.lsu2vme.get <> io.rvvcore.get.lsu2vme.get
-      io.rvvcore.get.vme2lsu.get <> lsu.io.vme2lsu.get
-    }
   }
 
   // ---------------------------------------------------------------------------
@@ -332,7 +317,7 @@ class SCore(p: Parameters) extends Module {
 
   // RV32F extension
   val floatCore       = Option.when(p.enableFloat)(FloatCore(p))
-  val floatReadPorts  = if (p.enableRvv) 4 else 3
+  val floatReadPorts  = 3
   val floatWritePorts = 2
   val fRegfile        =
     Option.when(p.enableFloat)(Module(new FRegfile(p, floatReadPorts, floatWritePorts)))
@@ -346,14 +331,16 @@ class SCore(p: Parameters) extends Module {
       false.B,
       Seq(
         io.dm.float_rs.get.valid             -> true.B,
-        floatCore.get.io.read_ports(0).valid -> true.B
+        floatCore.get.io.read_ports(0).valid -> true.B,
+        dispatch.io.frs1Read.get(0).valid    -> true.B
       )
     )
     fRegfile.get.io.read_ports(0).addr := MuxCase(
       0.U,
       Seq(
         io.dm.float_rs.get.valid             -> io.dm.float_rs.get.addr,
-        floatCore.get.io.read_ports(0).valid -> floatCore.get.io.read_ports(0).addr
+        floatCore.get.io.read_ports(0).valid -> floatCore.get.io.read_ports(0).addr,
+        dispatch.io.frs1Read.get(0).valid    -> dispatch.io.frs1Read.get(0).addr
       )
     )
     floatCore.get.io.read_ports(0).data := fRegfile.get.io.read_ports(0).data
@@ -363,11 +350,6 @@ class SCore(p: Parameters) extends Module {
       fRegfile.get.io.read_ports(j).valid := floatCore.get.io.read_ports(j).valid
       fRegfile.get.io.read_ports(j).addr  := floatCore.get.io.read_ports(j).addr
       floatCore.get.io.read_ports(j).data := fRegfile.get.io.read_ports(j).data
-    }
-
-    if (p.enableRvv) {
-      fRegfile.get.io.read_ports(3).valid := dispatch.io.frs1Read.get(0).valid
-      fRegfile.get.io.read_ports(3).addr  := dispatch.io.frs1Read.get(0).addr
     }
 
     // Broadcast data back from read port 0 to debug interface
@@ -440,12 +422,6 @@ class SCore(p: Parameters) extends Module {
       rob_io.writeDataFloat.get(i).bits.addr := fRegfile.get.io.write_ports(i).addr
       rob_io.writeDataFloat.get(i).bits.data := fRegfile.get.io.write_ports(i).data.asWord
     })
-  } else if (p.enableRvv) {
-    // Without an architectural floating-point register file, vector
-    // instructions that write an F register are illegal. Keep the otherwise
-    // unconditional RVV backend port fail-closed instead of accepting and
-    // silently dropping an unexpected writeback.
-    io.rvvcore.get.async_frd.ready := false.B
   }
 
   val mluDvuOffset = p.instructionLanes
@@ -474,30 +450,15 @@ class SCore(p: Parameters) extends Module {
     regfile.io.writeMask(i).valid := writeMask(i)
   }
   regfile.io.debugWriteValid := io.dm.scalar_rd.valid
-  regfile.io.pipelineFlush   := rob_io.trapRetired
-  fRegfile.foreach(_.io.pipelineFlush := rob_io.trapRetired)
 
   // ---------------------------------------------------------------------------
   // Rvv Extension
   if (p.enableRvv) {
-    // Connect dispatch with dedicated ROB tag metadata
-    val tagWidth = log2Ceil(p.retirementBufferSize)
-    for (i <- 0 until p.instructionLanes) {
-      val prevFires = PopCount((0 until i).map(j => dispatch.io.inst(j).fire))
-      val tag       =
-        if (p.retirementBufferSize > 1) (rob_io.enqPtr + prevFires)(tagWidth - 1, 0) else 0.U
-
-      io.rvvcore.get.inst(i).valid        := dispatch.io.rvv.get(i).valid
-      io.rvvcore.get.inst(i).bits         := dispatch.io.rvv.get(i).bits
-      io.rvvcore.get.inst(i).bits.pc      := dispatch.io.rvv.get(i).bits.pc
-      io.rvvcore.get.inst(i).bits.rob_tag := tag
-      dispatch.io.rvv.get(i).ready        := io.rvvcore.get.inst(i).ready
-    }
+    // Connect dispatch
+    dispatch.io.rvv.get <> io.rvvcore.get.inst
     dispatch.io.rvvState.get         := io.rvvcore.get.configState
     dispatch.io.rvvIdle.get          := io.rvvcore.get.rvv_idle
     dispatch.io.rvvQueueCapacity.get := io.rvvcore.get.queue_capacity
-    dispatch.io.imeLegalAccept.foreach(_ := io.rvvcore.get.imeLegalAccept.get)
-    dispatch.io.imeTrapValid.foreach(_ := io.rvvcore.get.trap.valid)
 
     // Register inputs
     io.rvvcore.get.rs := regfile.io.readData
@@ -508,12 +469,12 @@ class SCore(p: Parameters) extends Module {
       // ports work.
       val rvvFrsReg = Reg(Vec(p.instructionLanes, UInt(32.W)))
       for (i <- 0 until p.instructionLanes) {
-        // We use read_ports(3) for all lanes because scalar float operands
+        // We use read_ports(0) for all lanes because scalar float operands
         // are currently restricted to slot 0.
         rvvFrsReg(i) :=
           Mux(
             dispatch.io.frs1Read.get(i).valid,
-            fRegfile.get.io.read_ports(3).data.asWord,
+            fRegfile.get.io.read_ports(0).data.asWord,
             rvvFrsReg(i)
           )
         io.rvvcore.get.frs(i) := rvvFrsReg(i)
@@ -524,22 +485,15 @@ class SCore(p: Parameters) extends Module {
       }
     }
 
-    val fault_vstart = fault_manager.io.out.bits.vstart.getOrElse(MakeInvalid(0.U))
-    val vstart_write = Mux(fault_vstart.valid, fault_vstart, csr.io.rvv.get.vstart_write)
-    io.rvvcore.get.csr.vstart_write := vstart_write
+    io.rvvcore.get.csr.vstart_write <> csr.io.rvv.get.vstart_write
     io.rvvcore.get.csr.vxrm_write <> csr.io.rvv.get.vxrm_write
     io.rvvcore.get.csr.vxsat_write <> csr.io.rvv.get.vxsat_write
-    io.rvvcore.get.csr.frm      := csr.io.rvv.get.frm
-    csr.io.rvv.get.vstart       := io.rvvcore.get.csr.vstart
-    csr.io.rvv.get.vl           := io.rvvcore.get.configState.bits.vl
-    csr.io.rvv.get.vtype        := io.rvvcore.get.configState.bits.vtype
-    csr.io.rvv.get.vxrm         := io.rvvcore.get.csr.vxrm
-    csr.io.rvv.get.vxsat        := io.rvvcore.get.csr.vxsat
-    csr.io.rvv.get.fflags       := io.rvvcore.get.csr.fflags
-    io.rvvcore.get.imeGlobalHeadValid := rob_io.imeGlobalHeadValid
-    io.rvvcore.get.imeGlobalHeadTag := rob_io.imeGlobalHeadTag
-    io.rvvcore.get.flush        := rob_io.trapRetired
-    io.rvvcore.get.clear_vstart := rob_io.clearVstart.getOrElse(false.B)
+    io.rvvcore.get.csr.frm := csr.io.rvv.get.frm
+    csr.io.rvv.get.vstart  := io.rvvcore.get.csr.vstart
+    csr.io.rvv.get.vl      := io.rvvcore.get.configState.bits.vl
+    csr.io.rvv.get.vtype   := io.rvvcore.get.configState.bits.vtype
+    csr.io.rvv.get.vxrm    := io.rvvcore.get.csr.vxrm
+    csr.io.rvv.get.vxsat   := io.rvvcore.get.csr.vxsat
     if (p.enableVme) {
       csr.io.rvv.get.mtype := io.rvvcore.get.configState.bits.mtype.get
     } else {

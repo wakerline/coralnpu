@@ -42,11 +42,6 @@ module rvv_backend_dispatch
     rs_dp2zvt,
     rs_ready_zvt2dp,
 `endif
-`ifdef IME_ON
-    rs_valid_dp2ime,
-    rs_dp2ime,
-    rs_ready_ime2dp,
-`endif
     rs_valid_dp2lsu,
     rs_dp2lsu,
     rs_ready_lsu2dp,
@@ -57,14 +52,6 @@ module rvv_backend_dispatch
     uop_dp2rob,
     uop_ready_rob2dp,
     rob_entry_rob2dp,
-`ifdef IME_ON
-`ifdef IME_OPERAND_RS
-    ime_collector_active,
-    ime_collector_entry,
-`endif
-    ime_read_lock_mask,
-    ime_write_lock_mask,
-`endif
     rd_index_dp2vrf,        
     rd_data_vrf2dp,
     v0_mask_vrf2dp,
@@ -116,14 +103,6 @@ module rvv_backend_dispatch
     input  logic          [`NUM_DP_UOP-1:0]       rs_ready_zvt2dp;
 `endif
 
-`ifdef IME_ON
-// One IME macro instruction is dispatched through the ordinary UOP path.  The
-// selected lane supplies the real ROB tag; operand groups are fetched by IME.
-    output logic          [`NUM_DP_UOP-1:0]       rs_valid_dp2ime;
-    output IME_RS_t       [`NUM_DP_UOP-1:0]       rs_dp2ime;
-    input  logic          [`NUM_DP_UOP-1:0]       rs_ready_ime2dp;
-`endif
-
 // Dispatch unit to LSU 
     // to LSU RS
     output logic          [`NUM_DP_UOP-1:0]       rs_valid_dp2lsu;
@@ -140,23 +119,12 @@ module rvv_backend_dispatch
     input  logic          [`NUM_DP_UOP-1:0]       uop_ready_rob2dp;
     input  logic          [`ROB_DEPTH_WIDTH-1:0]  rob_entry_rob2dp;
 
-`ifdef IME_ON
-// IME register-group scoreboard. Read locks protect operand capture (WAR);
-// write locks protect the C result slot until architectural commit (RAW/WAW).
-`ifdef IME_OPERAND_RS
-    input logic ime_collector_active;
-    input IME_RS_t ime_collector_entry;
-`endif
-    input  logic [31:0] ime_read_lock_mask;
-    input  logic [31:0] ime_write_lock_mask;
-`endif
-
 // Dispatch unit sends read request to VRF for vector data.
 // Dispatch unit to VRF unit
 // rd_data would be return from VRF at the current cycle.
-    output logic [`NUM_DP_VRF-1:0][`REGIDX_WIDTH-1:0] rd_index_dp2vrf;          
-    input  logic [`NUM_DP_VRF-1:0][`VLEN-1:0]         rd_data_vrf2dp;
-    input  logic [`VLEN-1:0]                          v0_mask_vrf2dp;
+    output logic [`NUM_DP_VRF-1:0][`REGFILE_INDEX_WIDTH-1:0] rd_index_dp2vrf;          
+    input  logic [`NUM_DP_VRF-1:0][`VLEN-1:0]                rd_data_vrf2dp;
+    input  logic [`VLEN-1:0]                                 v0_mask_vrf2dp;
 
 // Dispatch unit accept all ROB entry to determine if vs_data of RS is from ROB or not
 // ROB unit to Dispatch unit
@@ -187,9 +155,6 @@ module rvv_backend_dispatch
     logic [`NUM_DP_UOP-1:0][$clog2(`VL_WIDTH)-1:0]  vlmax_shift;
 
     logic [`NUM_DP_UOP-1:0][`ROB_DEPTH_WIDTH-1:0]   rob_address;
-`ifdef IME_ON
-    logic [`NUM_DP_UOP-1:0]                         ime_hazard;
-`endif
 
 // ---code start------------------------------------------------------
     genvar i;
@@ -197,7 +162,7 @@ module rvv_backend_dispatch
     // vlmax = lmul * `VLENB / sew 
     generate
       for (i=0; i<`NUM_DP_UOP; i++) begin : gen_vlmax
-        assign lmul[i] = uop_uop2dp[i].uop_exe_unit==VEU_PMT ? uop_uop2dp[i].vector_csr.lmul_orig : uop_uop2dp[i].vector_csr.lmul;
+        assign lmul[i] = uop_uop2dp[i].uop_exe_unit==PMT ? uop_uop2dp[i].vector_csr.lmul_orig : uop_uop2dp[i].vector_csr.lmul;
         assign vlmax_shift[i] = ($clog2(`VL_WIDTH))'(lmul[i][1:0]) 
                                 + $clog2(`VLENB) 
                                 - ($clog2(`VL_WIDTH))'(uop_uop2dp[i].vector_csr.sew) 
@@ -217,101 +182,6 @@ module rvv_backend_dispatch
             assign suc_uop[i].vm        = uop_uop2dp[i].vm;
         end
     endgenerate
-
-`ifdef IME_ON
-    always_comb begin
-      for (int lane = 0; lane < `NUM_DP_UOP; lane++) begin
-        logic src_conflict;
-        logic dst_conflict;
-        logic active_ime_conflict;
-        logic older_rob_conflict;
-        logic prefix_conflict;
-        logic [31:0] current_read_mask;
-        logic [31:0] current_write_mask;
-        logic current_ime;
-
-        current_ime = uop_uop2dp[lane].ime.valid &&
-                      !uop_uop2dp[lane].ime.illegal;
-        current_read_mask = current_ime ?
-                            uop_uop2dp[lane].ime.read_mask : 32'b0;
-        current_write_mask = current_ime ?
-                             uop_uop2dp[lane].ime.write_mask : 32'b0;
-        src_conflict =
-            (uop_uop2dp[lane].vs1_valid &&
-             ime_write_lock_mask[uop_uop2dp[lane].vs1]) ||
-            (uop_uop2dp[lane].vs2_valid &&
-             ime_write_lock_mask[uop_uop2dp[lane].vs2_index]) ||
-            (uop_uop2dp[lane].vs3_valid &&
-             ime_write_lock_mask[uop_uop2dp[lane].dst_index]) ||
-            (uop_uop2dp[lane].v0_valid && ime_write_lock_mask[0]);
-        dst_conflict =
-            uop_uop2dp[lane].vd_valid &&
-            (ime_write_lock_mask[uop_uop2dp[lane].dst_index] ||
-             ime_read_lock_mask[uop_uop2dp[lane].dst_index]);
-        active_ime_conflict = current_ime &&
-`ifdef IME_OPERAND_RS
-            !(ime_collector_active &&
-              !uop_uop2dp[lane].first_uop_valid &&
-              uop_uop2dp[lane].ime_inst.rob_tag == ime_collector_entry.cmd.rob_tag &&
-              uop_uop2dp[lane].ime_inst.pc == ime_collector_entry.cmd.inst_pc) &&
-`endif
-            ((|((current_read_mask | current_write_mask) &
-                ime_write_lock_mask)) ||
-             (|(current_write_mask & ime_read_lock_mask)));
-
-        // IME reads the architectural VRF, not ROB bypass data.  Wait until
-        // every older vector producer touching A/B/C/v0 has retired to VRF.
-        older_rob_conflict = 1'b0;
-        if (current_ime) begin
-          for (int entry = 0; entry < `ROB_DEPTH; entry++) begin
-            older_rob_conflict |= rob_entry[entry].valid &&
-                                  (rob_entry[entry].w_type == VRF) &&
-                                  (current_read_mask[rob_entry[entry].w_index] ||
-                                   current_write_mask[rob_entry[entry].w_index]);
-          end
-        end
-
-        // Preserve program order inside a multi-lane dispatch bundle.  This
-        // covers the one cycle before a newly accepted IME publishes locks.
-        prefix_conflict = 1'b0;
-        for (int previous = 0; previous < lane; previous++) begin
-          if (uop_valid_uop2dp[previous] &&
-              uop_uop2dp[previous].ime.valid &&
-              !uop_uop2dp[previous].ime.illegal) begin
-            if (current_ime) begin
-              // The implementation has one IME macro RS/engine slot.  Keep
-              // the older command lane-independent, but accept at most one
-              // IME from a dispatch bundle.
-              prefix_conflict = 1'b1;
-            end else begin
-              prefix_conflict |=
-                  (uop_uop2dp[lane].vs1_valid &&
-                   uop_uop2dp[previous].ime.write_mask[uop_uop2dp[lane].vs1]) ||
-                  (uop_uop2dp[lane].vs2_valid &&
-                   uop_uop2dp[previous].ime.write_mask[uop_uop2dp[lane].vs2_index]) ||
-                  (uop_uop2dp[lane].vs3_valid &&
-                   uop_uop2dp[previous].ime.write_mask[uop_uop2dp[lane].dst_index]) ||
-                  (uop_uop2dp[lane].v0_valid &&
-                   uop_uop2dp[previous].ime.write_mask[0]) ||
-                  (uop_uop2dp[lane].vd_valid &&
-                   (uop_uop2dp[previous].ime.write_mask[uop_uop2dp[lane].dst_index] ||
-                    uop_uop2dp[previous].ime.read_mask[uop_uop2dp[lane].dst_index]));
-            end
-          end else if (current_ime && uop_valid_uop2dp[previous] &&
-                       uop_uop2dp[previous].vd_valid) begin
-            prefix_conflict |=
-                current_read_mask[uop_uop2dp[previous].dst_index] ||
-                current_write_mask[uop_uop2dp[previous].dst_index];
-          end
-        end
-
-        ime_hazard[lane] = current_ime ?
-                           (active_ime_conflict || older_rob_conflict ||
-                            prefix_conflict) :
-                           (src_conflict || dst_conflict || prefix_conflict);
-      end
-    end
-`endif
 // RAW data hazard check between uop[*] and ROB
     generate
         for (i=0; i<`ROB_DEPTH; i++) begin : gen_pre_uop_rob
@@ -413,9 +283,6 @@ module rvv_backend_dispatch
             assign uop_ctrl[i].uop_exe_unit = uop_uop2dp[i].uop_exe_unit;
             assign uop_ctrl[i].pshrob_valid = uop_uop2dp[i].pshrob_valid;
             assign uop_ctrl[i].pshlsu_valid = uop_uop2dp[i].pshlsu_valid;
-          `ifdef IME_ON
-            assign uop_ctrl[i].ime_illegal = uop_uop2dp[i].ime.illegal;
-          `endif
         end
     endgenerate
 
@@ -426,9 +293,6 @@ module rvv_backend_dispatch
         .raw_uop_uop            (raw_uop_uop),
         .arch_hazard            (arch_hazard),
         .uop_ctrl               (uop_ctrl),
-      `ifdef IME_ON
-        .ime_hazard             (ime_hazard),
-      `endif
       // handshake signals
         .uop_valid_uop2dp       (uop_valid_uop2dp),
         .uop_ready_dp2uop       (uop_ready_dp2uop),
@@ -447,10 +311,6 @@ module rvv_backend_dispatch
       `ifdef ZVT_ON
         .rs_valid_dp2zvt        (rs_valid_dp2zvt),
         .rs_ready_zvt2dp        (rs_ready_zvt2dp),
-      `endif
-      `ifdef IME_ON
-        .rs_valid_dp2ime        (rs_valid_dp2ime),
-        .rs_ready_ime2dp        (rs_ready_ime2dp),
       `endif
         .rs_valid_dp2lsu        (rs_valid_dp2lsu),
         .rs_ready_lsu2dp        (rs_ready_lsu2dp),
@@ -474,14 +334,6 @@ module rvv_backend_dispatch
             assign uop_info[i].vm         = uop_uop2dp[i].vm;
             assign uop_info[i].ignore_vma = uop_uop2dp[i].ignore_vma;
             assign uop_info[i].ignore_vta = uop_uop2dp[i].ignore_vta;
-          `ifdef IME_ON
-            assign uop_info[i].tile_lsu = uop_uop2dp[i].tile_lsu;
-            assign uop_info[i].ime_tile_lambda_shift =
-                uop_uop2dp[i].ime_tile_lambda_shift;
-            assign uop_info[i].ime_tile_line_shift =
-                uop_uop2dp[i].ime_tile_line_shift;
-            assign uop_info[i].sew = uop_uop2dp[i].vector_csr.sew;
-          `endif
 
             rvv_backend_dispatch_opr_byte_type #(
             ) u_opr_byte_type (
@@ -509,7 +361,7 @@ module rvv_backend_dispatch
             assign rs_dp2alu[i].rob_entry       = rob_address[i]; 
             assign rs_dp2alu[i].uop_funct6      = uop_uop2dp[i].uop_funct6;
             assign rs_dp2alu[i].uop_funct3      = uop_uop2dp[i].uop_funct3;
-            assign rs_dp2alu[i].is_cmp          = uop_uop2dp[i].uop_exe_unit==VEU_CMP; 
+            assign rs_dp2alu[i].is_cmp          = uop_uop2dp[i].uop_exe_unit==CMP; 
             assign rs_dp2alu[i].vstart          = uop_uop2dp[i].vector_csr.vstart;
             assign rs_dp2alu[i].vl              = uop_uop2dp[i].vs_evl;
             assign rs_dp2alu[i].vm              = uop_uop2dp[i].vm;
@@ -584,7 +436,7 @@ module rvv_backend_dispatch
             assign rs_dp2div[i].rob_entry       = rob_address[i]; 
             assign rs_dp2div[i].uop_funct6      = uop_uop2dp[i].uop_funct6;
             assign rs_dp2div[i].uop_funct3      = uop_uop2dp[i].uop_funct3;
-            assign rs_dp2div[i].is_div          = uop_uop2dp[i].uop_exe_unit==VEU_DIV; 
+            assign rs_dp2div[i].is_div          = uop_uop2dp[i].uop_exe_unit==DIV; 
             assign rs_dp2div[i].vs1_data        = uop_uop2dp[i].vs1_valid ? uop_operand[i].vs1 : (`VLEN)'(uop_uop2dp[i].rs1_data);
             assign rs_dp2div[i].vs1_data_valid  = uop_uop2dp[i].vs1_valid;
             assign rs_dp2div[i].rs1_data_valid  = uop_uop2dp[i].rs1_data_valid;
@@ -630,7 +482,6 @@ module rvv_backend_dispatch
           `ifdef TB_SUPPORT
             assign rs_dp2zvt[i].uop_pc          = uop_uop2dp[i].uop_pc; 
           `endif
-            assign rs_dp2zvt[i].rob_tag         = uop_uop2dp[i].rob_tag;
             assign rs_dp2zvt[i].rob_entry       = rob_address[i]; 
             assign rs_dp2zvt[i].uop_funct6      = uop_uop2dp[i].uop_funct6;
             assign rs_dp2zvt[i].uop_funct3      = uop_uop2dp[i].uop_funct3;
@@ -644,12 +495,7 @@ module rvv_backend_dispatch
             assign rs_dp2zvt[i].vl              = uop_uop2dp[i].vs_evl[$clog2(`TE):0];
             assign rs_dp2zvt[i].tk              = uop_uop2dp[i].vector_csr.tk;
             assign rs_dp2zvt[i].sew             = uop_uop2dp[i].vector_csr.sew;
-            // Use the de2-computed mt_eew, not a raw cast of `sew`: the SEW
-            // enum (SEW8=0, SEW16=1, SEW32=2) and EEW enum (EEW_NONE=0, EEW1=1,
-            // EEW8=2, EEW16=3, EEW32=4) do not align, so `EEW_e'(sew)` silently
-            // mis-tags the move (e.g. SEW8 -> EEW_NONE), causing zvt_ctrl to
-            // fall through to its EEW32 default path for vtmv.v.t / vtmv.t.v.
-            assign rs_dp2zvt[i].eew_mt          = uop_uop2dp[i].mt_eew;
+            assign rs_dp2zvt[i].eew_mt          = EEW_e'(uop_uop2dp[i].vector_csr.sew);
             assign rs_dp2zvt[i].rndMode         = fpnew_pkg::roundmode_e'(uop_uop2dp[i].vector_csr.frm);
             assign rs_dp2zvt[i].tss             = {uop_uop2dp[i].rs1_data[30:27],
                                                    uop_uop2dp[i].rs1_data[24],
@@ -660,38 +506,6 @@ module rvv_backend_dispatch
             assign rs_dp2zvt[i].first_uop_valid = uop_uop2dp[i].first_uop_valid;
             assign rs_dp2zvt[i].last_uop_valid  = uop_uop2dp[i].last_uop_valid;
             assign rs_dp2zvt[i].uop_index       = uop_uop2dp[i].uop_index[$clog2(`EMUL_MAX)-1:0];            
-          `endif
-
-          `ifdef IME_ON
-          // IME RS.  No vector payload is read here: the command snapshot and
-          // authoritative DE1 metadata are sufficient for group capture.
-            assign rs_dp2ime[i].rob_entry       = rob_address[i];
-`ifdef IME_OPERAND_RS
-            assign rs_dp2ime[i].operand_rs = uop_uop2dp[i].ime.valid &&
-              !uop_uop2dp[i].ime.illegal && !uop_uop2dp[i].ime.is_mx &&
-              !uop_uop2dp[i].ime.is_fp;
-            assign rs_dp2ime[i].fragment_first = uop_uop2dp[i].first_uop_valid;
-            assign rs_dp2ime[i].fragment_last = uop_uop2dp[i].last_uop_valid;
-            assign rs_dp2ime[i].fragment_group = 5'(uop_uop2dp[i].uop_index);
-            assign rs_dp2ime[i].fragment_valid = {
-              uop_uop2dp[i].vs3_valid, uop_uop2dp[i].vs2_valid,
-              uop_uop2dp[i].vs1_valid};
-            // Retirement gate above ensures raw architectural bytes are current.
-            // Read complete old-C registers: no vma/vta byte filtering or H3.
-            assign rs_dp2ime[i].fragment_data = {
-              vrf_byp[i].vd, vrf_byp[i].vs2, vrf_byp[i].vs1};
-            assign rs_dp2ime[i].a_snapshot = '0;
-            assign rs_dp2ime[i].b_snapshot = '0;
-            assign rs_dp2ime[i].c_snapshot = '0;
-`endif
-            assign rs_dp2ime[i].cmd.inst_pc     = uop_uop2dp[i].ime_inst.pc;
-            assign rs_dp2ime[i].cmd.rob_tag     = uop_uop2dp[i].ime_inst.rob_tag;
-            assign rs_dp2ime[i].cmd.opcode      = uop_uop2dp[i].ime_inst.opcode;
-            assign rs_dp2ime[i].cmd.bits        = uop_uop2dp[i].ime_inst.bits;
-            assign rs_dp2ime[i].cmd.rs1         = uop_uop2dp[i].rs1_data;
-            assign rs_dp2ime[i].cmd.rs2         = uop_uop2dp[i].ime_rs2_data;
-            assign rs_dp2ime[i].cmd.arch_state  = uop_uop2dp[i].vector_csr;
-            assign rs_dp2ime[i].meta            = uop_uop2dp[i].ime;
           `endif
 
           // LSU RS
@@ -718,30 +532,17 @@ module rvv_backend_dispatch
 
           // ROB
           `ifdef TB_SUPPORT
-            assign uop_dp2rob[i].uop_pc           = uop_uop2dp[i].uop_pc; 
+            assign uop_dp2rob[i].uop_pc         = uop_uop2dp[i].uop_pc; 
           `endif
-            assign uop_dp2rob[i].rob_tag          = uop_uop2dp[i].rob_tag;
-            assign uop_dp2rob[i].res_updating_end = uop_uop2dp[i].res_updating_end;
-            assign uop_dp2rob[i].last_uop_valid   = uop_uop2dp[i].last_uop_valid;
-          `ifdef IME_ON
-            assign uop_dp2rob[i].is_ime         = uop_uop2dp[i].ime.valid;
-            assign uop_dp2rob[i].ime_illegal    = uop_uop2dp[i].ime.illegal;
-            assign uop_dp2rob[i].ime_inst       = uop_uop2dp[i].ime_inst;
+            assign uop_dp2rob[i].w_index        = uop_uop2dp[i].dst_index;
+            assign uop_dp2rob[i].w_type         = uop_uop2dp[i].vd_valid ? VRF : 
+          `ifdef ZVE32F_ON
+                                                  uop_uop2dp[i].fd_valid ? FRF :
           `endif
-            assign uop_dp2rob[i].w_index          = uop_uop2dp[i].dst_index;
-          `ifdef IME_ON
-            assign uop_dp2rob[i].w_type           = uop_uop2dp[i].ime.valid ? NOWRITE :
-                                                    uop_uop2dp[i].vd_valid ? VRF :
-          `else
-            assign uop_dp2rob[i].w_type           = uop_uop2dp[i].vd_valid ? VRF :
-          `endif
-                                                  `ifdef ZVE32F_ON
-                                                    uop_uop2dp[i].fd_valid ? FRF :
-                                                  `endif
-                                                    uop_uop2dp[i].xd_valid ? XRF : NOWRITE;
-            assign uop_dp2rob[i].byte_type        = uop_operand_byte_type[i].vd;
-            assign uop_dp2rob[i].is_ff            = (uop_uop2dp[i].uop_exe_unit==LSU)&(uop_uop2dp[i].uop_funct6.lsu_funct6.lsu_umop==US_FF);
-            assign uop_dp2rob[i].vector_csr       = uop_uop2dp[i].vector_csr;
+                                                  XRF;
+            assign uop_dp2rob[i].byte_type      = uop_operand_byte_type[i].vd;
+            assign uop_dp2rob[i].vector_csr     = uop_uop2dp[i].vector_csr;
+            assign uop_dp2rob[i].last_uop_valid = uop_uop2dp[i].last_uop_valid;
         end
     endgenerate
 

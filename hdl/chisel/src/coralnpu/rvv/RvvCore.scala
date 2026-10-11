@@ -25,48 +25,30 @@ object RvvCore {
 }
 
 object GenerateCoreShimSource {
-  def apply(p: Parameters): String = {
-    val instructionLanes   = p.instructionLanes
-    val numRetireLanes     = p.rvvRetireLanes
-    val vlen               = p.rvvVlen
-    val xlen               = p.xlen
-    val xlenMinus1         = xlen - 1
-    val enableVme          = p.enableVme
-    val enableZvvmm        = p.enableZvvmm
-    val enableVerification = p.enableVerification
-
-    var moduleInterface = (if (xlen == 64) "`define XLEN_64 1\n" else "") +
-      """module RvvCoreWrapper(
+  def apply(instructionLanes: Integer, vlen: Integer, enableVme: Boolean = false): String = {
+    var moduleInterface = """module RvvCoreWrapper(
         |    input clk,
         |    input rstn,
         |    input logic [VSTART_LEN:0] vstart,
         |    input logic [1:0] vxrm,
         |    input logic vxsat,
         |    input logic [2:0] frm,
-        |    input logic imeGlobalHeadValid,
-        |    input logic [3:0] imeGlobalHeadTag,
-        |    input logic flush,
         |""".stripMargin.replaceAll("VSTART_LEN", (log2Ceil(vlen) - 1).toString)
 
     // Add instruction interface inputs
     for (i <- 0 until instructionLanes) {
       moduleInterface += """    input inst_GENI_valid,
-            |    input [XLEN_MINUS_1:0] inst_GENI_bits_pc,
+            |    input [31:0] inst_GENI_bits_pc,
             |    input [1:0] inst_GENI_bits_opcode,
             |    input [24:0] inst_GENI_bits_bits,
-            |    input [3:0] inst_GENI_bits_rob_tag,
-            |""".stripMargin
-        .replaceAll("GENI", i.toString)
-        .replaceAll("XLEN_MINUS_1", xlenMinus1.toString)
+            |""".stripMargin.replaceAll("GENI", i.toString)
     }
 
     // Add regfile read interface inputs
     for (i <- 0 until 2 * instructionLanes) {
       moduleInterface += """    input rs_GENI_valid,
-            |    input [XLEN_MINUS_1:0] rs_GENI_data,
-            |""".stripMargin
-        .replaceAll("GENI", i.toString)
-        .replaceAll("XLEN_MINUS_1", xlenMinus1.toString)
+            |    input [31:0] rs_GENI_data,
+            |""".stripMargin.replaceAll("GENI", i.toString)
     }
 
     // Add float regfile read interface inputs
@@ -84,21 +66,19 @@ object GenerateCoreShimSource {
     for (i <- 0 until instructionLanes) {
       moduleInterface += """    output rd_GENI_valid,
             |    output [4:0] rd_GENI_bits_addr,
-            |    output [XLEN_MINUS_1:0] rd_GENI_bits_data,
-            |""".stripMargin
-        .replaceAll("GENI", i.toString)
-        .replaceAll("XLEN_MINUS_1", xlenMinus1.toString)
+            |    output [31:0] rd_GENI_bits_data,
+            |""".stripMargin.replaceAll("GENI", i.toString)
     }
 
     moduleInterface += """    output async_rd_valid,
         |    output [4:0] async_rd_bits_addr,
-        |    output [XLEN_MINUS_1:0] async_rd_bits_data,
+        |    output [31:0] async_rd_bits_data,
         |    input async_rd_ready,
         |    output async_frd_valid,
         |    output [4:0] async_frd_bits_addr,
-        |    output [XLEN_MINUS_1:0] async_frd_bits_data,
+        |    output [31:0] async_frd_bits_data,
         |    input async_frd_ready,
-        |""".stripMargin.replaceAll("XLEN_MINUS_1", xlenMinus1.toString)
+        |""".stripMargin
 
     // RVV to LSU
     for (i <- 0 until 2) {
@@ -121,28 +101,11 @@ object GenerateCoreShimSource {
             |    input [4:0] lsu2rvv_GENI_bits_addr,
             |    input [VLEN-1:0] lsu2rvv_GENI_bits_data,
             |    input  lsu2rvv_GENI_bits_last,
-            |    input [TAIL_IDX_BITS:0] lsu2rvv_GENI_bits_ff_tail_index,
             |    output lsu2rvv_GENI_ready,
-            |""".stripMargin
-        .replaceAll("GENI", i.toString)
-        .replaceAll("VLEN", vlen.toString)
-        .replaceAll("TAIL_IDX_BITS", (log2Ceil(vlen / 8 + 1) - 1).toString)
-    }
-
-    if (p.enableVme) {
-      moduleInterface += """    output vme2lsu_valid,
-            |    output [VLEN-1:0] vme2lsu_bits_data,
-            |    input  vme2lsu_ready,
-            |    input  lsu2vme_valid,
-            |    input  [VLEN-1:0] lsu2vme_bits_data,
-            |    output lsu2vme_ready,
-            |""".stripMargin.replaceAll("VLEN", vlen.toString)
+            |""".stripMargin.replaceAll("GENI", i.toString).replaceAll("VLEN", vlen.toString)
     }
 
     // Add CSR output
-    if (enableZvvmm) {
-      moduleInterface += "    output imeLegalAccept,\n"
-    }
     moduleInterface += """    output vcsr_valid,
         |    output [VSTART_LEN:0] vcsr_vstart,
         |    output [1:0] vcsr_xrm,
@@ -152,7 +115,6 @@ object GenerateCoreShimSource {
 
     // Add RVV Config state output
     moduleInterface += """    output configStateValid,
-        |    output vsetVstartClear,
         |    output [7:0] configVl,
         |    output [VSTART_LEN:0] configVstart,
         |    output configMa,
@@ -163,33 +125,18 @@ object GenerateCoreShimSource {
         |    output [2:0] configLmulOrig,
         |    output configVill,
         |    output [31:0] configMtype,
-        |""".stripMargin.replaceAll("VSTART_LEN", (log2Ceil(vlen) - 1).toString)
-    if (enableZvvmm) {
-      moduleInterface += """    output [2:0] configImeLambda,
-          |    output configImeBs,
-          |    output configImeAltfmtA,
-          |    output configImeAltfmtB,
-          |    output configImeAltfmt,
-          |""".stripMargin
-    }
-    moduleInterface += """    output logic rvv_idle,
+        |    output logic rvv_idle,
         |    output logic [3:0] queue_capacity,
-        |""".stripMargin
+        |""".stripMargin.replaceAll("VSTART_LEN", (log2Ceil(vlen) - 1).toString)
 
     // Add rd_rob2rt_o interface outputs
-    for (i <- 0 until numRetireLanes) {
+    for (i <- 0 until instructionLanes) {
       moduleInterface += """
             |    output rd_rob2rt_o_GENI_valid,
             |    output rd_rob2rt_o_GENI_w_valid,
             |    output [4:0] rd_rob2rt_o_GENI_w_index,
-            |""".stripMargin.replaceAll("GENI", i.toString)
-      if (enableVerification) {
-        moduleInterface += "    output [127:0] rd_rob2rt_o_GENI_w_data,\n".replaceAll(
-          "GENI",
-          i.toString
-        )
-      }
-      moduleInterface += """    output rd_rob2rt_o_GENI_w_type,
+            |    output [127:0] rd_rob2rt_o_GENI_w_data,
+            |    output rd_rob2rt_o_GENI_w_type,
             |    output [15:0] rd_rob2rt_o_GENI_vd_type,
             |    output rd_rob2rt_o_GENI_trap_flag,
             |    output rd_rob2rt_o_GENI_vector_csr_vl,
@@ -202,56 +149,30 @@ object GenerateCoreShimSource {
             |    output rd_rob2rt_o_GENI_vector_csr_lmul_orig,
             |    output rd_rob2rt_o_GENI_vector_csr_vill,
             |""".stripMargin.replaceAll("GENI", i.toString)
-      if (enableZvvmm) {
-        moduleInterface += "    output rd_rob2rt_o_GENI_is_ime,\n".replaceAll("GENI", i.toString)
-      }
-      if (p.enableVme) {
+      if (enableVme) {
         moduleInterface += """    output [31:0] rd_rob2rt_o_GENI_vector_csr_mtype,
             |    output [1:0]  rd_rob2rt_o_GENI_vector_csr_mtwiden,
             |    output [13:0] rd_rob2rt_o_GENI_vector_csr_tm,
             |    output [1:0]  rd_rob2rt_o_GENI_vector_csr_tk,
             |""".stripMargin.replaceAll("GENI", i.toString)
       }
-      if (enableZvvmm) {
-        moduleInterface += """    output [2:0] rd_rob2rt_o_GENI_vector_csr_imeLambda,
-            |    output rd_rob2rt_o_GENI_vector_csr_imeBs,
-            |    output rd_rob2rt_o_GENI_vector_csr_imeAltfmtA,
-            |    output rd_rob2rt_o_GENI_vector_csr_imeAltfmtB,
-            |    output rd_rob2rt_o_GENI_vector_csr_imeAltfmt,
-            |""".stripMargin.replaceAll("GENI", i.toString)
-      }
-      moduleInterface += "    output [15:0] rd_rob2rt_o_GENI_vxsaturate,\n".replaceAll(
-        "GENI",
-        i.toString
-      )
-      if (enableVerification) {
-        moduleInterface += "    output [31:0] rd_rob2rt_o_GENI_uop_pc,\n".replaceAll(
-          "GENI",
-          i.toString
-        )
-      }
-      moduleInterface += """    output rd_rob2rt_o_GENI_last_uop_valid,
-            |    output [3:0]  rd_rob2rt_o_GENI_rob_tag,
-            |""".stripMargin.replaceAll("GENI", i.toString)
+      moduleInterface += """    output [15:0] rd_rob2rt_o_GENI_vxsaturate,
+            |    output [31:0] rd_rob2rt_o_GENI_uop_pc,
+            |    output rd_rob2rt_o_GENI_last_uop_valid,
+            """.stripMargin.replaceAll("GENI", i.toString)
     }
 
     // Add trap interface outputs
     moduleInterface += """
         |    output trap_valid,
-        |    output [XLEN_MINUS_1:0] trap_bits_pc,
+        |    output [31:0] trap_bits_pc,
         |    output [1:0] trap_bits_opcode,
-        |    output [24:0] trap_bits_bits,
-        |    output [3:0] trap_bits_rob_tag,""".stripMargin.replaceAll(
-      "XLEN_MINUS_1",
-      xlenMinus1.toString
-    )
+        |    output [24:0] trap_bits_bits,""".stripMargin
 
-    // Add vxsat and fflags backend update outputs
+    // Add vxsat backend update outputs
     moduleInterface += """
         |    output wr_vxsat_valid_o,
-        |    output wr_vxsat_o,
-        |    output wr_fflags_valid_o,
-        |    output [4:0] wr_fflags_o,""".stripMargin
+        |    output wr_vxsat_o,""".stripMargin
 
     // Remove last comma/linebreak
     moduleInterface = moduleInterface.dropRight(1)
@@ -272,13 +193,12 @@ object GenerateCoreShimSource {
       instructionLanes.toString
     )
     for (i <- 0 until instructionLanes) {
-      coreInstantiation += s"  assign inst_data[$i].rob_tag = inst_${i}_bits_rob_tag;\n"
-      coreInstantiation += s"  assign inst_data[$i].pc = inst_${i}_bits_pc;\n"
+      coreInstantiation += "  assign inst_data[GENI].pc = inst_GENI_bits_pc;\n".replaceAll(
+        "GENI",
+        i.toString
+      )
       coreInstantiation += "  assign inst_data[GENI].opcode = RVVOpCode'(inst_GENI_bits_opcode);\n"
-        .replaceAll(
-          "GENI",
-          i.toString
-        )
+        .replaceAll("GENI", i.toString)
       coreInstantiation += "  assign inst_data[GENI].bits = inst_GENI_bits_bits;\n".replaceAll(
         "GENI",
         i.toString
@@ -302,12 +222,10 @@ object GenerateCoreShimSource {
         i.toString
       )
     }
-    coreInstantiation += "  logic [2*GENN-1:0][XLEN_MINUS_1:0] reg_read_data;\n"
-      .replaceAll(
-        "GENN",
-        instructionLanes.toString
-      )
-      .replaceAll("XLEN_MINUS_1", xlenMinus1.toString)
+    coreInstantiation += "  logic [2*GENN-1:0][31:0] reg_read_data;\n".replaceAll(
+      "GENN",
+      instructionLanes.toString
+    )
     for (i <- 0 until 2 * instructionLanes) {
       coreInstantiation += "  assign reg_read_data[GENI] = rs_GENI_data;\n".replaceAll(
         "GENI",
@@ -316,18 +234,15 @@ object GenerateCoreShimSource {
     }
 
     // Float regfile read
-    coreInstantiation += "  logic [GENN-1:0][XLEN_MINUS_1:0] freg_read_data;\n"
-      .replaceAll(
-        "GENN",
-        instructionLanes.toString
-      )
-      .replaceAll("XLEN_MINUS_1", xlenMinus1.toString)
+    coreInstantiation += "  logic [GENN-1:0][31:0] freg_read_data;\n".replaceAll(
+      "GENN",
+      instructionLanes.toString
+    )
     for (i <- 0 until instructionLanes) {
-      if (xlen > 32) {
-        coreInstantiation += s"  assign freg_read_data[$i] = { {${xlen - 32}{1'b1}}, frs_$i };\n"
-      } else {
-        coreInstantiation += s"  assign freg_read_data[$i] = frs_$i;\n"
-      }
+      coreInstantiation += "  assign freg_read_data[GENI] = frs_GENI;\n".replaceAll(
+        "GENI",
+        i.toString
+      )
     }
 
     // RVV2LSU
@@ -361,38 +276,22 @@ object GenerateCoreShimSource {
       |  logic  [2-1:0][4:0]  uop_lsu_addr_lsu2rvv;
       |  logic  [2-1:0][VLEN-1:0] uop_lsu_wdata_lsu2rvv;
       |  logic  [2-1:0] uop_lsu_last_lsu2rvv;
-      |  logic  [2-1:0][TAIL_IDX_BITS:0] uop_lsu_ff_tail_index_lsu2rvv;
-      |  logic  [2-1:0] uop_lsu_ready_rvv2lsu;""".stripMargin
-      .replaceAll("VLEN", vlen.toString)
-      .replaceAll("TAIL_IDX_BITS", (log2Ceil(vlen / 8 + 1) - 1).toString)
+      |  logic  [2-1:0] uop_lsu_ready_rvv2lsu;""".stripMargin.replaceAll("VLEN", vlen.toString)
     for (i <- 0 until 2) {
       coreInstantiation += """
           |  assign uop_lsu_valid_lsu2rvv[GENI] = lsu2rvv_GENI_valid;
           |  assign uop_lsu_addr_lsu2rvv[GENI] = lsu2rvv_GENI_bits_addr;
           |  assign uop_lsu_wdata_lsu2rvv[GENI] = lsu2rvv_GENI_bits_data;
           |  assign uop_lsu_last_lsu2rvv[GENI] = lsu2rvv_GENI_bits_last;
-          |  assign uop_lsu_ff_tail_index_lsu2rvv[GENI] = lsu2rvv_GENI_bits_ff_tail_index;
           |  assign lsu2rvv_GENI_ready = uop_lsu_ready_rvv2lsu[GENI];
           |""".stripMargin.replaceAll("GENI", i.toString)
-    }
-
-    if (p.enableVme) {
-      coreInstantiation +=
-        """`ifndef ZVT_ON
-          |  assign vme2lsu_valid = 1'b0;
-          |  assign vme2lsu_bits_data = '0;
-          |  assign lsu2vme_ready = 1'b0;
-          |`endif
-          |""".stripMargin
     }
 
     // Scalar regfile write temp output
     coreInstantiation += """  logic [GENN-1:0] reg_write_valid;
         |  logic [GENN-1:0][4:0] reg_write_addr;
-        |  logic [GENN-1:0][XLEN_MINUS_1:0] reg_write_data;
-        |""".stripMargin
-      .replaceAll("GENN", instructionLanes.toString)
-      .replaceAll("XLEN_MINUS_1", xlenMinus1.toString)
+        |  logic [GENN-1:0][31:0] reg_write_data;
+        |""".stripMargin.replaceAll("GENN", instructionLanes.toString)
 
     // VCSR temp output
     coreInstantiation += """  RVVConfigState vector_csr;
@@ -404,26 +303,17 @@ object GenerateCoreShimSource {
     coreInstantiation += """  RVVConfigState config_state;
         |""".stripMargin
 
-    coreInstantiation += s"  ROB2RT_t [${numRetireLanes - 1}:0] rd_rob2rt_o;\n"
-    coreInstantiation += s"  logic [${numRetireLanes - 1}:0] rd_valid_rob2rt_o;\n"
+    coreInstantiation += "  ROB2RT_t [3:0] rd_rob2rt_o;\n"
+    coreInstantiation += "  logic [3:0] rd_valid_rob2rt_o;\n"
     coreInstantiation += "  RVVInstruction trap_data;\n"
 
-    val imeValidationPortConnection = if (enableZvvmm) {
-      "      .ime_legal_accept_o(imeLegalAccept),\n"
-    } else { "" }
-    coreInstantiation += """  RvvCore#(
-        |      .N (GENN),
-        |      .RegDataT(logic [XLEN_MINUS_1:0])
-        |  ) core(
+    coreInstantiation += """  RvvCore#(.N (GENN)) core(
         |      .clk(clk),
         |      .rstn(rstn),
         |      .vstart(vstart),
         |      .vxrm(vxrm),
         |      .vxsat(vxsat),
         |      .frm(frm),
-        |      .imeGlobalHeadValid(imeGlobalHeadValid),
-        |      .imeGlobalHeadTag(imeGlobalHeadTag),
-        |      .flush(flush),
         |      .inst_valid(inst_valid),
         |      .inst_data(inst_data),
         |      .inst_ready(inst_ready),
@@ -455,52 +345,29 @@ object GenerateCoreShimSource {
         |      .uop_lsu_addr_lsu2rvv(uop_lsu_addr_lsu2rvv),
         |      .uop_lsu_wdata_lsu2rvv(uop_lsu_wdata_lsu2rvv),
         |      .uop_lsu_last_lsu2rvv(uop_lsu_last_lsu2rvv),
-        |      .uop_lsu_ff_tail_index_lsu2rvv(uop_lsu_ff_tail_index_lsu2rvv),
         |      .uop_lsu_ready_rvv2lsu(uop_lsu_ready_rvv2lsu),
         |      .vcsr_valid(vcsr_valid),
         |      .vector_csr(vector_csr),
         |      .vcsr_ready(vcsr_ready),
         |      .config_state_valid(configStateValid),
         |      .config_state(config_state),
-        |      .vset_vstart_clear(vsetVstartClear),
         |      .rvv_idle(rvv_idle),
         |      .queue_capacity(queue_capacity),
         |      .rd_valid_rob2rt_o(rd_valid_rob2rt_o),
         |      .rd_rob2rt_o(rd_rob2rt_o),
         |      .trap_valid_o(trap_valid),
         |      .trap_data_o(trap_data),
-        |IME_VALIDATION_PORT      .wr_vxsat_valid_o(wr_vxsat_valid_o),
-        |      .wr_vxsat_o(wr_vxsat_o),
-        |      .wr_fflags_valid_o(wr_fflags_valid_o),
-        |      .wr_fflags_o(wr_fflags_o)
-        |""".stripMargin
-      .replaceAll("GENN", instructionLanes.toString)
-      .replace("IME_VALIDATION_PORT", imeValidationPortConnection)
-      .replaceAll("XLEN_MINUS_1", xlenMinus1.toString)
-    if (p.enableVme) {
-      coreInstantiation +=
-        """`ifdef ZVT_ON
-          |      ,.uop_vme2lsu_valid(vme2lsu_valid),
-          |      .uop_vme2lsu_data(vme2lsu_bits_data),
-          |      .uop_vme2lsu_ready(vme2lsu_ready),
-          |      .uop_lsu2vme_valid(lsu2vme_valid),
-          |      .uop_lsu2vme_data(lsu2vme_bits_data),
-          |      .uop_lsu2vme_ready(lsu2vme_ready)
-          |`endif
-          |""".stripMargin
-    }
+        |      .wr_vxsat_valid_o(wr_vxsat_valid_o),
+        |      .wr_vxsat_o(wr_vxsat_o)
+        |""".stripMargin.replaceAll("GENN", instructionLanes.toString)
     coreInstantiation += "  );\n"
 
-    for (i <- 0 until numRetireLanes) {
+    for (i <- 0 until instructionLanes) {
       coreInstantiation += """  assign rd_rob2rt_o_GENI_valid = rd_valid_rob2rt_o[GENI];
       |  assign rd_rob2rt_o_GENI_w_valid = rd_rob2rt_o[GENI].w_valid;
       |  assign rd_rob2rt_o_GENI_w_index = rd_rob2rt_o[GENI].w_index;
-      |""".stripMargin.replaceAll("GENI", i.toString)
-      if (enableVerification) {
-        coreInstantiation += "  assign rd_rob2rt_o_GENI_w_data = rd_rob2rt_o[GENI].w_data;\n"
-          .replaceAll("GENI", i.toString)
-      }
-      coreInstantiation += """  assign rd_rob2rt_o_GENI_w_type = rd_rob2rt_o[GENI].w_type;
+      |  assign rd_rob2rt_o_GENI_w_data = rd_rob2rt_o[GENI].w_data;
+      |  assign rd_rob2rt_o_GENI_w_type = rd_rob2rt_o[GENI].w_type;
       |  assign rd_rob2rt_o_GENI_vd_type = rd_rob2rt_o[GENI].vd_type;
       |  assign rd_rob2rt_o_GENI_trap_flag = rd_rob2rt_o[GENI].trap_flag;
       |  assign rd_rob2rt_o_GENI_vector_csr_vl = rd_rob2rt_o[GENI].vector_csr.vl;
@@ -513,16 +380,14 @@ object GenerateCoreShimSource {
       |  assign rd_rob2rt_o_GENI_vector_csr_lmul_orig = rd_rob2rt_o[GENI].vector_csr.lmul_orig;
       |  assign rd_rob2rt_o_GENI_vector_csr_vill = rd_rob2rt_o[GENI].vector_csr.vill;
       |  assign rd_rob2rt_o_GENI_vxsaturate = rd_rob2rt_o[GENI].vxsaturate;
-      |  assign rd_rob2rt_o_GENI_rob_tag = rd_rob2rt_o[GENI].rob_tag;
+      |`ifdef TB_SUPPORT
+      |  assign rd_rob2rt_o_GENI_uop_pc = rd_rob2rt_o[GENI].uop_pc;
       |  assign rd_rob2rt_o_GENI_last_uop_valid = rd_rob2rt_o[GENI].last_uop_valid;
+      |`else
+      |  assign rd_rob2rt_o_GENI_uop_pc = 32'b0;
+      |  assign rd_rob2rt_o_GENI_last_uop_valid = 1'b0;
+      |`endif
       |""".stripMargin.replaceAll("GENI", i.toString)
-      if (enableZvvmm) {
-        coreInstantiation += "  assign rd_rob2rt_o_GENI_is_ime = rd_rob2rt_o[GENI].is_ime;\n".replaceAll("GENI", i.toString)
-      }
-      if (enableVerification) {
-        coreInstantiation += "  assign rd_rob2rt_o_GENI_uop_pc = rd_rob2rt_o[GENI].uop_pc;\n"
-          .replaceAll("GENI", i.toString)
-      }
       if (enableVme) {
         // Rob2Rt does not carry the VME mtype state; tie off to 0.
         coreInstantiation +=
@@ -531,18 +396,8 @@ object GenerateCoreShimSource {
             "  assign rd_rob2rt_o_GENI_vector_csr_tm     = 14'd0;\n" +
             "  assign rd_rob2rt_o_GENI_vector_csr_tk     = 2'd0;\n").replaceAll("GENI", i.toString)
       }
-      if (enableZvvmm) {
-        coreInstantiation +=
-          ("  assign rd_rob2rt_o_GENI_vector_csr_imeLambda = rd_rob2rt_o[GENI].vector_csr.ime_lambda;\n" +
-            "  assign rd_rob2rt_o_GENI_vector_csr_imeBs = rd_rob2rt_o[GENI].vector_csr.ime_bs;\n" +
-            "  assign rd_rob2rt_o_GENI_vector_csr_imeAltfmtA = rd_rob2rt_o[GENI].vector_csr.ime_altfmt_a;\n" +
-            "  assign rd_rob2rt_o_GENI_vector_csr_imeAltfmtB = rd_rob2rt_o[GENI].vector_csr.ime_altfmt_b;\n" +
-            "  assign rd_rob2rt_o_GENI_vector_csr_imeAltfmt = rd_rob2rt_o[GENI].vector_csr.ime_altfmt;\n")
-            .replaceAll("GENI", i.toString)
-      }
     }
-    coreInstantiation += """  assign trap_bits_rob_tag = trap_data.rob_tag;
-      |  assign trap_bits_pc = trap_data.pc;
+    coreInstantiation += """  assign trap_bits_pc = trap_data.pc;
       |  assign trap_bits_opcode = trap_data.opcode;
       |  assign trap_bits_bits = trap_data.bits;
       |""".stripMargin
@@ -578,48 +433,12 @@ object GenerateCoreShimSource {
         "`else\n" +
         "  assign configMtype = 32'd0;\n" +
         "`endif\n"
-    if (enableZvvmm) {
-      coreInstantiation +=
-        "  assign configImeLambda = config_state.ime_lambda;\n" +
-          "  assign configImeBs = config_state.ime_bs;\n" +
-          "  assign configImeAltfmtA = config_state.ime_altfmt_a;\n" +
-          "  assign configImeAltfmtB = config_state.ime_altfmt_b;\n" +
-          "  assign configImeAltfmt = config_state.ime_altfmt;\n"
-    }
 
     moduleInterface + coreInstantiation + "endmodule\n"
   }
 }
 
 object GenerateBackendConfig {
-  private def imeLambdaMask(vlen: Int, sew: Int): Int = {
-    (1 to 7).foldLeft(0) { (mask, encoding) =>
-      val lambda = 1 << (encoding - 1)
-      val denominator = sew * lambda * lambda
-      val emulC = if (vlen % denominator == 0) vlen / denominator else 0
-      if (Seq(1, 2, 4, 8, 16).contains(emulC)) mask | (1 << (encoding - 1))
-      else mask
-    }
-  }
-
-  private def maskLiteral(mask: Int): String = {
-    val binary = mask.toBinaryString
-    "0" * (7 - binary.length) + binary
-  }
-
-  private def imeProfileLimits(vlen: Int): (Int, Int) = {
-    val legalShapes = for {
-      sew <- Seq(8, 16, 32)
-      encoding <- 1 to 7
-      lambda = 1 << (encoding - 1)
-      denominator = sew * lambda * lambda
-      if vlen % denominator == 0
-      emulC = vlen / denominator
-      if Seq(1, 2, 4, 8, 16).contains(emulC)
-    } yield (vlen / (sew * lambda), emulC)
-    (legalShapes.map(_._1).max, legalShapes.map(_._2).max)
-  }
-
   def apply(p: Parameters): String = {
     var config = """`ifndef RVV_CONFIG_SVH
         |`define RVV_CONFIG_SVH
@@ -629,71 +448,17 @@ object GenerateBackendConfig {
         |//`define DISPATCH2
         |
         |// FP ISA
+        |//`define ZVE32F_ON
         |""".stripMargin
-    // Some legacy Verilator/VCS targets still pass ZVE32F_ON on the command
-    // line.  Keep enableFloat as the generated configuration source while
-    // accepting those targets without redefining the same macro.
-    if (p.enableFloat)
-      config += "`ifndef ZVE32F_ON\n`define ZVE32F_ON\n`endif\n"
-    else config += "//`define ZVE32F_ON\n"
     if (p.enableVectorBf16) {
       config += "`define ZVFBFWMA_ON\n"
     } else {
       config += "//`define ZVFBFWMA_ON\n"
     }
-    if (p.enableZvvmm) {
-      val (imeMaxM, imeMaxCRegs) = imeProfileLimits(p.rvvVlen)
-      config += "`define IME_ON\n"
-      config += "`define ZVVMM_ON\n"
-      if (p.enableZvvfmm) config += "`define ZVVFMM_ON\n"
-      else config += "//`define ZVVFMM_ON\n"
-      if (p.enableZvvmtls) config += "`define ZVVMTLS_ON\n"
-      else config += "//`define ZVVMTLS_ON\n"
-      if (p.enableZvvmttls) config += "`define ZVVMTTLS_ON\n"
-      else config += "//`define ZVVMTTLS_ON\n"
-      config += s"`define IME_FP_PSM 1'b${p.imeFpPsm}\n"
-      config += s"`define IME_M_PAR ${p.imeMPar}\n"
-      config += s"`define IME_N_PAR ${p.imeNPar}\n"
-      config += s"`define IME_K_PAR ${p.imeKPar}\n"
-      config += s"`define IME_INT_OPT 1'b${if (p.imeIntOpt) 1 else 0}\n"
-      config += s"`define IME_INT_STREAM 1'b${if (p.imeIntStream) 1 else 0}\n"
-      config += s"`define IME_ODN_OPT 1'b${if (p.imeOdnOpt) 1 else 0}\n"
-      config += s"`define IME_RESULT_INDEX_OPT 1'b${if (p.imeResultIndexOpt) 1 else 0}\n"
-      config += s"`define IME_INT_PREEXT_OPT 1'b${if (p.imeIntPreextendOpt) 1 else 0}\n"
-      if (p.imeTileExactWindowOpt)
-        config += "`define IME_TILE_EXACT_WINDOW_OPT 1'b1\n"
-      config += s"`define IME_FETCH_PIPELINE 1'b${if (p.imeFetchPipeline) 1 else 0}\n"
-      config += s"`define IME_FP_ORDERED 1'b${if (p.imeFpOrdered) 1 else 0}\n"
-      config += s"`define IME_FP_LANES ${p.imeFpLanes}\n"
-      config += s"`define IME_MAX_M $imeMaxM\n"
-      config += s"`define IME_MAX_C_REGS $imeMaxCRegs\n"
-      config += s"`define IME_LAMBDA_MASK_SEW8 7'b${maskLiteral(imeLambdaMask(p.rvvVlen, 8))}\n"
-      config += s"`define IME_LAMBDA_MASK_SEW16 7'b${maskLiteral(imeLambdaMask(p.rvvVlen, 16))}\n"
-      config += s"`define IME_LAMBDA_MASK_SEW32 7'b${maskLiteral(imeLambdaMask(p.rvvVlen, 32))}\n"
-    } else {
-      config += "//`define IME_ON\n"
-      config += "//`define ZVVMM_ON\n"
-      config += "//`define ZVVFMM_ON\n"
-      config += "//`define ZVVMTLS_ON\n"
-      config += "//`define ZVVMTTLS_ON\n"
-      config += "//`define IME_FP_PSM\n"
-      config += "//`define IME_M_PAR\n"
-      config += "//`define IME_N_PAR\n"
-      config += "//`define IME_K_PAR\n"
-      config += "//`define IME_INT_OPT\n"
-      config += "//`define IME_INT_STREAM\n"
-      config += "//`define IME_ODN_OPT\n"
-      config += "//`define IME_RESULT_INDEX_OPT\n"
-      config += "//`define IME_INT_PREEXT_OPT\n"
-      config += "//`define IME_FETCH_PIPELINE\n"
-      config += "//`define IME_FP_ORDERED\n"
-      config += "//`define IME_FP_LANES\n"
-      config += "//`define IME_MAX_M\n"
-      config += "//`define IME_MAX_C_REGS\n"
-    }
     config += """
         |// LSU interaction
-        |`define UNMK_USCS_LOAD_NOHANDSHAKE
+        |// Disable until scalar side supports NOHANDSHAKE
+        |// `define UNMK_USCS_LOAD_NOHANDSHAKE
         |
         |// ARBITER
         |`define ARBITER_ON
@@ -718,9 +483,6 @@ class RvvCoreWrapper(p: Parameters)
     val vxrm   = Input(UInt(2.W))
     val vxsat  = Input(UInt(1.W))
     val frm    = Input(UInt(3.W))
-    val imeGlobalHeadValid = Input(Bool())
-    val imeGlobalHeadTag = Input(UInt(4.W))
-    val flush  = Input(Bool())
 
     val inst = Vec(p.instructionLanes, Flipped(Decoupled(new RvvCompressedInstruction(p))))
 
@@ -731,9 +493,8 @@ class RvvCoreWrapper(p: Parameters)
     val async_rd  = Decoupled(new RegfileWriteDataIO(p))
     val async_frd = Decoupled(new RegfileWriteDataIO(p))
 
-    val rd_rob2rt_o = Vec(p.rvvRetireLanes, new Rob2Rt(p))
+    val rd_rob2rt_o = Vec(4, new Rob2Rt(p))
     val trap        = Output(Valid(new RvvCompressedInstruction(p)))
-    val imeLegalAccept = Option.when(p.enableZvvmm)(Output(Bool()))
 
     val vcsr_valid  = Output(Bool())
     val vcsr_vstart = Output(UInt(7.W))
@@ -741,21 +502,16 @@ class RvvCoreWrapper(p: Parameters)
     val vcsr_vxsat  = Output(Bool())
     val vcsr_ready  = Input(Bool())
 
-    // VXSAT and FFLAGS updates from backend
+    // VXSAT update from backend
     val wr_vxsat_valid_o = Output(Bool())
     val wr_vxsat_o       = Output(Bool())
-    val wr_fflags_valid_o = Output(Bool())
-    val wr_fflags_o       = Output(UInt(5.W))
 
     // TODO(derekjchow): Parameterize
     val rvv2lsu = Vec(2, Decoupled(new Rvv2Lsu(p)))
     val lsu2rvv = Vec(2, Flipped(Decoupled(new Lsu2Rvv(p))))
-    val vme2lsu = Option.when(p.enableVme)(Decoupled(new Vme2Lsu(p)))
-    val lsu2vme = Option.when(p.enableVme)(Flipped(Decoupled(new Lsu2Vme(p))))
 
     // Config state
     val configStateValid = Output(Bool())
-    val vsetVstartClear  = Output(Bool())
     val configVl         = Output(UInt(8.W))
     val configVstart     = Output(UInt(7.W))
     val configMa         = Output(Bool())
@@ -767,14 +523,9 @@ class RvvCoreWrapper(p: Parameters)
     // This is the original one set in vset(i)vl(i)
     val configLmulOrig = Output(UInt(3.W))
 
-    val configVill      = Output(Bool())
-    val configMtype     = Output(UInt(32.W))
-    val configImeLambda = Option.when(p.enableZvvmm)(Output(UInt(3.W)))
-    val configImeBs     = Option.when(p.enableZvvmm)(Output(Bool()))
-    val configImeAltfmtA = Option.when(p.enableZvvmm)(Output(Bool()))
-    val configImeAltfmtB = Option.when(p.enableZvvmm)(Output(Bool()))
-    val configImeAltfmt  = Option.when(p.enableZvvmm)(Output(Bool()))
-    val rvv_idle         = Output(Bool())
+    val configVill  = Output(Bool())
+    val configMtype = Output(UInt(32.W))
+    val rvv_idle    = Output(Bool())
 
     val queue_capacity = Output(UInt(4.W))
   })
@@ -798,7 +549,6 @@ class RvvCoreWrapper(p: Parameters)
   addResource("hdl/verilog/rvv/common/handshake_multistage_ctrl.sv")
   addResource("hdl/verilog/rvv/common/handshake_multi_fifo.sv") // New
   addResource("hdl/verilog/rvv/common/cdffr.sv")
-  addResource("hdl/verilog/rvv/common/clz.sv")
   addResource("hdl/verilog/rvv/common/compressor_3to2.sv")
   addResource("hdl/verilog/rvv/common/compressor_4to2.sv")
   addResource("hdl/verilog/rvv/common/dff.sv")
@@ -863,7 +613,6 @@ class RvvCoreWrapper(p: Parameters)
   addResource("external/fpu_div_sqrt_mvp/hdl/div_sqrt_top_mvp.sv")
   addResource("external/fpu_div_sqrt_mvp/hdl/div_sqrt_mvp_wrapper.sv")
   addResource("external/cvfpu/src/fpnew_divsqrt_multi.sv")
-  addResource("external/cvfpu/vendor/cvw/fma/fmalza.sv")
   addResource("external/cvfpu/src/fpnew_fma.sv")
   addResource("external/cvfpu/src/fpnew_fma_multi.sv")
   addResource("external/cvfpu/src/fpnew_noncomp.sv")
@@ -926,59 +675,17 @@ class RvvCoreWrapper(p: Parameters)
   addResource("hdl/verilog/rvv/design/rvv_backend_falu.sv")
   addResource("hdl/verilog/rvv/design/rvv_backend.sv")
   addResource("hdl/verilog/rvv/design/RvvCore.sv")
-  if (p.enableZvvmm) {
-    addResource("hdl/verilog/rvv/design/Ime/ime_pkg.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_geometry.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_decode.sv")
-    // The backend LSU decoder recognizes Tile encodings even when TLS/TTLS is
-    // disabled, so feature-off becomes a precise illegal IME token instead of
-    // a scalar-side drop. Legal Tile commands execute in the shared LSU.
-    addResource("hdl/verilog/rvv/design/Ime/ime_tls_decode.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_pe_mulbulk_int_lane.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_pe_mulbulk.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_pe_adder_int_lane.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_pe_adder.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_pe_block.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_pe_array.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_acc_bank.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_operand_fetch.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_int_operand_selector.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_scheduler.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_fp_ordered_scheduler.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_result_packer.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_commit.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_ctrl.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime_subsystem.sv")
-    addResource("hdl/verilog/rvv/design/Ime/ime.sv")
-    if (p.enableZvvfmm) {
-      addResource("hdl/verilog/rvv/design/Ime/ime_fp_absaddsub.sv")
-      addResource("hdl/verilog/rvv/design/Ime/ime_fp_addfront.sv")
-      addResource("hdl/verilog/rvv/design/Ime/ime_fp_format_adapter.sv")
-      addResource("hdl/verilog/rvv/design/Ime/ime_fp_mulfront.sv")
-      addResource("hdl/verilog/rvv/design/Ime/ime_fp_rounding.sv")
-      addResource("hdl/verilog/rvv/design/Ime/ime_int_to_fp32_adapter.sv")
-      addResource("hdl/verilog/rvv/design/Ime/ime_mx_scale.sv")
-      addResource("hdl/verilog/rvv/design/Ime/ime_pe_mulbulk_fp_lane.sv")
-      addResource("hdl/verilog/rvv/design/Ime/ime_pe_adder_fp_lane.sv")
-    }
-  }
-  // IME reuses only the unchanged Zvt leaf primitives.  Its sign/magnitude
-  // add, accumulator front end and rounding semantics are private copies, so
-  // IME fixes cannot perturb the mutually-exclusive VME configuration.
-  if (p.enableVme || p.enableZvvfmm) {
-    addResource("hdl/verilog/rvv/design/Zvt/fp_align.sv")
-    addResource("hdl/verilog/rvv/design/Zvt/fp_classifier.sv")
-  }
   if (p.enableVme) {
     addResource("hdl/verilog/rvv/design/Zvt/fp_absaddsub.sv")
     addResource("hdl/verilog/rvv/design/Zvt/fp_addfront.sv")
-    addResource("hdl/verilog/rvv/design/Zvt/fp_lza.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/fp_align.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/fp_classifier.sv")
     addResource("hdl/verilog/rvv/design/Zvt/fp_mulfront.sv")
     addResource("hdl/verilog/rvv/design/Zvt/fp_rounding.sv")
     addResource("hdl/verilog/rvv/design/Zvt/zvt.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/zvt_acc.sv")
+    addResource("hdl/verilog/rvv/design/Zvt/zvt_acc_reg.sv")
     addResource("hdl/verilog/rvv/design/Zvt/zvt_ctrl.sv")
-    addResource("hdl/verilog/rvv/design/Zvt/zvt_mt.sv")
-    addResource("hdl/verilog/rvv/design/Zvt/zvt_mt_reg.sv")
     addResource("hdl/verilog/rvv/design/Zvt/zvt_pe_adder.sv")
     addResource("hdl/verilog/rvv/design/Zvt/zvt_pe_adder_fp_lane.sv")
     addResource("hdl/verilog/rvv/design/Zvt/zvt_pe_adder_int_lane.sv")
@@ -988,8 +695,7 @@ class RvvCoreWrapper(p: Parameters)
     addResource("hdl/verilog/rvv/design/Zvt/zvt_pe_mulbulk_fp_lane.sv")
     addResource("hdl/verilog/rvv/design/Zvt/zvt_pe_mulbulk_int_lane.sv")
   }
-  setInline("rvv_config.svh", if (p.xlen == 64) "`define XLEN_64 1\n" else "")
-  setInline("RvvCoreWrapper.sv", GenerateCoreShimSource(p))
+  setInline("RvvCoreWrapper.sv", GenerateCoreShimSource(p.instructionLanes, p.rvvVlen, p.enableVme))
 }
 
 // Shim class for RVVCore, which translates the SV RVVCore interfaces with the
@@ -1004,11 +710,8 @@ class RvvCoreShim(p: Parameters) extends Module {
 
   val rstn           = (!reset.asBool).asAsyncReset
   val rvvCoreWrapper = Module(new RvvCoreWrapper(p))
-  rvvCoreWrapper.io.clk   := clock
-  rvvCoreWrapper.io.rstn  := rstn
-  rvvCoreWrapper.io.imeGlobalHeadValid := io.imeGlobalHeadValid
-  rvvCoreWrapper.io.imeGlobalHeadTag := io.imeGlobalHeadTag
-  rvvCoreWrapper.io.flush := io.flush
+  rvvCoreWrapper.io.clk  := clock
+  rvvCoreWrapper.io.rstn := rstn
   rvvCoreWrapper.io.inst <> io.inst
   rvvCoreWrapper.io.rs <> io.rs
   rvvCoreWrapper.io.rd <> io.rd
@@ -1017,22 +720,15 @@ class RvvCoreShim(p: Parameters) extends Module {
   rvvCoreWrapper.io.async_frd <> io.async_frd
   rvvCoreWrapper.io.rd_rob2rt_o <> io.rd_rob2rt_o
   io.trap := rvvCoreWrapper.io.trap
-  io.imeLegalAccept.foreach(_ := rvvCoreWrapper.io.imeLegalAccept.get)
 
   rvvCoreWrapper.io.vstart     := Mux(io.csr.vstart_write.valid, io.csr.vstart_write.bits, vstart)
   rvvCoreWrapper.io.vxrm       := Mux(io.csr.vxrm_write.valid, io.csr.vxrm_write.bits, vxrm)
   rvvCoreWrapper.io.vxsat      := Mux(io.csr.vxsat_write.valid, io.csr.vxsat_write.bits, vxsat)
   rvvCoreWrapper.io.frm        := io.csr.frm
   rvvCoreWrapper.io.vcsr_ready := true.B
-  io.csr.fflags.valid := rvvCoreWrapper.io.wr_fflags_valid_o
-  io.csr.fflags.bits := rvvCoreWrapper.io.wr_fflags_o
 
   io.rvv2lsu <> rvvCoreWrapper.io.rvv2lsu
   io.lsu2rvv <> rvvCoreWrapper.io.lsu2rvv
-  if (p.enableVme) {
-    io.vme2lsu.get <> rvvCoreWrapper.io.vme2lsu.get
-    io.lsu2vme.get <> rvvCoreWrapper.io.lsu2vme.get
-  }
 
   // Conservatively mark config state as invalid the cycle when CSR instruction
   // updates vstart, vxrm or vxsat.
@@ -1050,13 +746,6 @@ class RvvCoreShim(p: Parameters) extends Module {
   io.configState.bits.lmul      := rvvCoreWrapper.io.configLmul
   io.configState.bits.lmul_orig := rvvCoreWrapper.io.configLmulOrig
   io.configState.bits.vill      := rvvCoreWrapper.io.configVill
-  if (p.enableZvvmm) {
-    io.configState.bits.imeLambda.get  := rvvCoreWrapper.io.configImeLambda.get
-    io.configState.bits.imeBs.get      := rvvCoreWrapper.io.configImeBs.get
-    io.configState.bits.imeAltfmtA.get := rvvCoreWrapper.io.configImeAltfmtA.get
-    io.configState.bits.imeAltfmtB.get := rvvCoreWrapper.io.configImeAltfmtB.get
-    io.configState.bits.imeAltfmt.get  := rvvCoreWrapper.io.configImeAltfmt.get
-  }
   if (p.enableVme) {
     val mt = rvvCoreWrapper.io.configMtype
     io.configState.bits.mtype.get   := mt
@@ -1070,9 +759,8 @@ class RvvCoreShim(p: Parameters) extends Module {
   val vstart_wdata = MuxCase(
     vstart,
     Seq(
-      io.csr.vstart_write.valid    -> io.csr.vstart_write.bits,
       rvvCoreWrapper.io.vcsr_valid -> rvvCoreWrapper.io.vcsr_vstart,
-      io.clear_vstart              -> 0.U
+      io.csr.vstart_write.valid    -> io.csr.vstart_write.bits
     )
   )
   vstart := vstart_wdata
@@ -1080,8 +768,8 @@ class RvvCoreShim(p: Parameters) extends Module {
   val vxrm_wdata = MuxCase(
     vxrm,
     Seq(
-      io.csr.vxrm_write.valid      -> io.csr.vxrm_write.bits,
-      rvvCoreWrapper.io.vcsr_valid -> rvvCoreWrapper.io.vcsr_xrm
+      rvvCoreWrapper.io.vcsr_valid -> rvvCoreWrapper.io.vcsr_xrm,
+      io.csr.vxrm_write.valid      -> io.csr.vxrm_write.bits
     )
   )
   vxrm := vxrm_wdata
@@ -1089,16 +777,14 @@ class RvvCoreShim(p: Parameters) extends Module {
   val vxsat_wdata = MuxCase(
     vxsat,
     Seq(
-      io.csr.vxsat_write.valid           -> io.csr.vxsat_write.bits,
       rvvCoreWrapper.io.wr_vxsat_valid_o -> (vxsat | rvvCoreWrapper.io.wr_vxsat_o),
-      rvvCoreWrapper.io.vcsr_valid       -> rvvCoreWrapper.io.vcsr_vxsat
+      rvvCoreWrapper.io.vcsr_valid       -> rvvCoreWrapper.io.vcsr_vxsat,
+      io.csr.vxsat_write.valid           -> io.csr.vxsat_write.bits
     )
   )
   vxsat := vxsat_wdata
 
-  io.csr.vstart       := vstart
-  io.csr.vxrm         := vxrm
-  io.csr.vxsat        := vxsat
-  io.csr.fflags.valid := rvvCoreWrapper.io.wr_fflags_valid_o
-  io.csr.fflags.bits  := rvvCoreWrapper.io.wr_fflags_o
+  io.csr.vstart := vstart
+  io.csr.vxrm   := vxrm
+  io.csr.vxsat  := vxsat
 }

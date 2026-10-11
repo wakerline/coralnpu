@@ -30,15 +30,6 @@ class RvvConfigState(p: Parameters) extends Bundle {
   // This is the original one set in vset(i)vl(i)
   val lmul_orig = Output(UInt(3.W))
   val vill      = Output(Bool())
-  // Zvvm/IME vtype state. These fields are independent of the Zvt/VME
-  // configuration state below. The IME high fields occupy vtype[30:25] on
-  // RV32, while the output-format field defined for this implementation is
-  // vtype[8].
-  val imeLambda  = Option.when(p.enableZvvmm)(Output(UInt(3.W)))
-  val imeBs      = Option.when(p.enableZvvmm)(Output(Bool()))
-  val imeAltfmtA = Option.when(p.enableZvvmm)(Output(Bool()))
-  val imeAltfmtB = Option.when(p.enableZvvmm)(Output(Bool()))
-  val imeAltfmt  = Option.when(p.enableZvvmm)(Output(Bool()))
   // VME (Zvt) non-tile state. Packed mtype view assembled from {tm, tk,
   // mtwiden} per §15.1.1.2.
   // Note: The spec (v0.3) has a discrepancy: it defines tk as tk[2:0] (3 bits,
@@ -53,23 +44,14 @@ class RvvConfigState(p: Parameters) extends Bundle {
   /** Construct the vtype CSR value. See section 3.4 of the RISC-V Vector Specification v1.0.
     */
   def vtype: UInt = {
-    val imeHighFields =
-      if (p.enableZvvmm) {
-        Cat(imeLambda.get, imeBs.get, imeAltfmtA.get, imeAltfmtB.get)
-      } else {
-        0.U(6.W)
-      }
-    val imeOutputAltfmt =
-      if (p.enableZvvmm) imeAltfmt.get else false.B
-    Cat(vill, imeHighFields, 0.U((p.xlen - 16).W), imeOutputAltfmt, ma, ta, sew, lmul_orig)
+    Cat(vill, 0.U((p.xlen - 9).W), ma, ta, sew, lmul_orig)
   }
 }
 
 class Lsu2Rvv(p: Parameters) extends Bundle {
-  val addr          = UInt(p.rvvRegCountWidth.W)
-  val data          = UInt(p.rvvVlen.W)
-  val last          = Bool()
-  val ff_tail_index = UInt(log2Ceil(p.rvvVlenb + 1).W)
+  val addr = UInt(p.rvvRegCountWidth.W)
+  val data = UInt(p.rvvVlen.W)
+  val last = Bool()
 }
 
 class Rvv2Lsu(p: Parameters) extends Bundle {
@@ -84,14 +66,6 @@ class Rvv2Lsu(p: Parameters) extends Bundle {
   val mask = Valid(UInt(p.rvvVlenb.W))
 }
 
-class Vme2Lsu(p: Parameters) extends Bundle {
-  val data = UInt(p.rvvVlen.W)
-}
-
-class Lsu2Vme(p: Parameters) extends Bundle {
-  val data = UInt(p.rvvVlen.W)
-}
-
 class RvvCoreIO(p: Parameters) extends Bundle {
   // Decode Cycle.
   val inst = Vec(p.instructionLanes, Flipped(Decoupled(new RvvCompressedInstruction(p))))
@@ -104,9 +78,6 @@ class RvvCoreIO(p: Parameters) extends Bundle {
   val rvv2lsu = Vec(2, Decoupled(new Rvv2Lsu(p)))
   val lsu2rvv = Vec(2, Flipped(Decoupled(new Lsu2Rvv(p))))
 
-  val vme2lsu = Option.when(p.enableVme)(Decoupled(new Vme2Lsu(p)))
-  val lsu2vme = Option.when(p.enableVme)(Flipped(Decoupled(new Lsu2Vme(p))))
-
   // Config state.
   val configState = Output(Valid(new RvvConfigState(p)))
 
@@ -116,38 +87,29 @@ class RvvCoreIO(p: Parameters) extends Bundle {
 
   // Async trap.
   val trap = Output(Valid(new RvvCompressedInstruction(p)))
-  // One-cycle acknowledgement that a normal IME command passed the unique
-  // backend DE1 legality check. This is not an execution-busy indication.
-  val imeLegalAccept = Option.when(p.enableZvvmm)(Output(Bool()))
 
   // Csr Interface.
   val csr = new RvvCsrIO(p)
 
   val rvv_idle       = Output(Bool())
   val queue_capacity = Output(UInt(4.W))
-  val imeGlobalHeadValid = Input(Bool())
-  val imeGlobalHeadTag = Input(UInt(4.W))
-  val flush          = Input(Bool())
-  val clear_vstart   = Input(Bool())
 
   // ROB to RT stage writes.
-  val rd_rob2rt_o = Vec(p.rvvRetireLanes, new Rob2Rt(p))
+  val rd_rob2rt_o = Vec(4, new Rob2Rt(p))
 }
 
 class Rob2Rt(p: Parameters) extends Bundle {
   val valid          = Bool()
   val w_valid        = Bool()
   val w_index        = UInt(5.W)
-  val w_data         = Option.when(p.enableVerification)(UInt(p.rvvVlen.W))
+  val w_data         = UInt(p.rvvVlen.W)
   val w_type         = Bool() // 0 for VRF, 1 for XRF
   val vd_type        = UInt(p.rvvVlenb.W)
   val trap_flag      = Bool()
-  val is_ime         = Option.when(p.enableZvvmm)(Bool())
   val vector_csr     = new RvvConfigState(p)
   val vxsaturate     = UInt(p.rvvVlenb.W)
-  val uop_pc         = Option.when(p.enableVerification)(UInt(32.W))
+  val uop_pc         = UInt(32.W)
   val last_uop_valid = Bool()
-  val rob_tag        = UInt(4.W)
 }
 
 class RvvCsrIO(p: Parameters) extends Bundle {
@@ -155,8 +117,6 @@ class RvvCsrIO(p: Parameters) extends Bundle {
   val vxrm         = Output(UInt(2.W))
   val vxsat        = Output(Bool())
   val frm          = Input(UInt(3.W))
-  // Sticky architectural fflags update produced at RVV retirement.
-  val fflags       = Output(Valid(UInt(5.W)))
   val vstart_write = Input(Valid(UInt(log2Ceil(p.rvvVlen).W)))
   val vxrm_write   = Input(Valid(UInt(2.W)))
   val vxsat_write  = Input(Valid(Bool()))
